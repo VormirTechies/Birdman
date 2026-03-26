@@ -6,7 +6,6 @@ import { Footer } from '@/components/organisms/Footer';
 import { FeedbackCard } from '@/components/molecules/FeedbackCard';
 import { Loading } from '@/components/atoms/Loading';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { MessageSquarePlus, Star } from 'lucide-react';
 import type { Feedback } from '@/types';
@@ -131,7 +130,7 @@ export default function FeedbackPage() {
             <div className="flex flex-wrap items-center gap-3 justify-center">
               <span className="text-sm font-medium text-deep-night">Filter by rating:</span>
               <Button
-                variant={filter === null ? 'default' : 'outline'}
+                variant={filter === null ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => setFilter(null)}
               >
@@ -140,7 +139,7 @@ export default function FeedbackPage() {
               {ratingCounts.map(({ rating, count }) => (
                 <Button
                   key={rating}
-                  variant={filter === rating ? 'default' : 'outline'}
+                  variant={filter === rating ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => setFilter(rating)}
                   className="gap-2"
