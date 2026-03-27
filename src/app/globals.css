@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Design Tokens — Birdman of Chennai
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Colors */
+  --color-parakeet-green: #00a36c;
+  --color-sunset-gold: #ff8c00;
+  --color-parchment: #fefdf5;
+  --color-mist-white: #f0f4f0;
+  --color-chennai-earth: #8b6914;
+  --color-deep-night: #1a1a2e;
+  
+  --color-error: #dc2626;
+  --color-warning: #ff8c00;
+  --color-success: #00a36c;
+  --color-info: #3b82f6;
+
+  /* Font Families */
+  --font-family-serif: 'Merriweather', Georgia, serif;
+  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-tamil: 'Noto Sans Tamil', sans-serif;
+
+  /* Shadows */
+  --shadow-glow-green: 0 0 20px rgba(0, 163, 108, 0.3);
+  --shadow-glow-gold: 0 0 20px rgba(255, 140, 0, 0.3);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Global Styles
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+  :root {
+    /* Base background and text for light mode */
+    background-color: var(--color-parchment);
+    color: var(--color-deep-night);
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Respect reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* Typography base */
+  body {
+    font-family: var(--font-family-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headings use serif font */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-family-serif);
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  /* Focus styles for accessibility */
+  *:focus-visible {
+    outline: 2px solid var(--color-parakeet-green);
+    outline-offset: 2px;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Utility Classes
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Font families */
+  .font-serif {
+    font-family: var(--font-family-serif);
+  }
+
+  .font-sans {
+    font-family: var(--font-family-sans);
+  }
+
+  .font-tamil {
+    font-family: var(--font-family-tamil);
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+
+  /* Shadow utilities */
+  .shadow-glow-green {
+    box-shadow: var(--shadow-glow-green);
+  }
+
+  .shadow-glow-gold {
+    box-shadow: var(--shadow-glow-gold);
+  }
+
+  /* Container styles */
+  .container-custom {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .container-custom {
+      max-width: 640px;
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .container-custom {
+      max-width: 768px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container-custom {
+      max-width: 1024px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container-custom {
+      max-width: 1280px;
+    }
+  }
+
+  /* Text balance for headings */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
