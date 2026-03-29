@@ -1,154 +1,199 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
 
-/* ────────────────────────────────────────────────────────────────────────────
-   Design Tokens — Birdman of Chennai
-   ──────────────────────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   WINGS OF CHENNAI — Design System
+   A nature-immersive design for the Birdman of Chennai
+   ════════════════════════════════════════════════════════════════════════════ */
 
 @theme {
-  /* Colors */
-  --color-parakeet-green: #00a36c;
-  --color-sunset-gold: #ff8c00;
-  --color-parchment: #fefdf5;
-  --color-mist-white: #f0f4f0;
-  --color-chennai-earth: #8b6914;
-  --color-deep-night: #1a1a2e;
-  
-  --color-error: #dc2626;
-  --color-warning: #ff8c00;
-  --color-success: #00a36c;
-  --color-info: #3b82f6;
+  /* ── Primary Palette ─────────────────────────────────────────────────── */
+  --color-sanctuary-green: #059669;
+  --color-sanctuary-green-light: #34d399;
+  --color-canopy-dark: #064e3b;
+  --color-golden-hour: #f59e0b;
+  --color-sunset-amber: #d97706;
+  --color-feather-cream: #fefce8;
+  --color-morning-mist: #ecfdf5;
+  --color-sky-wash: #f0fdf4;
+  --color-bark-brown: #78350f;
+  --color-night-sky: #0c0a09;
 
-  /* Font Families */
-  --font-family-serif: 'Merriweather', Georgia, serif;
-  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* ── Semantic Colors ─────────────────────────────────────────────────── */
+  --color-error: #dc2626;
+  --color-warning: #f59e0b;
+  --color-success: #059669;
+  --color-info: #0ea5e9;
+
+  /* ── Font Families ───────────────────────────────────────────────────── */
+  --font-family-display: 'Playfair Display', Georgia, serif;
+  --font-family-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-family-tamil: 'Noto Sans Tamil', sans-serif;
 
-  /* Shadows */
-  --shadow-glow-green: 0 0 20px rgba(0, 163, 108, 0.3);
-  --shadow-glow-gold: 0 0 20px rgba(255, 140, 0, 0.3);
+  /* ── Shadows ──────────────────────────────────────────────────────────── */
+  --shadow-glow-green: 0 0 30px rgba(5, 150, 105, 0.25);
+  --shadow-glow-gold: 0 0 30px rgba(245, 158, 11, 0.25);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.12);
+  --shadow-hero: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
-   Global Styles
-   ──────────────────────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   Base Styles
+   ════════════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
-    /* Base background and text for light mode */
-    background-color: var(--color-parchment);
-    color: var(--color-deep-night);
+    background-color: var(--color-feather-cream);
+    color: var(--color-canopy-dark);
   }
 
-  /* Smooth scrolling */
   html {
     scroll-behavior: smooth;
   }
 
-  /* Respect reduced motion preference */
   @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 
-  /* Typography base */
   body {
-    font-family: var(--font-family-sans);
+    font-family: var(--font-family-body);
     font-size: 1rem;
-    line-height: 1.6;
+    line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
-  /* Headings use serif font */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: var(--font-family-serif);
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-display);
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
   }
 
-  /* Focus styles for accessibility */
   *:focus-visible {
-    outline: 2px solid var(--color-parakeet-green);
-    outline-offset: 2px;
+    outline: 2px solid var(--color-sanctuary-green);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: rgba(5, 150, 105, 0.2);
+    color: var(--color-canopy-dark);
   }
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
+/* ════════════════════════════════════════════════════════════════════════════
    Utility Classes
-   ──────────────────────────────────────────────────────────────────────────── */
+   ════════════════════════════════════════════════════════════════════════════ */
 
 @layer utilities {
-  /* Font families */
-  .font-serif {
-    font-family: var(--font-family-serif);
+  .font-display {
+    font-family: var(--font-family-display);
   }
-
-  .font-sans {
-    font-family: var(--font-family-sans);
+  .font-body {
+    font-family: var(--font-family-body);
   }
-
   .font-tamil {
     font-family: var(--font-family-tamil);
     font-size: 1.125rem;
     line-height: 1.7;
   }
 
-  /* Shadow utilities */
-  .shadow-glow-green {
-    box-shadow: var(--shadow-glow-green);
+  .shadow-glow-green { box-shadow: var(--shadow-glow-green); }
+  .shadow-glow-gold { box-shadow: var(--shadow-glow-gold); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-card-hover { box-shadow: var(--shadow-card-hover); }
+
+  .text-balance { text-wrap: balance; }
+  .text-gradient-green {
+    background: linear-gradient(135deg, #059669, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #d97706, #fbbf24);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .shadow-glow-gold {
-    box-shadow: var(--shadow-glow-gold);
+  .bg-nature-gradient {
+    background: linear-gradient(135deg, #064e3b 0%, #059669 50%, #34d399 100%);
+  }
+  .bg-sunset-gradient {
+    background: linear-gradient(135deg, #78350f 0%, #d97706 50%, #fbbf24 100%);
+  }
+  .bg-hero-overlay {
+    background: linear-gradient(
+      to bottom,
+      rgba(6, 78, 59, 0.7) 0%,
+      rgba(6, 78, 59, 0.3) 40%,
+      rgba(0, 0, 0, 0.1) 70%,
+      rgba(254, 252, 232, 0.95) 100%
+    );
+  }
+  .bg-glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .bg-glass-dark {
+    background: rgba(6, 78, 59, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
-  /* Container styles */
-  .container-custom {
+  /* Container */
+  .container-wide {
     width: 100%;
+    max-width: 1280px;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
-
   @media (min-width: 640px) {
-    .container-custom {
-      max-width: 640px;
-      padding-left: 2rem;
-      padding-right: 2rem;
-    }
+    .container-wide { padding-left: 2rem; padding-right: 2rem; }
   }
 
-  @media (min-width: 768px) {
-    .container-custom {
-      max-width: 768px;
-    }
+  /* Organic divider wave */
+  .wave-divider {
+    position: relative;
   }
+  .wave-divider::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 40'%3E%3Cpath fill='%23064e3b' d='M0,20 C360,40 720,0 1080,20 C1260,30 1380,25 1440,20 L1440,40 L0,40 Z'/%3E%3C/svg%3E") repeat-x;
+    background-size: 1440px 40px;
+  }
+}
 
-  @media (min-width: 1024px) {
-    .container-custom {
-      max-width: 1024px;
-    }
-  }
+/* ════════════════════════════════════════════════════════════════════════════
+   Custom Scrollbar
+   ════════════════════════════════════════════════════════════════════════════ */
 
-  @media (min-width: 1280px) {
-    .container-custom {
-      max-width: 1280px;
-    }
-  }
-
-  /* Text balance for headings */
-  .text-balance {
-    text-wrap: balance;
-  }
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-feather-cream);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sanctuary-green);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-canopy-dark);
 }

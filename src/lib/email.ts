@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
-import BookingConfirmation from '@/emails/booking-confirmation';
-import BookingReminder from '@/emails/booking-reminder';
-import BookingReschedule from '@/emails/booking-reschedule';
+import BookingConfirmation from '../../emails/booking-confirmation';
+import BookingReminder from '../../emails/booking-reminder';
+import BookingReschedule from '../../emails/booking-reschedule';
 import type { Booking } from './db/schema';
 
 // ═══════════════════════════════════════════════════════════════════════════

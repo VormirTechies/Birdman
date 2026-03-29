@@ -1,190 +1,310 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Star,
+  MessageSquare,
+  Send,
+  CheckCircle2,
+  Bird,
+  Quote,
+} from 'lucide-react';
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
-import { FeedbackCard } from '@/components/molecules/FeedbackCard';
-import { Loading } from '@/components/atoms/Loading';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { MessageSquarePlus, Star } from 'lucide-react';
-import type { Feedback } from '@/types';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Counter } from '@/components/ui/counter';
+import {
+  AnimatedSection,
+  StaggerContainer,
+  StaggerItem,
+} from '@/components/ui/animated-section';
 
-// Mock feedback data
-const mockFeedback: Feedback[] = [
-  {
-    id: '1',
-    name: 'Priya Sharma',
-    rating: 5,
-    message: 'An absolutely breathtaking experience! Seeing thousands of parakeets gather at once is truly magical. Mr. Sudarson\'s dedication and love for these birds is inspiring. A must-visit for anyone in Chennai! The way the birds trust him is beautiful.',
-    visitDate: '2026-03-18',
-    createdAt: '2026-03-20T10:30:00Z',
-  },
-  {
-    id: '2',
-    name: 'Rajesh Kumar',
-    rating: 5,
-    message: 'This is not just bird watching, it\'s witnessing a miracle of nature. The way the birds trust Mr. Sudarson is beautiful to see. My kids were amazed and it was a wonderful educational experience for them.',
-    visitDate: '2026-03-16',
-    createdAt: '2026-03-18T15:45:00Z',
-  },
-  {
-    id: '3',
-    name: 'Anonymous',
-    rating: 5,
-    message: 'A unique sanctuary in the heart of Chennai. The feeding sessions are well-organized and respectful to the birds. Highly recommend visiting during the evening session for the best light.',
-    visitDate: '2026-03-14',
-    createdAt: '2026-03-15T09:20:00Z',
-  },
-  {
-    id: '4',
-    name: 'Lakshmi Venkat',
-    rating: 5,
-    message: 'We came all the way from Bangalore to see this and it exceeded all expectations. The sound of thousands of birds is something you have to experience. Worth every kilometer of the drive!',
-    visitDate: '2026-03-10',
-    createdAt: '2026-03-12T14:10:00Z',
-  },
-  {
-    id: '5',
-    name: 'Mohammed Ali',
-    rating: 5,
-    message: 'A wonderful conservation effort by Mr. Sudarson. Seeing this many wild birds in harmony is a testament to his patience and care over the years.',
-    visitDate: '2026-03-08',
-    createdAt: '2026-03-10T11:00:00Z',
-  },
-  {
-    id: '6',
-    name: 'Anita Desai',
-    rating: 4,
-    message: 'Fantastic experience! The only suggestion would be to have more shade for visitors during summer months. Otherwise, absolutely wonderful.',
-    visitDate: '2026-03-06',
-    createdAt: '2026-03-08T16:20:00Z',
-  },
-  {
-    id: '7',
-    name: 'Kumar Swamy',
-    rating: 5,
-    message: 'As a photographer, this was a dream come true. The birds are so comfortable and the lighting during evening feed is perfect. Thank you Mr. Sudarson!',
-    visitDate: '2026-03-04',
-    createdAt: '2026-03-06T12:45:00Z',
-  },
-  {
-    id: '8',
-    name: 'Deepa Krishnan',
-    rating: 5,
-    message: 'An unforgettable experience for our entire family. The kids learned so much about bird conservation and had a great time. Will definitely visit again!',
-    visitDate: '2026-03-02',
-    createdAt: '2026-03-04T09:30:00Z',
-  },
+/* ════════════════════════════════════════════════════════════════════════════
+   FEEDBACK PAGE — Testimonial Wall + Submit Form
+   ════════════════════════════════════════════════════════════════════════════ */
+
+const mockFeedback = [
+  { id: '1', name: 'Priya Sundaram', rating: 5, message: 'An absolutely magical experience! Watching thousands of parakeets arrive at feeding time is something I will never forget. Mr. Sah is truly an inspiration to everyone who visits.', visitDate: 'March 2026' },
+  { id: '2', name: 'Raj Krishnamurthy', rating: 5, message: 'We visited during the evening session and it was breathtaking. The birds know him by heart. A must-visit for anyone in Chennai.', visitDate: 'February 2026' },
+  { id: '3', name: 'Sarah Mitchell', rating: 5, message: 'I traveled from London specifically to see this. It exceeded all expectations. The connection between Mr. Sah and these birds is truly extraordinary and deeply moving.', visitDate: 'January 2026' },
+  { id: '4', name: 'Anand Rajan', rating: 4, message: 'Beautiful experience. The morning session was incredible — the sky literally turning green with parakeets. Highly recommend arriving early.', visitDate: 'December 2025' },
+  { id: '5', name: 'Meera Venkatesh', rating: 5, message: 'Brought my children here and they were absolutely mesmerized! Mr. Sah is so kind and patient. He explained everything about the birds with such love.', visitDate: 'November 2025' },
+  { id: '6', name: 'David Chen', rating: 5, message: 'As a wildlife photographer, I\'ve seen many things. But 14,000 parakeets gathering on one rooftop? That\'s something else entirely. Pure magic.', visitDate: 'October 2025' },
+  { id: '7', name: 'Lakshmi Narayan', rating: 5, message: 'சென்னையின் சிறந்த அனுபவம்! பறவைகளின் அழகை வார்த்தைகளால் விவரிக்க இயலாது. நிச்சயம் மீண்டும் வருவேன்.', visitDate: 'September 2025' },
+  { id: '8', name: 'Thomas Wright', rating: 4, message: 'Wonderful experience. The only reason for 4 stars is that it can get quite crowded during weekends. Try to visit on a weekday morning for the best experience.', visitDate: 'August 2025' },
+  { id: '9', name: 'Kavitha Subramanian', rating: 5, message: 'This man has dedicated his entire life to these birds. The love and care is evident in every grain of rice he lays out. A humbling experience.', visitDate: 'July 2025' },
 ];
 
+function StarRatingSelector({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const [hover, setHover] = useState(0);
+
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHover(star)}
+          onMouseLeave={() => setHover(0)}
+          className="p-0.5 transition-transform hover:scale-110"
+          aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+        >
+          <Star
+            className={`w-7 h-7 transition-colors ${
+              star <= (hover || value)
+                ? 'text-golden-hour fill-golden-hour'
+                : 'text-canopy-dark/20'
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function FeedbackPage() {
-  const [feedback, setFeedback] = useState<Feedback[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    rating: 0,
+    message: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
-  useEffect(() => {
-    // Mock API call
-    const fetchFeedback = async () => {
-      setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setFeedback(mockFeedback);
-      setLoading(false);
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.rating === 0 || !formData.message) return;
+    setIsSubmitting(true);
+    await new Promise((r) => setTimeout(r, 1200));
+    setIsSubmitted(true);
+    setIsSubmitting(false);
+  };
 
-    fetchFeedback();
-  }, []);
-
-  const filteredFeedback = filter
-    ? feedback.filter((item) => item.rating === filter)
-    : feedback;
-
-  const ratingCounts = [5, 4, 3, 2, 1].map((rating) => ({
-    rating,
-    count: feedback.filter((item) => item.rating === rating).length,
-  }));
+  const avgRating =
+    mockFeedback.reduce((sum, f) => sum + f.rating, 0) / mockFeedback.length;
 
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-parchment py-24 md:py-32">
-        <div className="container mx-auto px-4 max-w-6xl">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="font-serif font-bold text-4xl md:text-5xl text-deep-night mb-4">
-              Visitor Testimonials
+
+      {/* ── HERO ─────────────────────────────────────────────────────────── */}
+      <section className="pt-20 bg-canopy-dark">
+        <div className="container-wide py-16 md:py-24 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-sm font-medium px-4 py-1.5 rounded-full mb-5">
+              <MessageSquare className="w-4 h-4" />
+              Visitor Reviews
+            </span>
+            <h1 className="font-display font-black text-white text-4xl md:text-5xl lg:text-6xl mb-4">
+              What Visitors{' '}
+              <span className="text-golden-hour">Say</span>
             </h1>
-            <p className="text-deep-night/70 text-lg mb-8">
-              Read what visitors say about their experience
-            </p>
-            <Button asChild size="lg">
-              <Link href="/feedback/submit">
-                <MessageSquarePlus className="w-5 h-5 mr-2" />
-                Share Your Experience
-              </Link>
-            </Button>
-          </div>
 
-          {/* Filter by Rating */}
-          <div className="mb-8">
-            <div className="flex flex-wrap items-center gap-3 justify-center">
-              <span className="text-sm font-medium text-deep-night">Filter by rating:</span>
-              <Button
-                variant={filter === null ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => setFilter(null)}
-              >
-                All
-              </Button>
-              {ratingCounts.map(({ rating, count }) => (
-                <Button
-                  key={rating}
-                  variant={filter === rating ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilter(rating)}
-                  className="gap-2"
-                >
-                  <Star className="w-4 h-4 fill-current" />
-                  {rating} ({count})
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Loading State */}
-          {loading && (
-            <div className="flex justify-center py-12">
-              <Loading size="lg" />
-            </div>
-          )}
-
-          {/* Feedback Grid */}
-          {!loading && (
-            <>
-              {filteredFeedback.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredFeedback.map((item) => (
-                    <FeedbackCard
-                      key={item.id}
-                      name={item.name}
-                      rating={item.rating}
-                      message={item.message}
-                      date={item.createdAt}
-                      truncateLength={200}
-                    />
-                  ))}
+            {/* Stats */}
+            <div className="flex items-center justify-center gap-8 mt-8">
+              <div className="text-center">
+                <div className="flex items-center gap-1.5 justify-center">
+                  <Star className="w-5 h-5 text-golden-hour fill-golden-hour" />
+                  <span className="font-display font-bold text-2xl text-white">
+                    {avgRating.toFixed(1)}
+                  </span>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-deep-night/60">
-                    No feedback found for this rating.
-                  </p>
+                <span className="text-white/50 text-sm">Average Rating</span>
+              </div>
+              <div className="w-px h-10 bg-white/20" />
+              <div className="text-center">
+                <div className="font-display font-bold text-2xl text-white">
+                  <Counter target={mockFeedback.length} />
                 </div>
-              )}
-            </>
-          )}
+                <span className="text-white/50 text-sm">Total Reviews</span>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </main>
+      </section>
+
+      {/* ── REVIEWS GRID ─────────────────────────────────────────────────── */}
+      <section className="py-12 md:py-20 bg-feather-cream">
+        <div className="container-wide">
+          <StaggerContainer className="columns-1 md:columns-2 lg:columns-3 gap-5">
+            {mockFeedback.map((review) => (
+              <StaggerItem key={review.id} className="break-inside-avoid mb-5">
+                <div className="bg-white p-6 rounded-2xl shadow-card hover:shadow-card-hover transition-shadow duration-300">
+                  <Quote className="w-8 h-8 text-sanctuary-green/15 mb-3" />
+
+                  {/* Stars */}
+                  <div className="flex gap-0.5 mb-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${
+                          i < review.rating
+                            ? 'text-golden-hour fill-golden-hour'
+                            : 'text-canopy-dark/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="text-canopy-dark/70 text-sm leading-relaxed mb-4">
+                    &ldquo;{review.message}&rdquo;
+                  </p>
+
+                  <div className="flex items-center gap-3 pt-3 border-t border-canopy-dark/5">
+                    <div className="w-9 h-9 bg-sanctuary-green/10 text-sanctuary-green rounded-full flex items-center justify-center text-sm font-semibold shrink-0">
+                      {review.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-canopy-dark">
+                        {review.name}
+                      </div>
+                      <div className="text-xs text-canopy-dark/40">
+                        {review.visitDate}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
+        </div>
+      </section>
+
+      {/* ── SUBMIT FORM ──────────────────────────────────────────────────── */}
+      <section className="py-16 md:py-24 bg-morning-mist">
+        <div className="container-wide max-w-xl">
+          <AnimatedSection className="text-center mb-10">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-canopy-dark mb-3">
+              Share Your Experience
+            </h2>
+            <p className="text-canopy-dark/60">
+              Visited the sanctuary? We&apos;d love to hear from you.
+            </p>
+          </AnimatedSection>
+
+          <AnimatePresence mode="wait">
+            {isSubmitted ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white p-10 rounded-2xl shadow-card text-center"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                >
+                  <CheckCircle2 className="w-16 h-16 text-sanctuary-green mx-auto mb-4" />
+                </motion.div>
+                <h3 className="font-display font-bold text-2xl text-canopy-dark mb-2">
+                  Thank You!
+                </h3>
+                <p className="text-canopy-dark/60 mb-6">
+                  Your feedback has been submitted and will appear shortly.
+                </p>
+                <Button
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setFormData({ name: '', rating: 0, message: '' });
+                  }}
+                  variant="outline"
+                  className="rounded-full"
+                >
+                  Submit Another Review
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.form
+                key="form"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                onSubmit={handleSubmit}
+                className="bg-white p-8 rounded-2xl shadow-card space-y-6"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-canopy-dark mb-2">
+                    Your Name
+                  </label>
+                  <Input
+                    placeholder="Enter your name (optional)"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="rounded-xl h-11 border-canopy-dark/10 focus:border-sanctuary-green"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-canopy-dark mb-2">
+                    Your Rating <span className="text-error">*</span>
+                  </label>
+                  <StarRatingSelector
+                    value={formData.rating}
+                    onChange={(v) =>
+                      setFormData((prev) => ({ ...prev, rating: v }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-canopy-dark mb-2">
+                    Your Experience <span className="text-error">*</span>
+                  </label>
+                  <Textarea
+                    placeholder="Tell us about your visit to the sanctuary..."
+                    value={formData.message}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        message: e.target.value,
+                      }))
+                    }
+                    rows={4}
+                    className="rounded-xl border-canopy-dark/10 focus:border-sanctuary-green resize-none"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={
+                    isSubmitting || formData.rating === 0 || !formData.message
+                  }
+                  className="w-full bg-sanctuary-green hover:bg-canopy-dark text-white rounded-xl h-12 text-base gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Bird className="w-5 h-5 animate-bounce" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Submit Review
+                    </>
+                  )}
+                </Button>
+              </motion.form>
+            )}
+          </AnimatePresence>
+        </div>
+      </section>
+
       <Footer />
     </>
   );

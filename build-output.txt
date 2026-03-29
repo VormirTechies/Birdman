@@ -1,0 +1,65 @@
+﻿Γû▓ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 4.3s
+  Running TypeScript ...
+  Finished TypeScript in 6.6s ...
+  Collecting page data using 13 workers ...
+node.exe : Error: DATABASE_URL 
+environment variable is not set
+At line:1 char:1
++ & "C:\nvm4w\nodejs/node.exe" "C:
+\nvm4w\nodejs/node_modules/npm/bin
+/np ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~
+    + CategoryInfo          : N   
+ otSpecified: (Error: DATABA    
+SE...able is not set:String    ) 
+[], RemoteException
+    + FullyQualifiedErrorId : N   
+ ativeCommandError
+ 
+    at module evaluation (D:\Vormi
+r\Birdman\.next\server\chunks\[roo
+t-of-the-server]__0q-t.w6._.js:29:
+46073)
+    at instantiateModule (D:\Vormi
+r\Birdman\.next\server\chunks\[tur
+bopack]_runtime.js:853:9)
+    at 
+getOrInstantiateModuleFromParent (
+D:\Vormir\Birdman\.next\server\chu
+nks\[turbopack]_runtime.js:877:12)
+    at Context.esmImport [as i] (D
+:\Vormir\Birdman\.next\server\chun
+ks\[turbopack]_runtime.js:281:20)
+    at module evaluation (D:\Vormi
+r\Birdman\.next\server\chunks\[roo
+t-of-the-server]__068uy.-._.js:1:1
+612)
+    at instantiateModule (D:\Vormi
+r\Birdman\.next\server\chunks\[tur
+bopack]_runtime.js:853:9)
+    at instantiateRuntimeModule (D
+:\Vormir\Birdman\.next\server\chun
+ks\[turbopack]_runtime.js:882:12)
+    at 
+getOrInstantiateRuntimeModule (D:\
+Vormir\Birdman\.next\server\chunks
+\[turbopack]_runtime.js:895:12)
+    at Object.m (D:\Vormir\Birdman
+\.next\server\chunks\[turbopack]_r
+untime.js:898:18)
+    at Object.<anonymous> (D:\Vorm
+ir\Birdman\.next\server\app\api\bo
+okings\route.js:7:3)
+
+> Build error occurred
+Error: Failed to collect page 
+data for /api/bookings
+    at ignore-listed frames {
+  type: 'Error'
+}

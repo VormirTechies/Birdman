@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { createBookingSchema } from '@/lib/validations';
