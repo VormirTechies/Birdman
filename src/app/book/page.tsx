@@ -118,9 +118,36 @@ export default function BookingPage() {
     }
     setIsSubmitting(true);
     setError('');
-    await new Promise((r) => setTimeout(r, 1500));
-    setStep(4);
-    setIsSubmitting(false);
+    
+    try {
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          visitorName: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          numberOfGuests: formData.guests,
+          bookingDate: formData.date ? format(formData.date, 'yyyy-MM-dd') : '',
+          bookingTime: '04:30 PM', // Hardcoded as per session requirement for now
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to confirm booking. Please try again.');
+      }
+
+      setStep(4);
+    } catch (err: any) {
+      console.error('[Booking] Submission error:', err);
+      setError(err.message || 'An unexpected error occurred. Please check your connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
