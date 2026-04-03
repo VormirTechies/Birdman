@@ -1,6 +1,6 @@
 import { db } from './index';
-import { bookings, type NewBooking, type Booking } from './schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { bookings, verificationCodes, feedback, galleryImages, type NewBooking, type Booking, type NewFeedback, type Feedback } from './schema';
+import { eq, and, desc, gt, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATABASE QUERIES - Birdman of Chennai Booking System
@@ -145,4 +145,133 @@ export async function cancelBooking(id: string): Promise<Booking | undefined> {
     .returning();
 
   return cancelled;
+}
+
+// ─── Verification Codes ──────────────────────────────────────────────────────
+
+export async function createVerificationCode(userId: string, code: string, newEmail: string) {
+  // Delete any existing codes for this user to avoid conflicts
+  await db.delete(verificationCodes).where(eq(verificationCodes.userId, userId));
+
+  const [inserted] = await db
+    .insert(verificationCodes)
+    .values({
+      userId,
+      code,
+      newEmail,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
+    })
+    .returning();
+
+  return inserted;
+}
+
+export async function getValidVerificationCode(userId: string, code: string) {
+  return db.query.verificationCodes.findFirst({
+    where: and(
+      eq(verificationCodes.userId, userId),
+      eq(verificationCodes.code, code),
+      gt(verificationCodes.expiresAt, new Date())
+    ),
+  });
+}
+
+export async function deleteVerificationCode(id: string) {
+  await db.delete(verificationCodes).where(eq(verificationCodes.id, id));
+}
+
+// ─── Admin Dashboard Queries ──────────────────────────────────────────────────
+
+export async function getTodayBookings() {
+  const today = new Date().toISOString().split('T')[0];
+  return db.query.bookings.findMany({
+    where: eq(bookings.bookingDate, today),
+    orderBy: [desc(bookings.bookingTime)],
+  });
+}
+
+export async function getAllBookings(limit = 100) {
+  return db.query.bookings.findMany({
+    orderBy: [desc(bookings.createdAt)],
+    limit,
+  });
+}
+
+export async function getDashboardStats() {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const all = await db.query.bookings.findMany();
+  
+  const totalVisitors = all.reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const todayVisitors = all
+    .filter(b => b.bookingDate === today && b.status === 'confirmed')
+    .reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const upcomingVisitors = all
+    .filter(b => b.bookingDate > today && b.status === 'confirmed')
+    .reduce((sum, b) => sum + b.numberOfGuests, 0);
+
+  return {
+    totalVisitors,
+    todayVisitors,
+    upcomingVisitors,
+    totalBookings: all.length,
+    todayBookings: all.filter(b => b.bookingDate === today).length,
+    upcomingBookings: all.filter(b => b.bookingDate > today).length
+  };
+}
+
+export async function getPendingFeedback() {
+  return db.query.feedback.findMany({
+    where: eq(feedback.isApproved, false),
+    orderBy: [desc(feedback.createdAt)],
+  });
+}
+
+export async function approveFeedback(id: string) {
+  await db.update(feedback)
+    .set({ isApproved: true })
+    .where(eq(feedback.id, id));
+}
+
+export async function getApprovedFeedback(limit = 20) {
+  return db.query.feedback.findMany({
+    where: eq(feedback.isApproved, true),
+    orderBy: [desc(feedback.createdAt)],
+    limit,
+  });
+}
+
+export async function deleteFeedback(id: string) {
+  await db.delete(feedback).where(eq(feedback.id, id));
+}
+
+export async function createFeedback(data: NewFeedback) {
+  const [inserted] = await db
+    .insert(feedback)
+    .values({
+      ...data,
+      isApproved: false,
+    })
+    .returning();
+  return inserted;
+}
+
+// ─── Gallery Queries ─────────────────────────────────────────────────────────
+
+export async function getGalleryImages() {
+  return db.query.galleryImages.findMany({
+    orderBy: [sql`${galleryImages.order} asc`],
+  });
+}
+
+export async function addGalleryImage(url: string, caption?: string) {
+  const [inserted] = await db
+    .insert(galleryImages)
+    .values({ url, caption, order: 0 })
+    .returning();
+  return inserted;
+}
+
+export async function deleteGalleryImage(id: string) {
+  await db.delete(galleryImages).where(eq(galleryImages.id, id));
 }

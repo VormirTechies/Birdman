@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { createBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
+import { sendPushToAllAdmins } from '@/lib/push';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -22,6 +24,13 @@ export async function POST(request: NextRequest) {
       numberOfGuests: validatedData.numberOfGuests,
       bookingDate: validatedData.bookingDate,
       bookingTime: validatedData.bookingTime,
+    });
+
+    // Notify Admins Immediately
+    await sendPushToAllAdmins({
+      title: 'New Parakeet Visit Booked!',
+      body: `${booking.visitorName} scheduled ${booking.numberOfGuests} guests for ${booking.bookingDate}.`,
+      url: '/admin'
     });
 
     // Send confirmation email (non-blocking - failure should not fail booking)

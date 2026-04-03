@@ -14,7 +14,7 @@ export const bookings = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     visitorName: varchar('visitor_name', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }).notNull(), // Indian format: +91-XXXXXXXXXX
-    email: varchar('email', { length: 255 }).notNull(),
+    email: varchar('email', { length: 255 }),
     numberOfGuests: integer('number_of_guests').notNull().default(1),
     bookingDate: date('booking_date').notNull(), // Simplified: direct date, no sessions
     bookingTime: time('booking_time').notNull(), // Morning or evening time slot
@@ -62,7 +62,7 @@ export const feedback = pgTable(
     rating: integer('rating'), // Nullable: 1-5 stars (visitor can give text-only feedback)
     message: text('message').notNull(), // Required: the feedback content
     visitDate: date('visit_date'), // Nullable: when they visited (if provided)
-    isApproved: boolean('is_approved').notNull().default(true), // Moderation flag (default: auto-approve)
+    isApproved: boolean('is_approved').notNull().default(false), // Moderation flag (default: review required)
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
@@ -81,6 +81,40 @@ export const adminUsers = pgTable('admin_users', {
   passwordHash: text('password_hash').notNull(), // bcrypt hash (12+ rounds)
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── Verification Codes Table ────────────────────────────────────────────────
+// Stores temporary OTPs for secure admin profile updates (email change)
+
+export const verificationCodes = pgTable(
+  'verification_codes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(), // Links to Supabase Auth User ID
+    code: varchar('code', { length: 6 }).notNull(), // 6-digit OTP
+    newEmail: varchar('new_email', { length: 255 }).notNull(), // The pending email address
+    expiresAt: timestamp('expires_at').notNull(), // 15-minute window
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('verification_codes_user_id_idx').on(table.userId),
+  })
+);
+
+// ─── Push Subscriptions Table ────────────────────────────────────────────────
+// Stores administrative push tokens for real-time browser notifications
+
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').notNull(), // Links to Supabase Auth User ID
+    subscription: text('subscription').notNull(), // JSON stringified subscription object
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('push_subscriptions_user_id_idx').on(table.userId),
+  })
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPE EXPORTS - TypeScript inference from Drizzle schema

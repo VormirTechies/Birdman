@@ -9,8 +9,8 @@ export const createBookingSchema = z.object({
     .max(100, 'Name must be less than 100 characters'),
   phone: z
     .string()
-    .regex(/^\+91-\d{10}$/, 'Phone must be in format +91-XXXXXXXXXX'),
-  email: z.string().email('Invalid email address'),
+    .min(10, 'Phone must be at least 10 digits'),
+  email: z.string().email('Invalid email address').or(z.literal('')),
   numberOfGuests: z
     .number()
     .int('Number of guests must be an integer')
@@ -27,7 +27,7 @@ export const createBookingSchema = z.object({
     }, 'Booking date must be in the future'),
   bookingTime: z
     .string()
-    .regex(/^\d{2}:\d{2}$/, 'Time must be in HH:MM format'),
+    .min(5, 'Time must be provided'),
 });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
