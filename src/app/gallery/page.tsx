@@ -10,10 +10,10 @@ export default async function GalleryPage() {
   // Default to portrait aspect if not specified (matches masonry look)
   const transformedImages = images.map(img => ({
     src: img.url,
-    alt: img.caption || 'Parakeet at Birdman Sanctuary',
+    alt: img.altText || img.caption || 'Parakeet at Birdman Sanctuary',
     caption: img.caption || '',
-    category: ['all', 'parakeets'] as any[], // Default for now
-    aspect: 'portrait' as const
+    category: (img.category && img.category.length > 0) ? ['all', ...img.category] : ['all', 'parakeets'],
+    aspect: (img.aspect as 'portrait' | 'landscape' | 'square') || 'portrait'
   }));
 
   return (

@@ -11,37 +11,6 @@ export function RealtimeNotifier() {
   const supabase = createClient();
 
   useEffect(() => {
-    // 0. Register Service Worker & Subscribe to Push
-    const registerPush = async () => {
-        if ('serviceWorker' in navigator && VAPID_PUBLIC_KEY) {
-            try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
-                
-                // Get Subscription
-                let subscription = await registration.pushManager.getSubscription();
-                
-                if (!subscription) {
-                    subscription = await registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-                    });
-                }
-
-                // Send to backend
-                await fetch('/api/admin/push/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ subscription })
-                });
-
-            } catch (err) {
-                console.error('Failed to register push:', err);
-            }
-        }
-    };
-
-    registerPush();
-
     // 1. Listen for New Bookings
     const bookingsChannel = supabase.channel('realtime_bookings')
       .on(

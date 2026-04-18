@@ -39,9 +39,11 @@ export const galleryImages = pgTable(
   'gallery_images',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    url: text('url').notNull(), // Vercel Blob Storage or Cloudinary CDN URL
+    url: text('url').notNull().unique(), // Vercel Blob Storage or Cloudinary CDN URL
     caption: text('caption'), // Nullable: optional description
     altText: varchar('alt_text', { length: 255 }), // Nullable: for accessibility
+    category: text('category').array(), // Categories like ['parakeets', 'birdman']
+    aspect: varchar('aspect', { length: 50 }).default('square'), // square | portrait | landscape
     order: integer('order').notNull().default(0), // Display order (lower = shown first)
     uploadedAt: timestamp('uploaded_at').notNull().defaultNow(),
   },

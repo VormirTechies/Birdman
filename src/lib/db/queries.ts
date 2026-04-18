@@ -36,36 +36,48 @@ export async function getBookingById(id: string): Promise<Booking | undefined> {
 export async function getBookings(params: {
   status?: 'confirmed' | 'cancelled' | 'completed';
   date?: string;
+  minDate?: string; // e.g. "2024-04-18" to show today onwards
+  search?: string;  // name, email, or phone
   limit?: number;
   offset?: number;
-}): Promise<Booking[]> {
-  const { status, date, limit = 50, offset = 0 } = params;
+}): Promise<{ bookings: Booking[]; total: number }> {
+  const { status, date, minDate, search, limit = 50, offset = 0 } = params;
 
-  let query = db.query.bookings.findMany({
-    limit,
-    offset,
-    orderBy: [desc(bookings.createdAt)],
-  });
-
-  // Apply filters
+  // 1. BASE CONDITIONS
   const conditions = [];
-  if (status) {
-    conditions.push(eq(bookings.status, status));
-  }
-  if (date) {
-    conditions.push(eq(bookings.bookingDate, date));
+  if (status) conditions.push(eq(bookings.status, status));
+  if (date) conditions.push(eq(bookings.bookingDate, date));
+  if (minDate) conditions.push(gt(bookings.bookingDate, minDate)); // Using gt or gte? User said "don't show past date", so today onwards.
+
+  // 2. SEARCH LOGIC (Case Insensitive)
+  if (search) {
+    const searchLower = `%${search.toLowerCase()}%`;
+    conditions.push(sql`(
+      lower(${bookings.visitorName}) LIKE ${searchLower} OR 
+      lower(${bookings.email}) LIKE ${searchLower} OR 
+      ${bookings.phone} LIKE ${searchLower}
+    )`);
   }
 
-  if (conditions.length > 0) {
-    query = db.query.bookings.findMany({
-      where: conditions.length === 1 ? conditions[0] : and(...conditions),
+  const whereClause = conditions.length > 0 
+    ? (conditions.length === 1 ? conditions[0] : and(...conditions)) 
+    : undefined;
+
+  // 3. EXECUTE QUERIES (Parallel for speed)
+  const [data, totalCount] = await Promise.all([
+    db.query.bookings.findMany({
+      where: whereClause,
       limit,
       offset,
       orderBy: [desc(bookings.createdAt)],
-    });
-  }
+    }),
+    db.select({ count: sql<number>`count(*)` }).from(bookings).where(whereClause)
+  ]);
 
-  return query;
+  return { 
+    bookings: data, 
+    total: Number(totalCount[0]?.count || 0) 
+  };
 }
 
 // ─── Get Bookings by Date ────────────────────────────────────────────────────
@@ -263,9 +275,11 @@ export async function getGalleryImages() {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS "gallery_images" (
       "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      "url" text NOT NULL,
+      "url" text NOT NULL UNIQUE,
       "caption" text,
       "alt_text" varchar(255),
+      "category" text[],
+      "aspect" varchar(50) DEFAULT 'square',
       "order" integer NOT NULL DEFAULT 0,
       "uploaded_at" timestamp DEFAULT now() NOT NULL
     );

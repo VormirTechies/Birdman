@@ -3,6 +3,8 @@
 import { Toaster } from 'sonner';
 import { AdminSidebar } from '@/components/organisms/admin/AdminSidebar';
 import { RealtimeNotifier } from '@/components/organisms/admin/RealtimeNotifier';
+import { PushProvider } from '@/components/providers/PushProvider';
+import { usePush } from '@/components/providers/PushProvider';
 
 export default function AdminLayout({
   children,
@@ -11,11 +13,13 @@ export default function AdminLayout({
 }) {
   return (
     <div className="min-h-screen bg-[#fafafa]">
-      <AdminSidebar />
-      <RealtimeNotifier />
-      <div className="lg:pl-72 min-h-screen pb-32 lg:pb-0">
-        {children}
-      </div>
+      <PushProvider>
+        <AdminSidebar />
+        <RealtimeNotifier />
+        <div className="lg:pl-72 min-h-screen pb-32 lg:pb-0">
+          {children}
+        </div>
+      </PushProvider>
       <Toaster 
         position="top-right"
         richColors
