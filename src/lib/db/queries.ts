@@ -259,6 +259,18 @@ export async function createFeedback(data: NewFeedback) {
 // ─── Gallery Queries ─────────────────────────────────────────────────────────
 
 export async function getGalleryImages() {
+  // 🔥 Self-Healing: Ensure the table exists before attempting to read.
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "gallery_images" (
+      "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "url" text NOT NULL,
+      "caption" text,
+      "alt_text" varchar(255),
+      "order" integer NOT NULL DEFAULT 0,
+      "uploaded_at" timestamp DEFAULT now() NOT NULL
+    );
+  `);
+
   return db.query.galleryImages.findMany({
     orderBy: [sql`${galleryImages.order} asc`],
   });
