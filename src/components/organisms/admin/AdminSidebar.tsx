@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import { usePush } from '@/components/providers/PushProvider';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
@@ -31,14 +32,7 @@ const navItems = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [permission, setPermission] = useState<string>('loading');
-  const supabase = createClient();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setPermission(Notification.permission);
-    }
-  }, []);
+  const { permission, isSubscribed, isLoading, enablePush, testPush } = usePush();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -75,6 +69,7 @@ export function AdminSidebar() {
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(true)}
+            suppressHydrationWarning
             className="text-white/40 hover:text-white"
           >
             <Menu className="w-6 h-6" />
@@ -96,7 +91,11 @@ export function AdminSidebar() {
                 <Bird className="w-8 h-8 text-sanctuary-green" />
                 <span className="font-display font-bold text-xl text-white">Birdman Admin</span>
               </div>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-white/50 hover:text-white">
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)} 
+                suppressHydrationWarning
+                className="p-2 text-white/50 hover:text-white"
+              >
                 <X className="w-8 h-8" />
               </button>
             </div>
@@ -121,6 +120,7 @@ export function AdminSidebar() {
             <Button
               variant="destructive"
               onClick={handleSignOut}
+              suppressHydrationWarning
               className="h-16 rounded-2xl text-lg gap-3"
             >
               <LogOut className="w-6 h-6" />
@@ -165,30 +165,42 @@ export function AdminSidebar() {
         <div className="pt-8 mt-8 border-t border-white/5 space-y-6">
           {/* Notification Quick Access */}
           <div className="px-4">
-             <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] uppercase font-bold tracking-widest text-white/30">Sanctuary Alerts</span>
                 <span className={cn(
                   "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter",
-                  permission === 'granted' 
+                  permission === 'granted' && isSubscribed
                     ? "bg-sanctuary-green/20 text-sanctuary-green" 
                     : "bg-red-500/20 text-red-500"
                 )}>
-                  {permission}
+                  {isLoading ? '...' : (isSubscribed ? 'Online' : 'Disabled')}
                 </span>
              </div>
-             <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                   const res = await fetch('/api/admin/push/test', { method: 'POST' });
-                   if (res.ok) alert('🕊️ Test push dispatched! Check your desktop/phone.');
-                   else alert('❌ Test push failed. Please check permissions.');
-                }}
-                className="w-full bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl h-10 text-xs gap-2"
-             >
-                <Bell className="w-3.5 h-3.5" />
-                Push Test Alert
-             </Button>
+             
+             {isSubscribed ? (
+               <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={testPush}
+                  suppressHydrationWarning
+                  className="w-full bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 rounded-xl h-10 text-xs gap-2"
+               >
+                  <Bell className="w-3.5 h-3.5" />
+                  Trigger Manual Pulse
+               </Button>
+             ) : (
+               <Button
+                  variant="default"
+                  size="sm"
+                  onClick={enablePush}
+                  disabled={isLoading}
+                  suppressHydrationWarning
+                  className="w-full bg-sanctuary-green hover:bg-sanctuary-green/90 text-white rounded-xl h-10 text-xs gap-2"
+               >
+                  <Bell className="w-3.5 h-3.5" />
+                  {isLoading ? 'Initializing...' : 'Enable Admin Alerts'}
+               </Button>
+             )}
           </div>
 
           <div className="bg-white/5 rounded-2xl p-4 flex items-center gap-3">
@@ -203,6 +215,7 @@ export function AdminSidebar() {
           <Button
             variant="ghost"
             onClick={handleSignOut}
+            suppressHydrationWarning
             className="w-full justify-start text-white/40 hover:text-white hover:bg-white/5 h-12 rounded-xl gap-3"
           >
             <LogOut className="w-5 h-5" />

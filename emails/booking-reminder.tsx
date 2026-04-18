@@ -59,8 +59,14 @@ export default function BookingReminder({
           <Section>
             <Text style={styles.sectionHeading}>📍 Location</Text>
             <Text style={styles.text}>
-              Birdman of Chennai<br />
-              Velachery, Chennai, Tamil Nadu
+              <strong>Birdman of Chennai</strong><br />
+              2, Iyya Mudali St, Adikesavarpuram,<br />
+              Chintadripet, Chennai, Tamil Nadu 600002
+            </Text>
+            <Text style={styles.text}>
+              <a href="https://maps.app.goo.gl/G76qA7qZAJ3g44Pu9" style={styles.link}>
+                🦅 Open Navigation
+              </a>
             </Text>
           </Section>
 
@@ -182,5 +188,10 @@ const styles = {
     fontSize: '16px',
     color: '#1f2937',
     margin: '16px 0 0',
+  },
+  link: {
+    color: '#dc2626',
+    textDecoration: 'underline',
+    fontWeight: 'bold',
   },
 };

@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getAllBookings } from '@/lib/db/queries';
+import { getBookings } from '@/lib/db/queries';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -11,21 +11,27 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const bookings = await getAllBookings(200); // Expanded history view
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || undefined;
+    const isToday = searchParams.get('isToday') === 'true';
+    const showPast = searchParams.get('showPast') === 'true';
     
-    return NextResponse.json(bookings.map(b => ({
-        id: b.id,
-        visitorName: b.visitorName,
-        phone: b.phone,
-        email: b.email,
-        numberOfGuests: b.numberOfGuests,
-        bookingDate: b.bookingDate,
-        bookingTime: b.bookingTime,
-        status: b.status,
-        createdAt: b.createdAt.toISOString()
-    })));
+    const today = new Date().toISOString().split('T')[0];
+    const offset = (page - 1) * limit;
+
+    const result = await getBookings({
+      date: isToday ? today : undefined,
+      minDate: (isToday || showPast) ? undefined : today, // If not 'isToday' and not 'showPast', show 'today onwards'
+      search,
+      limit,
+      offset
+    });
+
+    return NextResponse.json(result);
   } catch (error: any) {
-    console.error('[API] Failed to fetch historical bookings:', error);
+    console.error('[API] Failed to fetch bookings:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

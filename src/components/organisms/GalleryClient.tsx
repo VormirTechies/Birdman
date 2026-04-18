@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Bird, ArrowRight, Eye, ImageIcon } from 'lucide-react';
+import { Camera, Eye, ImageIcon, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
-import { AnimatedSection, StaggerContainer, StaggerItem } from '@/components/ui/animated-section';
+import { AnimatedSection } from '@/components/ui/animated-section';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type GalleryCategory = 'all' | 'parakeets' | 'birdman' | 'sanctuary';
@@ -70,7 +70,7 @@ export function GalleryClient({ initialImages }: { initialImages: GalleryImage[]
       </section>
 
       {/* ── FILTERS ──────────────────────────────────────────────────────── */}
-      <section className="bg-white/80 backdrop-blur-xl sticky top-16 md:top-20 z-[60] border-b border-canopy-dark/5 shadow-sm">
+      <section className="bg-white/80 backdrop-blur-xl sticky top-16 md:top-20 z-50 border-b border-canopy-dark/5 shadow-sm">
         <div className="container-wide py-5">
           <Tabs
             value={activeCategory}
@@ -97,41 +97,63 @@ export function GalleryClient({ initialImages }: { initialImages: GalleryImage[]
           <AnimatePresence mode="popLayout">
             <motion.div
               layout
-              className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 md:gap-8"
+              className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 md:gap-6 lg:gap-8 [column-fill:_balance]"
             >
               {filteredImages.map((img, i) => (
                 <motion.div
                   key={img.src}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }}
-                  transition={{ duration: 0.6, delay: i * 0.05 }}
-                  className="break-inside-avoid mb-6 md:mb-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+                  transition={{ 
+                    duration: 0.5, 
+                    delay: i * 0.05,
+                    ease: [0.23, 1, 0.32, 1] 
+                  }}
+                  className="break-inside-avoid mb-4 md:mb-6 lg:mb-8"
                 >
                   <button
                     onClick={() => openLightbox(i)}
-                    className="block w-full group relative overflow-hidden rounded-[2.5rem] bg-white shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 border border-canopy-dark/5"
+                    className="block w-full group relative overflow-hidden rounded-[2rem] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_80px_rgba(0,0,0,0.08)] transition-all duration-700 hover:-translate-y-2 border border-canopy-dark/5"
                   >
-                    <div className="aspect-auto">
+                    <div className="relative">
                       <Image
                         src={img.src}
                         alt={img.alt}
                         width={800}
-                        height={1200}
-                        className="w-full h-auto object-cover transition-transform duration-1000 group-hover:scale-110"
+                        height={img.aspect === 'portrait' ? 1200 : img.aspect === 'landscape' ? 600 : 800}
+                        className="w-full h-auto object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                       />
                       
-                      {/* Artistic Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-canopy-dark via-canopy-dark/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
-                         <p className="text-white font-bold text-lg mb-4 line-clamp-2">{img.caption}</p>
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white">
-                               <Eye className="w-5 h-5" />
+                      {/* 💎 Glassmorphism Archive Overlay */}
+                      <div className="absolute inset-x-4 bottom-4 p-6 bg-white/10 backdrop-blur-2xl rounded-[1.5rem] border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0 shadow-2xl">
+                         <div className="flex flex-col gap-3">
+                            {img.caption && (
+                              <p className="text-white font-bold text-sm leading-snug drop-shadow-md">
+                                {img.caption}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between mt-2">
+                               <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 bg-sanctuary-green rounded-lg flex items-center justify-center text-white scale-90 group-hover:scale-100 transition-transform duration-500">
+                                     <Eye className="w-4 h-4" />
+                                  </div>
+                                  <span className="text-white/90 text-[10px] font-black uppercase tracking-[0.2em] pt-0.5">Explore</span>
+                               </div>
+                               <div className="flex gap-1">
+                                  {img.category.filter(c => c !== 'all').map(c => (
+                                    <span key={c} className="px-2 py-0.5 bg-white/20 rounded-md text-[8px] text-white font-bold uppercase">
+                                      {c}
+                                    </span>
+                                  ))}
+                               </div>
                             </div>
-                            <span className="text-white/80 text-sm font-medium uppercase tracking-widest">Enlarge</span>
                          </div>
                       </div>
+                      
+                      {/* Subtle Dark Gradient for better legibility when overlay is active */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-canopy-dark/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
                     </div>
                   </button>
                 </motion.div>
@@ -162,7 +184,6 @@ export function GalleryClient({ initialImages }: { initialImages: GalleryImage[]
         <section className="pb-24 pt-12 text-center">
           <div className="container-wide">
             <div className="bg-canopy-dark rounded-[4rem] p-12 md:p-24 relative overflow-hidden shadow-2xl">
-              {/* Background Glow */}
               <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(62,176,140,0.1),transparent_70%)] pointer-events-none" />
               
               <div className="relative z-10 max-w-2xl mx-auto">
