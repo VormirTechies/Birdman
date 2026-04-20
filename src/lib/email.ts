@@ -3,6 +3,8 @@ import { render } from '@react-email/render';
 import BookingConfirmation from '../../emails/booking-confirmation';
 import BookingReminder from '../../emails/booking-reminder';
 import BookingReschedule from '../../emails/booking-reschedule';
+import BookingCancelledBlocked from '../../emails/booking-cancelled-blocked';
+import BookingTimeChanged from '../../emails/booking-time-changed';
 import type { Booking } from './db/schema';
 import React from 'react';
 
@@ -202,5 +204,77 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
   } catch (error) {
     console.error('[Email Service] Admin OTP failed:', error);
     return { success: false, error: 'Failed to send verification code' };
+  }
+}
+
+// ─── Send Blocked Date Cancellation Notification ─────────────────────────────
+
+export async function sendBlockedDateCancellation(booking: {
+  email: string | null;
+  visitorName: string;
+  bookingDate: string;
+  numberOfGuests: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!booking.email) return { success: false, error: 'No email address provided' };
+
+    const transporter = getTransporter();
+    const emailHtml = await render(
+        React.createElement(BookingCancelledBlocked, {
+            visitorName: booking.visitorName,
+            bookingDate: booking.bookingDate,
+            numberOfGuests: booking.numberOfGuests,
+        })
+    );
+
+    await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: booking.email,
+      subject: '⚠️ Important Update: Visit Cancelled — Birdman of Chennai',
+      html: emailHtml,
+    });
+
+    console.log('[Email Service] Blocked cancellation sent to:', booking.email);
+    return { success: true };
+  } catch (error) {
+    console.error('[Email Service] Blocked cancellation exception:', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// ─── Send Time Change Notification ──────────────────────────────────────────
+
+export async function sendTimeChangeNotification(booking: {
+  email: string | null;
+  visitorName: string;
+  bookingDate: string;
+  bookingTime: string; // The time has already been updated in the DB
+  numberOfGuests: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!booking.email) return { success: false, error: 'No email address provided' };
+
+    const transporter = getTransporter();
+    const emailHtml = await render(
+        React.createElement(BookingTimeChanged, {
+            visitorName: booking.visitorName,
+            bookingDate: booking.bookingDate,
+            newTime: booking.bookingTime,
+            numberOfGuests: booking.numberOfGuests,
+        })
+    );
+
+    await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: booking.email,
+      subject: '⏰ Update on your visit time — Birdman of Chennai',
+      html: emailHtml,
+    });
+
+    console.log('[Email Service] Time change notification sent to:', booking.email);
+    return { success: true };
+  } catch (error) {
+    console.error('[Email Service] Time change exception:', error);
+    return { success: false, error: String(error) };
   }
 }

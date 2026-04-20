@@ -6,17 +6,22 @@ import { RealtimeNotifier } from '@/components/organisms/admin/RealtimeNotifier'
 import { PushProvider } from '@/components/providers/PushProvider';
 import { usePush } from '@/components/providers/PushProvider';
 
+import { usePathname } from 'next/navigation';
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/admin/login';
+
   return (
     <div className="min-h-screen bg-[#fafafa]">
       <PushProvider>
-        <AdminSidebar />
-        <RealtimeNotifier />
-        <div className="lg:pl-72 min-h-screen pb-32 lg:pb-0">
+        {!isLoginPage && <AdminSidebar />}
+        {!isLoginPage && <RealtimeNotifier />}
+        <div className={!isLoginPage ? "lg:pl-72 min-h-screen pb-32 lg:pb-0" : "min-h-screen"}>
           {children}
         </div>
       </PushProvider>

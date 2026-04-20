@@ -16,6 +16,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = createBookingSchema.parse(body);
 
+    // Fetch availability for the requested date to enforce capacity and block rules
+    const { getDateAvailability } = await import('@/lib/db/queries');
+    const dayAvail = await getDateAvailability(validatedData.bookingDate);
+
+    if (dayAvail.isBlocked) {
+      return NextResponse.json(
+        { success: false, error: 'This date is currently blocked and cannot accept bookings.' },
+        { status: 400 }
+      );
+    }
+
+    if (validatedData.numberOfGuests > dayAvail.remainingGuests) {
+      return NextResponse.json(
+        { success: false, error: `Only ${dayAvail.remainingGuests} slots remaining on this date.` },
+        { status: 400 }
+      );
+    }
+
+    // Use the dynamic slot time from availability settings
+    const slotTimeToUse = dayAvail.slotTime;
+
     // Create booking in database
     const booking = await createBooking({
       visitorName: validatedData.visitorName,
@@ -23,13 +44,15 @@ export async function POST(request: NextRequest) {
       email: validatedData.email,
       numberOfGuests: validatedData.numberOfGuests,
       bookingDate: validatedData.bookingDate,
-      bookingTime: validatedData.bookingTime,
+      bookingTime: slotTimeToUse, // Always use admin-configured time
+      category: validatedData.category as any,
+      organisationName: validatedData.organisationName,
     });
 
     // Notify Admins Immediately
     await sendPushToAllAdmins({
-      title: 'New Parakeet Visit Booked!',
-      body: `${booking.visitorName} scheduled ${booking.numberOfGuests} guests for ${booking.bookingDate}.`,
+      title: 'New Visit Booked!',
+      body: `${booking.visitorName} scheduled ${booking.numberOfGuests} guests for ${booking.bookingDate} (${booking.category}).`,
       url: '/admin'
     });
 
@@ -59,6 +82,7 @@ export async function POST(request: NextRequest) {
           bookingTime: booking.bookingTime,
           numberOfGuests: booking.numberOfGuests,
           status: booking.status,
+          category: booking.category,
         },
         emailSent,
       },

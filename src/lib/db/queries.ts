@@ -1,6 +1,6 @@
 import { db } from './index';
-import { bookings, verificationCodes, feedback, galleryImages, type NewBooking, type Booking, type NewFeedback, type Feedback } from './schema';
-import { eq, and, desc, gt, sql } from 'drizzle-orm';
+import { bookings, verificationCodes, feedback, galleryImages, daySettings, appConfig, type NewBooking, type Booking, type NewFeedback, type Feedback, type DaySetting } from './schema';
+import { eq, and, desc, gt, gte, lte, sql, asc, count, sum } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATABASE QUERIES - Birdman of Chennai Booking System
@@ -211,24 +211,60 @@ export async function getAllBookings(limit = 100) {
 
 export async function getDashboardStats() {
   const today = new Date().toISOString().split('T')[0];
-  
-  const all = await db.query.bookings.findMany();
-  
-  const totalVisitors = all.reduce((sum, b) => sum + b.numberOfGuests, 0);
-  const todayVisitors = all
-    .filter(b => b.bookingDate === today && b.status === 'confirmed')
-    .reduce((sum, b) => sum + b.numberOfGuests, 0);
-  const upcomingVisitors = all
-    .filter(b => b.bookingDate > today && b.status === 'confirmed')
-    .reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const monthStart = today.substring(0, 7) + '-01'; // e.g. 2026-04-01
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+  // Server-side aggregation for performance at scale
+  const [todayStats] = await db.select({
+    count: sql<number>`count(*)`,
+    guests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+    visited: sql<number>`coalesce(sum(case when ${bookings.visited} = true then 1 else 0 end), 0)`,
+  }).from(bookings).where(and(
+    eq(bookings.bookingDate, today),
+    eq(bookings.status, 'confirmed')
+  ));
+
+  const [upcomingStats] = await db.select({
+    count: sql<number>`count(*)`,
+    guests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+  }).from(bookings).where(and(
+    gt(bookings.bookingDate, today),
+    lte(bookings.bookingDate, nextWeekStr),
+    eq(bookings.status, 'confirmed')
+  ));
+
+  const [monthStats] = await db.select({
+    count: sql<number>`count(*)`,
+    guests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+  }).from(bookings).where(and(
+    gte(bookings.bookingDate, monthStart),
+    eq(bookings.status, 'confirmed')
+  ));
+
+  const [totalStats] = await db.select({
+    count: sql<number>`count(*)`,
+    guests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+  }).from(bookings);
+
+  // Get today's capacity
+  const dayConfig = await getDaySettings(today);
 
   return {
-    totalVisitors,
-    todayVisitors,
-    upcomingVisitors,
-    totalBookings: all.length,
-    todayBookings: all.filter(b => b.bookingDate === today).length,
-    upcomingBookings: all.filter(b => b.bookingDate > today).length
+    todayGuests: Number(todayStats?.guests || 0),
+    todayBookings: Number(todayStats?.count || 0),
+    todayVisited: Number(todayStats?.visited || 0),
+    todayRemaining: Number(todayStats?.count || 0) - Number(todayStats?.visited || 0),
+    todayCapacity: dayConfig.maxGuests,
+    todaySlotsUsed: Number(todayStats?.guests || 0),
+    todaySlotsOpen: dayConfig.maxGuests - Number(todayStats?.guests || 0),
+    upcomingGuests: Number(upcomingStats?.guests || 0),
+    upcomingBookings: Number(upcomingStats?.count || 0),
+    monthGuests: Number(monthStats?.guests || 0),
+    monthBookings: Number(monthStats?.count || 0),
+    totalGuests: Number(totalStats?.guests || 0),
+    totalBookings: Number(totalStats?.count || 0),
   };
 }
 
@@ -300,4 +336,313 @@ export async function addGalleryImage(url: string, caption?: string) {
 
 export async function deleteGalleryImage(id: string) {
   await db.delete(galleryImages).where(eq(galleryImages.id, id));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v2.0 QUERIES — Day Settings, Availability, Calendar, Checklist
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── App Config ──────────────────────────────────────────────────────────────
+
+const CONFIG_DEFAULTS: Record<string, string> = {
+  default_slot_time: '16:30',
+  default_max_guests: '100',
+};
+
+export async function getAppConfig(key: string): Promise<string> {
+  const row = await db.query.appConfig.findFirst({
+    where: eq(appConfig.key, key),
+  });
+  return row?.value ?? CONFIG_DEFAULTS[key] ?? '';
+}
+
+export async function setAppConfig(key: string, value: string): Promise<void> {
+  await db.insert(appConfig)
+    .values({ key, value, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: appConfig.key,
+      set: { value, updatedAt: new Date() },
+    });
+}
+
+export async function getAllAppConfig(): Promise<Record<string, string>> {
+  const rows = await db.query.appConfig.findMany();
+  const config: Record<string, string> = { ...CONFIG_DEFAULTS };
+  for (const row of rows) {
+    config[row.key] = row.value;
+  }
+  return config;
+}
+
+// ─── Day Settings ────────────────────────────────────────────────────────────
+
+export async function getDaySettings(date: string): Promise<{
+  slotTime: string;
+  maxGuests: number;
+  isBlocked: boolean;
+  blockReason: string | null;
+}> {
+  const row = await db.query.daySettings.findFirst({
+    where: eq(daySettings.date, date),
+  });
+
+  const defaults = await getAllAppConfig();
+
+  return {
+    slotTime: row?.slotTime ?? defaults.default_slot_time ?? '16:30',
+    maxGuests: row?.maxGuests ?? parseInt(defaults.default_max_guests ?? '100'),
+    isBlocked: row?.isBlocked ?? false,
+    blockReason: row?.blockReason ?? null,
+  };
+}
+
+export async function upsertDaySettings(date: string, data: {
+  slotTime?: string | null;
+  maxGuests?: number | null;
+  isBlocked?: boolean;
+  blockReason?: string | null;
+}): Promise<DaySetting> {
+  const [result] = await db.insert(daySettings)
+    .values({
+      date,
+      slotTime: data.slotTime ?? null,
+      maxGuests: data.maxGuests ?? null,
+      isBlocked: data.isBlocked ?? false,
+      blockReason: data.blockReason ?? null,
+    })
+    .onConflictDoUpdate({
+      target: daySettings.date,
+      set: {
+        ...(data.slotTime !== undefined && { slotTime: data.slotTime }),
+        ...(data.maxGuests !== undefined && { maxGuests: data.maxGuests }),
+        ...(data.isBlocked !== undefined && { isBlocked: data.isBlocked }),
+        ...(data.blockReason !== undefined && { blockReason: data.blockReason }),
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return result;
+}
+
+// ─── Block / Unblock Dates ───────────────────────────────────────────────────
+
+export async function blockDate(date: string, reason?: string): Promise<{
+  setting: DaySetting;
+  affectedBookings: Booking[];
+}> {
+  // 1. Block the date
+  const setting = await upsertDaySettings(date, {
+    isBlocked: true,
+    blockReason: reason ?? null,
+  });
+
+  // 2. Find and cancel affected bookings
+  const affected = await db.query.bookings.findMany({
+    where: and(
+      eq(bookings.bookingDate, date),
+      eq(bookings.status, 'confirmed')
+    ),
+  });
+
+  // 3. Cancel them
+  if (affected.length > 0) {
+    await db.update(bookings)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(and(
+        eq(bookings.bookingDate, date),
+        eq(bookings.status, 'confirmed')
+      ));
+  }
+
+  return { setting, affectedBookings: affected };
+}
+
+export async function unblockDate(date: string): Promise<DaySetting> {
+  return upsertDaySettings(date, { isBlocked: false, blockReason: null });
+}
+
+export async function getBlockedDates(startDate: string, endDate: string): Promise<DaySetting[]> {
+  return db.query.daySettings.findMany({
+    where: and(
+      gte(daySettings.date, startDate),
+      lte(daySettings.date, endDate),
+      eq(daySettings.isBlocked, true)
+    ),
+  });
+}
+
+// ─── Date Availability ───────────────────────────────────────────────────────
+
+export async function getDateAvailability(date: string): Promise<{
+  slotTime: string;
+  maxGuests: number;
+  bookedGuests: number;
+  remaining: number;
+  isBlocked: boolean;
+  bookingCount: number;
+}> {
+  const config = await getDaySettings(date);
+
+  const [stats] = await db.select({
+    totalGuests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+    bookingCount: sql<number>`count(*)`,
+  }).from(bookings).where(and(
+    eq(bookings.bookingDate, date),
+    eq(bookings.status, 'confirmed')
+  ));
+
+  const bookedGuests = Number(stats?.totalGuests || 0);
+
+  return {
+    slotTime: config.slotTime,
+    maxGuests: config.maxGuests,
+    bookedGuests,
+    remaining: Math.max(0, config.maxGuests - bookedGuests),
+    isBlocked: config.isBlocked,
+    bookingCount: Number(stats?.bookingCount || 0),
+  };
+}
+
+export async function getAvailabilityRange(startDate: string, endDate: string): Promise<Array<{
+  date: string;
+  slotTime: string;
+  maxGuests: number;
+  bookedGuests: number;
+  remaining: number;
+  isBlocked: boolean;
+}>> {
+  // 1. Get all day settings in range
+  const settings = await db.query.daySettings.findMany({
+    where: and(
+      gte(daySettings.date, startDate),
+      lte(daySettings.date, endDate)
+    ),
+  });
+  const settingsMap = new Map(settings.map(s => [s.date, s]));
+
+  // 2. Get booking aggregates per date
+  const bookingAgg = await db.select({
+    date: bookings.bookingDate,
+    totalGuests: sql<number>`coalesce(sum(${bookings.numberOfGuests}), 0)`,
+  }).from(bookings).where(and(
+    gte(bookings.bookingDate, startDate),
+    lte(bookings.bookingDate, endDate),
+    eq(bookings.status, 'confirmed')
+  )).groupBy(bookings.bookingDate);
+  const bookingMap = new Map(bookingAgg.map(b => [b.date, Number(b.totalGuests)]));
+
+  // 3. Get global defaults
+  const defaults = await getAllAppConfig();
+  const defaultTime = defaults.default_slot_time ?? '16:30';
+  const defaultMax = parseInt(defaults.default_max_guests ?? '100');
+
+  // 4. Build result for each date in range
+  const results: Array<{
+    date: string;
+    slotTime: string;
+    maxGuests: number;
+    bookedGuests: number;
+    remaining: number;
+    isBlocked: boolean;
+  }> = [];
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = d.toISOString().split('T')[0];
+    const setting = settingsMap.get(dateStr);
+    const booked = bookingMap.get(dateStr) ?? 0;
+    const maxGuests = setting?.maxGuests ?? defaultMax;
+
+    results.push({
+      date: dateStr,
+      slotTime: setting?.slotTime ?? defaultTime,
+      maxGuests,
+      bookedGuests: booked,
+      remaining: Math.max(0, maxGuests - booked),
+      isBlocked: setting?.isBlocked ?? false,
+    });
+  }
+
+  return results;
+}
+
+// ─── Calendar Month View ─────────────────────────────────────────────────────
+
+export async function getCalendarMonth(year: number, month: number): Promise<Array<{
+  date: string;
+  bookingCount: number;
+  totalGuests: number;
+  maxGuests: number;
+  slotTime: string;
+  isBlocked: boolean;
+  percentFull: number;
+}>> {
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const endMonth = month === 12 ? 1 : month + 1;
+  const endYear = month === 12 ? year + 1 : year;
+  const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+  // Last day of month
+  const lastDay = new Date(endYear, month === 12 ? 0 : month, 0).getDate();
+  const lastDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  return getAvailabilityRange(startDate, lastDate).then(range =>
+    range.map(day => ({
+      ...day,
+      bookingCount: 0, // Will be enriched below
+      totalGuests: day.bookedGuests,
+      percentFull: day.maxGuests > 0 ? Math.round((day.bookedGuests / day.maxGuests) * 100) : 0,
+    }))
+  );
+}
+
+// ─── Daily Checklist ─────────────────────────────────────────────────────────
+
+export async function getDailyChecklist(date: string): Promise<{
+  bookings: Booking[];
+  totalGuests: number;
+  visitedCount: number;
+  remainingCount: number;
+}> {
+  const dayBookings = await db.query.bookings.findMany({
+    where: and(
+      eq(bookings.bookingDate, date),
+      eq(bookings.status, 'confirmed')
+    ),
+    orderBy: [asc(bookings.bookingTime), asc(bookings.visitorName)],
+  });
+
+  const totalGuests = dayBookings.reduce((s, b) => s + b.numberOfGuests, 0);
+  const visitedCount = dayBookings.filter(b => b.visited).length;
+
+  return {
+    bookings: dayBookings,
+    totalGuests,
+    visitedCount,
+    remainingCount: dayBookings.length - visitedCount,
+  };
+}
+
+export async function toggleVisited(bookingId: string, visited: boolean): Promise<Booking | undefined> {
+  const [updated] = await db.update(bookings)
+    .set({
+      visited,
+      ...(visited && { status: 'completed' as const }),
+      updatedAt: new Date(),
+    })
+    .where(eq(bookings.id, bookingId))
+    .returning();
+  return updated;
+}
+
+// ─── Get Bookings by Date for Time Change Notifications ─────────────────────
+
+export async function getConfirmedBookingsByDate(date: string): Promise<Booking[]> {
+  return db.query.bookings.findMany({
+    where: and(
+      eq(bookings.bookingDate, date),
+      eq(bookings.status, 'confirmed')
+    ),
+  });
 }

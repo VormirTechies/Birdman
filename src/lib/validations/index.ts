@@ -11,11 +11,12 @@ export const createBookingSchema = z.object({
     .string()
     .min(10, 'Phone must be at least 10 digits'),
   email: z.string().email('Invalid email address').or(z.literal('')),
+  category: z.enum(['individual', 'school', 'organisation']).default('individual'),
+  organisationName: z.string().optional(),
   numberOfGuests: z
     .number()
     .int('Number of guests must be an integer')
-    .min(1, 'At least 1 guest required')
-    .max(10, 'Maximum 10 guests per booking'),
+    .min(1, 'At least 1 guest required'),
   bookingDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
@@ -24,10 +25,33 @@ export const createBookingSchema = z.object({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       return bookingDate > today;
-    }, 'Booking date must be in the future'),
+    }, 'Booking date must be in the future')
+    .refine((date) => {
+      const bookingDate = new Date(date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const thirtyDaysFromNow = new Date(today);
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+      return bookingDate <= thirtyDaysFromNow;
+    }, 'Bookings can only be made up to 30 days in advance'),
   bookingTime: z
     .string()
-    .min(5, 'Time must be provided'),
+    .min(4, 'Time must be provided'),
+}).superRefine((data, ctx) => {
+  if (data.category === 'individual' && data.numberOfGuests > 10) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Maximum 10 guests for individual bookings',
+      path: ['numberOfGuests'],
+    });
+  }
+  if (data.category !== 'individual' && (!data.organisationName || data.organisationName.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Organisation name is required for this booking type',
+      path: ['organisationName'],
+    });
+  }
 });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;

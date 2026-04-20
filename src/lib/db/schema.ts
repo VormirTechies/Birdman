@@ -1,8 +1,8 @@
-import { pgTable, uuid, varchar, text, timestamp, integer, boolean, date, time, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, integer, boolean, date, time, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// BIRDMAN OF CHENNAI - MVP DATABASE SCHEMA
-// Simplified Sprint 1 schema - No sessions, direct bookings with date/time
+// BIRDMAN OF CHENNAI - DATABASE SCHEMA v2.0
+// Admin Panel v2.0: Dynamic scheduling, capacity management, visitor tracking
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── Bookings Table ──────────────────────────────────────────────────────────
@@ -16,11 +16,14 @@ export const bookings = pgTable(
     phone: varchar('phone', { length: 20 }).notNull(), // Indian format: +91-XXXXXXXXXX
     email: varchar('email', { length: 255 }),
     numberOfGuests: integer('number_of_guests').notNull().default(1),
-    bookingDate: date('booking_date').notNull(), // Simplified: direct date, no sessions
-    bookingTime: time('booking_time').notNull(), // Morning or evening time slot
+    bookingDate: date('booking_date').notNull(),
+    bookingTime: time('booking_time').notNull(), // Dynamic — fetched from day_settings or global default
+    category: varchar('category', { length: 50 }).notNull().default('individual'), // individual | school | organisation
+    organisationName: varchar('organisation_name', { length: 255 }), // Required when category ≠ individual
+    visited: boolean('visited').notNull().default(false), // Checked off in the daily checklist
     confirmationSent: boolean('confirmation_sent').notNull().default(false),
     reminderSent: boolean('reminder_sent').notNull().default(false),
-    reminderSentAt: timestamp('reminder_sent_at'), // Nullable: only set when reminder sent
+    reminderSentAt: timestamp('reminder_sent_at'),
     status: varchar('status', { length: 50 }).notNull().default('confirmed'), // confirmed | cancelled | completed
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -118,6 +121,37 @@ export const pushSubscriptions = pgTable(
   })
 );
 
+// ─── Day Settings Table ──────────────────────────────────────────────────────
+// Per-day overrides for slot time, guest capacity, and date blocking.
+// If no row exists for a date, global defaults from app_config apply.
+
+export const daySettings = pgTable(
+  'day_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    date: date('date').notNull(),              // The specific date this setting applies to
+    slotTime: time('slot_time'),               // Override time (null = use global default)
+    maxGuests: integer('max_guests'),           // Override capacity (null = use global default)
+    isBlocked: boolean('is_blocked').notNull().default(false), // Block this entire day
+    blockReason: text('block_reason'),          // Optional reason shown in cancellation email
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    dateUniq: uniqueIndex('day_settings_date_uniq').on(table.date),
+  })
+);
+
+// ─── App Config Table ────────────────────────────────────────────────────────
+// Key-value store for global application settings.
+// Seeds: default_slot_time = '16:30', default_max_guests = '100'
+
+export const appConfig = pgTable('app_config', {
+  key: varchar('key', { length: 100 }).primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPE EXPORTS - TypeScript inference from Drizzle schema
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,3 +167,8 @@ export type NewFeedback = typeof feedback.$inferInsert;
 
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type NewAdminUser = typeof adminUsers.$inferInsert;
+
+export type DaySetting = typeof daySettings.$inferSelect;
+export type NewDaySetting = typeof daySettings.$inferInsert;
+
+export type AppConfig = typeof appConfig.$inferSelect;
