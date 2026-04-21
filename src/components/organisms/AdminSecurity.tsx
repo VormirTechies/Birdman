@@ -107,19 +107,19 @@ export function AdminSecurity({ isOpen, onClose, isEmbed = false }: AdminSecurit
   const ContentWrapper = isEmbed 
     ? ({ children }: { children: ReactNode }) => <div>{children}</div> 
     : ({ children }: { children: ReactNode }) => (
-    <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-canopy-dark/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-zinc-950/40 backdrop-blur-md"
         onClick={onClose}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-black/[0.03] overflow-hidden"
       >
         {children}
       </motion.div>
@@ -130,35 +130,35 @@ export function AdminSecurity({ isOpen, onClose, isEmbed = false }: AdminSecurit
     <ContentWrapper>
         {/* Header - Only in Modal */}
         {!isEmbed && (
-          <div className="p-6 border-b border-canopy-dark/5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-sanctuary-green/10 rounded-xl flex items-center justify-center">
-                <ShieldCheck className="w-6 h-6 text-sanctuary-green" />
+          <div className="p-8 border-b border-zinc-100 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center shadow-lg">
+                <ShieldCheck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="font-display font-bold text-xl text-canopy-dark">Security Settings</h2>
-                <p className="text-xs text-canopy-dark/40">Manage your administrative credentials</p>
+                <h2 className="font-display font-black text-xl text-zinc-900 tracking-tight">Security Access</h2>
+                <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mt-0.5">Credential Management</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-canopy-dark/5 rounded-full transition-colors text-canopy-dark/30 hover:text-canopy-dark">
+            <button onClick={onClose} className="p-2.5 hover:bg-zinc-100 rounded-full transition-colors text-zinc-300 hover:text-zinc-900 border border-transparent hover:border-zinc-200">
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
 
         {/* Tabs */}
-        <div className={cn("flex border-b border-canopy-dark/5", isEmbed && "mt-0")}>
+        <div className={cn("flex border-b border-zinc-100", isEmbed && "mt-0")}>
           <button
             onClick={() => { setActiveTab('email'); setStep('request'); setMessage({type:'', text:''}); }}
-            className={`flex-1 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === 'email' ? 'border-sanctuary-green text-sanctuary-green bg-sanctuary-green/[0.02]' : 'border-transparent text-canopy-dark/40 hover:text-canopy-dark'}`}
+            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'email' ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-transparent text-zinc-300 hover:text-zinc-500'}`}
           >
-            Change Email
+            Email Migration
           </button>
           <button
             onClick={() => { setActiveTab('password'); setMessage({type:'', text:''}); }}
-            className={`flex-1 py-4 text-sm font-medium transition-colors border-b-2 ${activeTab === 'password' ? 'border-sanctuary-green text-sanctuary-green bg-sanctuary-green/[0.02]' : 'border-transparent text-canopy-dark/40 hover:text-canopy-dark'}`}
+            className={`flex-1 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${activeTab === 'password' ? 'border-zinc-900 text-zinc-900 bg-zinc-50/50' : 'border-transparent text-zinc-300 hover:text-zinc-500'}`}
           >
-            Change Password
+            Access Key
           </button>
         </div>
 
@@ -168,55 +168,56 @@ export function AdminSecurity({ isOpen, onClose, isEmbed = false }: AdminSecurit
             {activeTab === 'email' ? (
               <motion.div
                 key="email-tab"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
               >
                 {step === 'request' ? (
-                  <form onSubmit={handleRequestEmailChange} className="space-y-5">
-                    <p className="text-sm text-canopy-dark/60 leading-relaxed">
-                      Enter your new email address. We will send a 6-digit verification code to ensure you have access to it.
+                  <form onSubmit={handleRequestEmailChange} className="space-y-6">
+                    <p className="text-sm text-zinc-500 font-medium leading-relaxed bg-zinc-50 p-5 rounded-2xl border border-black/[0.02]">
+                      Initiate credentials migration by entering your new target identity. A 6-digit verification code will be dispatched.
                     </p>
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-canopy-dark/40">New Email Address</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-4">New Identity</label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-canopy-dark/30" />
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
                         <Input
                           type="email"
                           required
                           value={newEmail}
                           onChange={(e) => setNewEmail(e.target.value)}
-                          placeholder="new-admin@birdmanofchennai.com"
-                          className="pl-11 h-12 rounded-xl border-canopy-dark/10"
+                          placeholder="admin@sanctuary.com"
+                          className="pl-12 h-14 rounded-2xl bg-zinc-50 border-transparent text-zinc-900 placeholder:text-zinc-200 focus:bg-white focus:border-zinc-900/10 focus:ring-4 focus:ring-zinc-900/5 transition-all text-sm font-bold"
                         />
                       </div>
                     </div>
-                    <Button type="submit" disabled={isLoading} className="w-full bg-sanctuary-green h-12 rounded-xl text-base gap-2">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Request Verification Code'}
+                    <Button type="submit" disabled={isLoading} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white h-14 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-xl shadow-black/10 active:scale-[0.98]">
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Dispatch Verification'}
                     </Button>
                   </form>
                 ) : (
-                  <form onSubmit={handleVerifyOTP} className="space-y-5">
-                    <div className="flex flex-col items-center text-center space-y-3">
-                      <div className="w-12 h-12 bg-sanctuary-green/10 rounded-full flex items-center justify-center">
-                        <Mail className="w-6 h-6 text-sanctuary-green" />
+                  <form onSubmit={handleVerifyOTP} className="space-y-6">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="w-14 h-14 bg-sanctuary-green/10 rounded-[1.25rem] flex items-center justify-center shadow-inner">
+                        <Mail className="w-7 h-7 text-sanctuary-green" />
                       </div>
-                      <h3 className="font-bold text-lg text-canopy-dark">Enter 6-Digit Code</h3>
-                      <p className="text-sm text-canopy-dark/60">We sent a verification code to <strong>{newEmail}</strong></p>
+                      <h3 className="font-black text-xl text-zinc-900 tracking-tight">Identity Verification</h3>
+                      <p className="text-sm text-zinc-400 font-medium">Verify code dispatched to <strong>{newEmail}</strong></p>
                     </div>
                     <Input
                       required
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      className="text-center text-3xl font-bold tracking-[0.5em] h-16 rounded-xl border-sanctuary-green/30"
+                      className="text-center text-3xl font-black bg-zinc-50 border-black/5 tracking-[0.4em] h-20 rounded-2xl focus:bg-white focus:border-sanctuary-green/30"
                       placeholder="000000"
                     />
-                    <Button type="submit" disabled={isLoading} className="w-full bg-sanctuary-green h-12 rounded-xl text-base gap-2">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify & Update Email'}
+                    <Button type="submit" disabled={isLoading} className="w-full bg-sanctuary-green hover:bg-zinc-900 text-white h-14 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-xl shadow-green-900/10 active:scale-[0.98]">
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm & Re-Authenticate'}
                     </Button>
-                    <button type="button" onClick={() => setStep('request')} className="w-full text-xs text-canopy-dark/40 hover:text-sanctuary-green transition-colors">
-                      Didn&apos;t receive the code? Try another email.
+                    <button type="button" onClick={() => setStep('request')} className="w-full text-[10px] font-black uppercase tracking-widest text-zinc-300 hover:text-zinc-900 transition-colors">
+                      Retry Migration
                     </button>
                   </form>
                 )}
@@ -224,46 +225,47 @@ export function AdminSecurity({ isOpen, onClose, isEmbed = false }: AdminSecurit
             ) : (
               <motion.div
                 key="password-tab"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                className="space-y-5"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
               >
-                <p className="text-sm text-canopy-dark/60 leading-relaxed">
-                  Update your dashboard password. You will be signed out immediately after a successful update.
+                <p className="text-sm text-zinc-500 font-medium leading-relaxed bg-zinc-50 p-5 rounded-2xl border border-black/[0.02]">
+                  Recalibrate your access key. Successful update will trigger a global session termination for security.
                 </p>
-                <form onSubmit={handlePasswordChange} className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-canopy-dark/40">New Password</label>
+                <form onSubmit={handlePasswordChange} className="space-y-6">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-4">New Access Key</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-canopy-dark/30" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
                       <Input
                         type="password"
                         required
                         minLength={8}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min 8 characters"
-                        className="pl-11 h-12 rounded-xl border-canopy-dark/10"
+                        placeholder="••••••••"
+                        className="pl-12 h-14 rounded-2xl bg-zinc-50 border-transparent text-zinc-900 placeholder:text-zinc-200 focus:bg-white focus:border-zinc-900/10 focus:ring-4 focus:ring-zinc-900/5 transition-all text-sm font-bold"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-canopy-dark/40">Confirm New Password</label>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-4">Confirm Connection Key</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-canopy-dark/30" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
                       <Input
                         type="password"
                         required
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm password"
-                        className="pl-11 h-12 rounded-xl border-canopy-dark/10"
+                        placeholder="••••••••"
+                        className="pl-12 h-14 rounded-2xl bg-zinc-50 border-transparent text-zinc-900 placeholder:text-zinc-200 focus:bg-white focus:border-zinc-900/10 focus:ring-4 focus:ring-zinc-900/5 transition-all text-sm font-bold"
                       />
                     </div>
                   </div>
-                  <Button type="submit" disabled={isLoading} className="w-full bg-canopy-dark h-12 rounded-xl text-base gap-2">
-                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Update Password & Sign Out'}
+                  <Button type="submit" disabled={isLoading} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white h-14 rounded-2xl text-xs font-black uppercase tracking-widest gap-2 shadow-xl shadow-black/10 active:scale-[0.98]">
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Execute Recalibration'}
                   </Button>
                 </form>
               </motion.div>
@@ -272,15 +274,17 @@ export function AdminSecurity({ isOpen, onClose, isEmbed = false }: AdminSecurit
 
           {message.text && (
             <motion.div
-              initial={{ opacity: 0, y: 5 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                "mt-6 p-4 rounded-xl flex items-center gap-3 text-sm",
-                message.type === 'success' ? 'bg-sanctuary-green/10 text-sanctuary-green' : 'bg-red-50 text-red-600'
+                "mt-8 p-5 rounded-2xl flex items-center gap-4 text-xs font-black uppercase tracking-tight shadow-sm border",
+                message.type === 'success' ? 'bg-zinc-900 text-white border-transparent shadow-zinc-900/10' : 'bg-red-50 text-red-600 border-red-100'
               )}
             >
-              {message.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <XCircle className="w-5 h-5 shrink-0" />}
-              {message.text}
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", message.type === 'success' ? 'bg-white/10' : 'bg-red-600/10')}>
+                {message.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-white" /> : <XCircle className="w-4 h-4 text-red-600" />}
+              </div>
+              <p className="flex-1 leading-snug">{message.text}</p>
             </motion.div>
           )}
         </div>

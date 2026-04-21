@@ -5,7 +5,7 @@ export default async function AdminDashboardPage() {
   const stats = await getDashboardStats();
 
   return (
-    <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-10">
+    <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12 animate-in fade-in duration-1000">
       <DashboardV2 initialStats={stats} />
     </main>
   );

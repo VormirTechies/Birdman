@@ -39,72 +39,74 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-feather-cream/50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
       {/* Background Ambience */}
-      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none"></div>
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-sanctuary-green/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-canopy-light/5 blur-[100px] rounded-full -z-10 pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02] mix-blend-overlay pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-zinc-50 blur-[120px] rounded-full -z-10 pointer-events-none opacity-50" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-zinc-50 blur-[100px] rounded-full -z-10 pointer-events-none opacity-50" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[440px] relative z-10"
       >
         {/* Logo Section */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <motion.div 
-            initial={{ scale: 0.8, y: -10 }}
+            initial={{ scale: 0.9, y: -10 }}
             animate={{ scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-            className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-canopy-dark/[0.02] border border-canopy-dark/5 relative"
+            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.1 }}
+            className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-black/[0.05] border border-black/[0.03] relative group"
           >
-            <Bird className="w-12 h-12 text-sanctuary-green" />
-            <div className="absolute -top-2 -right-2 w-7 h-7 bg-amber-400 rounded-full border-4 border-feather-cream flex items-center justify-center">
+            <Bird className="w-12 h-12 text-zinc-900 transition-transform duration-500 group-hover:scale-110" />
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-sanctuary-green rounded-full border-4 border-white flex items-center justify-center shadow-lg">
               <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
             </div>
           </motion.div>
-          <h1 className="font-display font-bold text-3xl text-canopy-dark tracking-tight mb-2">
-            Administrator Access
+          <h1 className="font-display font-black text-4xl text-zinc-900 tracking-tight mb-3">
+            Sanctuary <span className="text-zinc-400">HQ</span>
           </h1>
-          <p className="text-canopy-dark/40 text-sm font-bold tracking-widest uppercase">
-            Birdman Sanctuary Control
+          <p className="text-zinc-400 text-[10px] font-black tracking-[0.2em] uppercase">
+            Administrative Control Interface
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-canopy-dark/[0.04] border border-canopy-dark/5 relative">
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-canopy-dark/40 ml-2">
+        <div className="bg-white p-10 md:p-12 rounded-[3.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)] border border-black/[0.03] relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 -z-10" />
+          
+          <form onSubmit={handleLogin} className="space-y-8 relative">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-5">
                 Identity
               </label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-canopy-dark/30" />
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@bridge.com"
                   required
-                  className="rounded-2xl h-14 bg-canopy-dark/[0.02] border-canopy-dark/10 text-canopy-dark placeholder:text-canopy-dark/20 pl-12 focus:bg-white focus:ring-2 focus:ring-sanctuary-green/20 transition-all text-base"
+                  className="rounded-3xl h-16 bg-zinc-50 border-transparent text-zinc-900 placeholder:text-zinc-300 pl-14 focus:bg-white focus:border-zinc-900/10 focus:ring-4 focus:ring-zinc-900/5 transition-all text-base font-bold shadow-inner"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-canopy-dark/40 ml-2">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-zinc-400 ml-5">
                 Access Key
               </label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-canopy-dark/30" />
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
                 <Input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="rounded-2xl h-14 bg-canopy-dark/[0.02] border-canopy-dark/10 text-canopy-dark placeholder:text-canopy-dark/20 pl-12 focus:bg-white focus:ring-2 focus:ring-sanctuary-green/20 transition-all text-base"
+                  className="rounded-3xl h-16 bg-zinc-50 border-transparent text-zinc-900 placeholder:text-zinc-300 pl-14 focus:bg-white focus:border-zinc-900/10 focus:ring-4 focus:ring-zinc-900/5 transition-all text-base font-bold shadow-inner"
                 />
               </div>
             </div>
@@ -112,13 +114,13 @@ export default function LoginPage() {
             <AnimatePresence>
               {error && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-50 border border-red-100 px-4 py-3 rounded-2xl flex items-center gap-3 overflow-hidden"
+                  initial={{ opacity: 0, height: 0, y: -10 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -10 }}
+                  className="bg-red-50/50 border border-red-100 px-5 py-4 rounded-2xl flex items-center gap-3 overflow-hidden"
                 >
                   <ShieldCheck className="w-5 h-5 text-red-500 shrink-0" />
-                  <p className="text-red-600 text-sm font-medium leading-tight">
+                  <p className="text-red-900 text-xs font-black uppercase tracking-tighter leading-tight">
                     {error}
                   </p>
                 </motion.div>
@@ -128,13 +130,13 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-sanctuary-green hover:bg-canopy-dark text-white rounded-2xl h-14 text-lg font-bold gap-3 shadow-xl shadow-sanctuary-green/20 transition-all active:scale-[0.98]"
+              className="w-full bg-zinc-900 hover:bg-zinc-800 text-white rounded-[2rem] h-16 text-sm font-black uppercase tracking-[0.1em] gap-3 shadow-2xl shadow-zinc-900/20 transition-all active:scale-[0.98] mt-4"
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Enter Dashboard
+                  Establish Connection
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -143,8 +145,8 @@ export default function LoginPage() {
         </div>
 
         {/* Footer Link */}
-        <p className="text-center mt-8 text-canopy-dark/30 text-xs font-bold tracking-widest uppercase">
-          &copy; {new Date().getFullYear()} Birdman of Chennai
+        <p className="text-center mt-12 text-zinc-300 text-[10px] font-black tracking-[0.3em] uppercase">
+          &copy; {new Date().getFullYear()} Birdman Terminal
         </p>
       </motion.div>
     </div>

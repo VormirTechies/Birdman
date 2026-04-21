@@ -21,7 +21,7 @@ export default function AdminLayout({
       <PushProvider>
         {!isLoginPage && <AdminSidebar />}
         {!isLoginPage && <RealtimeNotifier />}
-        <div className={!isLoginPage ? "lg:pl-72 min-h-screen pb-32 lg:pb-0" : "min-h-screen"}>
+        <div className={!isLoginPage ? "lg:pl-72 min-h-screen pt-16 lg:pt-0 pb-24 lg:pb-0" : "min-h-screen"}>
           {children}
         </div>
       </PushProvider>
