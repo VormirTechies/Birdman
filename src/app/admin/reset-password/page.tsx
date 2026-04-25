@@ -36,26 +36,14 @@ export default function ResetPasswordPage() {
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    // Check for valid session from magic link
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          // No valid session, redirect to login
-          router.push('/admin/login');
-          return;
-        }
-        
-        setIsCheckingSession(false);
-      } catch (err) {
-        console.error('Session check error:', err);
-        router.push('/admin/login');
-      }
-    };
+    // When arriving via magic link, the session is created from URL hash
+    // Just mark as ready after a brief delay
+    const timer = setTimeout(() => {
+      setIsCheckingSession(false);
+    }, 500);
 
-    checkSession();
-  }, [router, supabase]);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();

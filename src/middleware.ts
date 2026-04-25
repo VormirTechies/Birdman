@@ -37,10 +37,13 @@ export async function middleware(request: NextRequest) {
 
   // Protect Admin Dashboard Routes
   if (request.nextUrl.pathname.startsWith('/admin')) {
-    // Exception: Don't protect the login page (avoid infinite loop)
-    if (request.nextUrl.pathname === '/admin/login') {
-      // If user is already logged in, redirect to the dashboard
-      if (user) {
+    // Exception: Don't protect login and reset-password pages
+    if (
+      request.nextUrl.pathname === '/admin/login' ||
+      request.nextUrl.pathname === '/admin/reset-password'
+    ) {
+      // If user is already logged in and trying to access login, redirect to dashboard
+      if (user && request.nextUrl.pathname === '/admin/login') {
         return NextResponse.redirect(new URL('/admin', request.url))
       }
       return response
