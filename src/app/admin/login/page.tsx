@@ -89,9 +89,8 @@ export default function AdminLoginPage() {
 
       if (authError) throw authError;
 
-      // Successful login
+      // Successful login - redirect to dashboard
       router.push('/admin');
-      router.refresh();
     } catch (err: any) {
       setError(err.message || 'Invalid login credentials');
     } finally {
