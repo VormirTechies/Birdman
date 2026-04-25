@@ -27,7 +27,9 @@ export default function AdminLayout({
 
   // Routes that should bypass the layout wrapper
   const isExcludedRoute =
-    pathname?.includes('/login') || pathname?.includes('/not-found');
+    pathname?.includes('/login') || 
+    pathname?.includes('/not-found') ||
+    pathname?.includes('/reset-password');
 
   if (isExcludedRoute) {
     return (
