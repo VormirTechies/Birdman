@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Bird, Mail, Lock, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import Carousel from '../_components/Carousel';
 import OTPInput from '../_components/OTPInput';
 
@@ -73,11 +74,29 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
 
-    // TODO: Implement actual authentication
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const supabase = createClient();
+      
+      // Validate inputs
+      if (!email || !password) {
+        throw new Error('Please fill in all fields');
+      }
+
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      // Successful login
       router.push('/admin');
-    }, 1000);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || 'Invalid login credentials');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
