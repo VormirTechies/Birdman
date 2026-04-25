@@ -1,32 +1,71 @@
 'use client';
 
+import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { Work_Sans } from 'next/font/google';
 import { Toaster } from 'sonner';
-import { AdminSidebar } from '@/components/organisms/admin/AdminSidebar';
-import { RealtimeNotifier } from '@/components/organisms/admin/RealtimeNotifier';
-import { PushProvider } from '@/components/providers/PushProvider';
-import { usePush } from '@/components/providers/PushProvider';
+import { NextIntlClientProvider } from 'next-intl';
+import { AdminV2Sidebar } from './_components/Sidebar';
+import { AdminV2Header } from './_components/Header';
+import { AdminV2BottomNav } from './_components/BottomNav';
+import enMessages from '@/../messages/en.json';
 
-export default function AdminLayout({
+const workSans = Work_Sans({
+  subsets: ['latin'],
+  variable: '--font-work-sans',
+  display: 'swap',
+  weight: ['400', '500', '600', '700'],
+});
+
+export default function AdminV2Layout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen bg-[#fafafa]">
-      <PushProvider>
-        <AdminSidebar />
-        <RealtimeNotifier />
-        <div className="lg:pl-72 min-h-screen pb-32 lg:pb-0">
+  const pathname = usePathname();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Routes that should bypass the layout wrapper
+  const isExcludedRoute =
+    pathname?.includes('/login') || pathname?.includes('/not-found');
+
+  if (isExcludedRoute) {
+    return (
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <div className={workSans.variable}>
           {children}
         </div>
-      </PushProvider>
-      <Toaster 
-        position="top-right"
-        richColors
-        expand={true}
-        theme="light"
-        className="z-[9999]"
-      />
-    </div>
+        <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />
+      </NextIntlClientProvider>
+    );
+  }
+
+  return (
+    <NextIntlClientProvider locale="en" messages={enMessages}>
+      <div className={`${workSans.variable} min-h-screen bg-[#F5F5F5]`}>
+        {/* Fixed sidebar (desktop) + drawer (mobile) */}
+        <AdminV2Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+
+        {/* Main area — offset right of the desktop sidebar */}
+        <div className="lg:ml-65 flex flex-col min-h-screen">
+          {/* Fixed top header */}
+          <AdminV2Header onMenuClick={() => setIsSidebarOpen(true)} />
+
+          {/* Page content — padded below header, and above bottom nav on mobile */}
+          <main className="flex-1 mt-16 pb-16 lg:pb-0 p-4 lg:p-8">
+            {children}
+          </main>
+        </div>
+
+        {/* Fixed bottom nav — mobile only */}
+        <AdminV2BottomNav onMoreClick={() => setIsSidebarOpen(true)} />
+
+        <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />
+      </div>
+    </NextIntlClientProvider>
   );
 }
+
