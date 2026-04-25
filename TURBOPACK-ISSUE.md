@@ -1,48 +1,52 @@
-# Turbopack Development Issue
+# Turbopack Development Issue - RESOLVED ✅
 
 ## Problem
-The project uses Next.js 16.2.1, where Turbopack is the default bundler for development. However, Turbopack is experiencing fatal crashes during development, causing infinite page reload loops and build failures.
+During the admin folder migration (adminV2 → admin), Turbopack was experiencing fatal crashes with errors about missing `/admin/sessions/page` route.
 
 ## Symptoms
 - Repeated `FATAL: An unexpected Turbopack error occurred` messages
-- Panic logs written to temp directory
-- Infinite GET requests to routes causing server overload
-- Browser unable to load pages properly
+- Panic logs mentioning "Failed to write app endpoint /admin/sessions/page"
+- Infinite GET requests causing server reload loops
+- Exit code 1 crashes
 
 ## Root Cause
-The Turbopack bundler in Next.js 16.2.1 has stability issues that cause crashes when:
-- Processing certain middleware configurations
-- Hot module reloading (HMR)
-- Handling route navigation
+The `.next` build cache contained stale references to routes from the old folder structure. After renaming folders, Turbopack tried to build non-existent routes cached from the previous build.
 
-## Workaround
+## Solution ✅
 
-### Option 1: Use Environment Variable (Recommended)
-**Windows PowerShell:**
+**Clear the Next.js build cache:**
 ```powershell
-$env:TURBOPACK='0'; npm run dev
+# Windows PowerShell
+Remove-Item -Recurse -Force .next
+npm run dev
 ```
 
-**Linux/Mac:**
 ```bash
-TURBOPACK=0 npm run dev
+# Linux/Mac
+rm -rf .next
+npm run dev
 ```
 
-### Option 2: Downgrade to Next.js 15
-If the Turbopack crashes persist, consider downgrading to Next.js 15 where Turbopack is opt-in:
-```bash
-npm install next@15
+This removes all cached build artifacts and forces a clean rebuild with the new folder structure.
+
+## Prevention
+
+After major folder or route restructuring, always clear the build cache:
+```powershell
+Remove-Item -Recurse -Force .next
 ```
 
 ## Fixed Issues
-✅ Removed `router.refresh()` call after login that was contributing to reload loops
-✅ Added `/admin/reset-password` to middleware exceptions to prevent redirect loops
-✅ Verified webpack bundler works correctly as fallback
+✅ Removed `router.refresh()` call after login (was contributing to reload loops)
+✅ Added `/admin/reset-password` to middleware exceptions (prevented redirect loops)  
+✅ Cleared stale Next.js cache referencing old adminV2 routes
 
 ## Status
-- **Development**: Use webpack (TURBOPACK=0) until Next.js 16 Turbopack stability improves
-- **Production**: Vercel deployment uses optimized bundler automatically (no issue)
+- ✅ **Development**: Server running cleanly at http://localhost:3000
+- ✅ **Turbopack**: Working correctly after cache clear
+- ✅ **Production**: No impact (Vercel builds from clean state)
 
-## References
-- Next.js 16 Turbopack: https://nextjs.org/docs/architecture/turbopack
-- Issue tracker: Monitor for Next.js 16 Turbopack fixes
+## Notes
+- The `.next` folder is gitignored and should be cleared whenever folder/route structures change significantly
+- Turbopack itself was not the issue - it was trying to build cached but non-existent routes
+
