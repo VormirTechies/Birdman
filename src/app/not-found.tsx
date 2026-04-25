@@ -1,28 +1,24 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import { Home } from 'lucide-react';
+import { Home, Bird } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#f8f1d4]">
       <div className="max-w-2xl w-full text-center">
-        {/* 404 Image with Parakeets */}
-        <div className="mb-6 flex justify-center">
-          <div className="relative w-full h-64 md:h-80">
-            <Image
-              src="/images/404.png"
-              alt="404 - Parakeets on numbers"
-              fill
-              className="object-contain"
-              priority
-            />
+        {/* 404 Icon */}
+        <div className="mb-8 flex justify-center">
+          <div className="relative">
+            <Bird className="w-32 h-32 text-[#2d6a4f] opacity-20" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-8xl font-bold text-[#2d6a4f]">404</span>
+            </div>
           </div>
         </div>
 
         {/* Main Heading */}
         <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">
-          404 - Page Not Found
+          Page Not Found
         </h1>
 
         {/* Description */}
