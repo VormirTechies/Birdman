@@ -6,17 +6,17 @@ import { Home, Calendar, ClipboardList, UserCircle, MoreHorizontal } from 'lucid
 import { cn } from '@/lib/utils';
 
 const BOTTOM_NAV_ITEMS = [
-  { label: 'HOME', icon: Home, href: '/adminV2' },
-  { label: 'CALENDAR', icon: Calendar, href: '/adminV2/calendar' },
-  { label: 'CHECKLIST', icon: ClipboardList, href: '/adminV2/checklist' },
-  { label: 'PROFILE', icon: UserCircle, href: '/adminV2/profile' },
+  { label: 'HOME', icon: Home, href: '/admin' },
+  { label: 'CALENDAR', icon: Calendar, href: '/admin/calendar' },
+  { label: 'CHECKLIST', icon: ClipboardList, href: '/admin/checklist' },
+  { label: 'PROFILE', icon: UserCircle, href: '/admin/profile' },
 ];
 
 interface BottomNavProps {
   onMoreClick: () => void;
 }
 
-export function AdminV2BottomNav({ onMoreClick }: BottomNavProps) {
+export function AdminBottomNav({ onMoreClick }: BottomNavProps) {
   const pathname = usePathname();
 
   return (
@@ -27,7 +27,7 @@ export function AdminV2BottomNav({ onMoreClick }: BottomNavProps) {
       {BOTTOM_NAV_ITEMS.map((item) => {
         const isActive =
           pathname === item.href ||
-          (item.href !== '/adminV2' && pathname?.startsWith(item.href));
+          (item.href !== '/admin' && pathname?.startsWith(item.href));
 
         return (
           <Link

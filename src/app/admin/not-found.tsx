@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export default function AdminV2NotFound() {
+export default function AdminNotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#f8f1d4]">
           <div className="max-w-2xl w-full text-center">

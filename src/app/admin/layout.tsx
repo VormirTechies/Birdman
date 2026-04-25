@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation';
 import { Work_Sans } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { NextIntlClientProvider } from 'next-intl';
-import { AdminV2Sidebar } from './_components/Sidebar';
-import { AdminV2Header } from './_components/Header';
-import { AdminV2BottomNav } from './_components/BottomNav';
+import { AdminSidebar } from './_components/Sidebar';
+import { AdminHeader } from './_components/Header';
+import { AdminBottomNav } from './_components/BottomNav';
 import enMessages from '@/../messages/en.json';
 
 const workSans = Work_Sans({
@@ -17,7 +17,7 @@ const workSans = Work_Sans({
   weight: ['400', '500', '600', '700'],
 });
 
-export default function AdminV2Layout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -44,7 +44,7 @@ export default function AdminV2Layout({
     <NextIntlClientProvider locale="en" messages={enMessages}>
       <div className={`${workSans.variable} min-h-screen bg-[#F5F5F5]`}>
         {/* Fixed sidebar (desktop) + drawer (mobile) */}
-        <AdminV2Sidebar
+        <AdminSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
@@ -52,7 +52,7 @@ export default function AdminV2Layout({
         {/* Main area — offset right of the desktop sidebar */}
         <div className="lg:ml-65 flex flex-col min-h-screen">
           {/* Fixed top header */}
-          <AdminV2Header onMenuClick={() => setIsSidebarOpen(true)} />
+          <AdminHeader onMenuClick={() => setIsSidebarOpen(true)} />
 
           {/* Page content — padded below header, and above bottom nav on mobile */}
           <main className="flex-1 mt-16 pb-16 lg:pb-0 p-4 lg:p-8">
@@ -61,7 +61,7 @@ export default function AdminV2Layout({
         </div>
 
         {/* Fixed bottom nav — mobile only */}
-        <AdminV2BottomNav onMoreClick={() => setIsSidebarOpen(true)} />
+        <AdminBottomNav onMoreClick={() => setIsSidebarOpen(true)} />
 
         <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />
       </div>

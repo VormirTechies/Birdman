@@ -10,14 +10,14 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
-export function AdminV2Header({ onMenuClick }: HeaderProps) {
+export function AdminHeader({ onMenuClick }: HeaderProps) {
   const avatarRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
 
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/adminV2/login');
+    router.push('/admin/login');
   };
 
   const profileMenuGroups = [
@@ -27,12 +27,12 @@ export function AdminV2Header({ onMenuClick }: HeaderProps) {
         {
           label: 'Profile',
           icon: UserCircle,
-          onClick: () => router.push('/adminV2/profile'),
+          onClick: () => router.push('/admin/profile'),
         },
         {
           label: 'Settings',
           icon: Settings,
-          onClick: () => router.push('/adminV2/settings'),
+          onClick: () => router.push('/admin/settings'),
         },
       ],
     },

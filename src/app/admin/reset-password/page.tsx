@@ -43,14 +43,14 @@ export default function ResetPasswordPage() {
         
         if (sessionError || !session) {
           // No valid session, redirect to login
-          router.push('/adminV2/login');
+          router.push('/admin/login');
           return;
         }
         
         setIsCheckingSession(false);
       } catch (err) {
         console.error('Session check error:', err);
-        router.push('/adminV2/login');
+        router.push('/admin/login');
       }
     };
 
@@ -89,7 +89,7 @@ export default function ResetPasswordPage() {
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
-        router.push('/adminV2/login?reset=success');
+        router.push('/admin/login?reset=success');
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'Failed to reset password. Please try again.');
@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
   };
 
   const handleBackToLogin = () => {
-    router.push('/adminV2/login');
+    router.push('/admin/login');
   };
 
   // Show loading state while checking session

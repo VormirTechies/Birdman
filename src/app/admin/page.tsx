@@ -45,7 +45,7 @@ const STAT_CARDS: StatCardProps[] = [
   },
 ];
 
-export default function AdminV2Page() {
+export default function AdminPage() {
   const router = useRouter();
 
   return (
@@ -64,7 +64,7 @@ export default function AdminV2Page() {
           </p>
         </div>
         <button
-          onClick={() => router.push('/adminV2/bookings/new')}
+          onClick={() => router.push('/admin/bookings/new')}
           className="shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
         >

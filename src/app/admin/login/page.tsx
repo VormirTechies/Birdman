@@ -76,7 +76,7 @@ export default function AdminLoginPage() {
     // TODO: Implement actual authentication
     setTimeout(() => {
       setIsLoading(false);
-      router.push('/adminV2');
+      router.push('/admin');
     }, 1000);
   };
 

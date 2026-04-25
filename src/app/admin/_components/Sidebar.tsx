@@ -19,12 +19,12 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/adminV2' },
-  { label: 'Calendar', icon: Calendar, href: '/adminV2/calendar' },
-  { label: 'Checklist', icon: ClipboardList, href: '/adminV2/checklist' },
-  { label: 'History', icon: History, href: '/adminV2/history' },
-  { label: 'Gallery', icon: Images, href: '/adminV2/gallery' },
-  { label: 'Profile', icon: UserCircle, href: '/adminV2/profile' },
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
+  { label: 'Calendar', icon: Calendar, href: '/admin/calendar' },
+  { label: 'Checklist', icon: ClipboardList, href: '/admin/checklist' },
+  { label: 'History', icon: History, href: '/admin/history' },
+  { label: 'Gallery', icon: Images, href: '/admin/gallery' },
+  { label: 'Profile', icon: UserCircle, href: '/admin/profile' },
 ];
 
 interface SidebarProps {
@@ -38,7 +38,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
   const handleSignOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    window.location.href = '/adminV2/login';
+    window.location.href = '/admin/login';
   };
 
   return (
@@ -58,7 +58,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
         {NAV_ITEMS.map((item) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== '/adminV2' && pathname?.startsWith(item.href));
+            (item.href !== '/admin' && pathname?.startsWith(item.href));
           return (
             <Link
               key={item.href}
@@ -90,7 +90,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
       {/* Bottom actions */}
       <div className="px-3 py-3 border-t border-[#E0E0E0] space-y-0.5 shrink-0">
         <Link
-          href="/adminV2/help"
+          href="/admin/help"
           onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#616161] hover:bg-[#F5F5F5] hover:text-[#212121] transition-colors min-h-11"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
@@ -111,7 +111,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function AdminV2Sidebar({ isOpen, onClose }: SidebarProps) {
+export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar — always visible, fixed */}
