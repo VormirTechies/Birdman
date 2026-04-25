@@ -104,19 +104,32 @@ export default function AdminLoginPage() {
     setForgotError('');
     setForgotLoading(true);
 
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(forgotEmail)) {
-      setForgotError('Please enter a valid email address');
-      setForgotLoading(false);
-      return;
-    }
+    try {
+      const supabase = createClient();
 
-    // TODO: Send OTP to email
-    setTimeout(() => {
+      // Validate email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(forgotEmail)) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      // Send magic link for password reset
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        forgotEmail,
+        {
+          redirectTo: `${window.location.origin}/admin/reset-password`,
+        }
+      );
+
+      if (resetError) throw resetError;
+
+      // Show success state
+      setCurrentView('success');
+    } catch (err: any) {
+      setForgotError(err.message || 'Failed to send reset email. Please try again.');
+    } finally {
       setForgotLoading(false);
-      setCurrentView('verify');
-    }, 1000);
+    }
   };
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
@@ -704,10 +717,10 @@ export default function AdminLoginPage() {
                       className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
                       style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
                     >
-                      Password Changed Successfully!
+                      Check Your Email
                     </h2>
                     <p className="text-xs lg:text-sm text-[#616161]">
-                      Your password has been updated. Please log in again with your new credentials to continue managing your property.
+                      We&apos;ve sent a password reset link to your email. Click the link in the email to reset your password.
                     </p>
                   </div>
 
