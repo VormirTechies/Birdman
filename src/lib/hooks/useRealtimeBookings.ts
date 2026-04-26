@@ -77,13 +77,18 @@ export function useRealtimeBookings(options: UseRealtimeBookingsOptions) {
             onDelete?.(payload.old.id);
           }
         )
-        .subscribe((status) => {
+        .subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
             console.log('✅ Realtime subscription active');
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Realtime subscription error');
+            console.error('❌ Realtime subscription error:', err);
+            console.error('Possible causes:');
+            console.error('1. RLS policies blocking access');
+            console.error('2. Realtime not enabled on table');
+            console.error('3. Invalid channel configuration');
           } else if (status === 'TIMED_OUT') {
             console.error('⏱️ Realtime subscription timed out');
+            console.error('Check your internet connection and Supabase status');
           }
         });
 
