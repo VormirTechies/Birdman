@@ -6,6 +6,7 @@ import { SearchBar } from './SearchBar';
 import { DatePicker } from './DatePicker';
 import { BookingsTable } from './BookingsTable';
 import { BookingsList } from './BookingsList';
+import { useRealtimeBookings } from '@/lib/hooks/useRealtimeBookings';
 import type { Booking } from './BookingsTable';
 
 // Mock data
@@ -72,12 +73,32 @@ export function RecentBookings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
+  const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS);
+
+  // Setup realtime subscription - will automatically refresh when bookings change
+  // Note: Currently using mock data. Once API integration is complete,
+  // this will update the real bookings list in real-time.
+  useRealtimeBookings({
+    onInsert: (newBooking) => {
+      console.log('[RecentBookings] New booking, refreshing list...');
+      // When API is integrated, fetch fresh data here
+      // For now, we rely on the parent component's key prop to trigger re-render
+    },
+    onUpdate: (updatedBooking) => {
+      console.log('[RecentBookings] Booking updated, refreshing list...');
+      // When API is integrated, update the specific booking in the list
+    },
+    onDelete: (bookingId) => {
+      console.log('[RecentBookings] Booking deleted, refreshing list...');
+      // When API is integrated, remove the booking from the list
+    }
+  });
 
   // Filter bookings based on search query
   const filteredBookings = useMemo(() => {
-    if (!searchQuery) return MOCK_BOOKINGS;
+    if (!searchQuery) return bookings;
     const query = searchQuery.toLowerCase();
-    return MOCK_BOOKINGS.filter(
+    return bookings.filter(
       (booking) =>
         booking.guestName.toLowerCase().includes(query) ||
         booking.email.toLowerCase().includes(query) ||

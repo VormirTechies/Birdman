@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { Work_Sans } from 'next/font/google';
 import { Toaster } from 'sonner';
@@ -8,6 +8,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { AdminSidebar } from './_components/Sidebar';
 import { AdminHeader } from './_components/Header';
 import { AdminBottomNav } from './_components/BottomNav';
+import { subscribeUser } from '@/lib/push/client';
+import { requestPushPermission } from '@/lib/push/send';
+import { createClient } from '@/lib/supabase/client';
 import enMessages from '@/../messages/en.json';
 
 const workSans = Work_Sans({
@@ -25,11 +28,59 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Setup push notifications on mount
+  useEffect(() => {
+    const setupPushNotifications = async () => {
+      // Only run on client side and when not on excluded routes
+      if (typeof window === 'undefined') return;
+      if (pathname?.includes('/login') || pathname?.includes('/reset-password')) return;
+
+      try {
+        // Check if user is authenticated
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) return;
+
+        console.log('[Admin Layout] Setting up push notifications...');
+
+        // Request notification permission if not already granted
+        if ('Notification' in window && Notification.permission === 'default') {
+          const permission = await requestPushPermission();
+          
+          if (permission === 'granted') {
+            console.log('✅ Push notification permission granted');
+            
+            // Subscribe to push notifications
+            try {
+              const subscription = await subscribeUser();
+              console.log('✅ Push subscription created:', subscription);
+            } catch (subError) {
+              console.error('Failed to create push subscription:', subError);
+            }
+          } else {
+            console.log('❌ Push notification permission denied');
+          }
+        } else if (Notification.permission === 'granted') {
+          // Permission already granted, ensure subscription exists
+          try {
+            await subscribeUser();
+            console.log('✅ Push subscription verified');
+          } catch (subError) {
+            console.error('Failed to verify push subscription:', subError);
+          }
+        }
+      } catch (error) {
+        console.error('[Admin Layout] Error setting up push notifications:', error);
+      }
+    };
+
+    setupPushNotifications();
+  }, [pathname]);
+
   // Routes that should bypass the layout wrapper
   const isExcludedRoute =
-    pathname?.includes('/login') || 
-    pathname?.includes('/not-found') ||
-    pathname?.includes('/reset-password');
+    pathname?.includes('/login') || pathname?.includes('/not-found') || pathname?.includes('/reset-password');
 
   if (isExcludedRoute) {
     return (
