@@ -71,6 +71,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
                   : 'text-[#616161] hover:bg-[#F5F5F5] hover:text-[#212121]'
               )}
               style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+              suppressHydrationWarning
             >
               <item.icon
                 className={cn(
@@ -94,6 +95,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#616161] hover:bg-[#F5F5F5] hover:text-[#212121] transition-colors min-h-11"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          suppressHydrationWarning
         >
           <HelpCircle className="w-5 h-5 text-[#9E9E9E] shrink-0" />
           <span>Help</span>
@@ -102,6 +104,7 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
           onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#616161] hover:bg-red-50 hover:text-[#ba1a1a] transition-colors min-h-11"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          suppressHydrationWarning
         >
           <LogOut className="w-5 h-5 text-[#ba1a1a] shrink-0" />
           <span>Sign Out</span>
@@ -145,6 +148,7 @@ export function AdminSidebar({ isOpen, onClose }: SidebarProps) {
                 onClick={onClose}
                 className="absolute top-4 right-4 p-2 rounded-lg hover:bg-[#F5F5F5] text-[#616161] transition-colors z-10"
                 aria-label="Close menu"
+                suppressHydrationWarning
               >
                 <X className="w-5 h-5" />
               </button>

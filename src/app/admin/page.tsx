@@ -1,157 +1,141 @@
 'use client';
 
-import { useState } from 'react';
-import { Users, CalendarCheck, CalendarClock, TrendingUp, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Users, CalendarCheck, CalendarClock, TrendingUp, Plus, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { StatCard } from './_components/StatCard';
 import { RecentBookings } from './_components/RecentBookings';
-import { useRealtimeBookings } from '@/lib/hooks/useRealtimeBookings';
-import { sendPushNotification } from '@/lib/push/send';
 import type { StatCardProps } from './_components/StatCard';
-
-const STAT_CARDS: StatCardProps[] = [
-  {
-    label: "Today's Visitors",
-    value: 148,
-    icon: Users,
-    trend: '+12%',
-    trendUp: true,
-    iconBg: '#E8F5E9',
-    iconColor: '#2E7D32',
-  },
-  {
-    label: 'Next 30 Days',
-    value: 320,
-    icon: CalendarCheck,
-    trend: '+5%',
-    trendUp: true,
-    iconBg: '#E8F5E9',
-    iconColor: '#2E7D32',
-  },
-  {
-    label: 'Last 30 Days',
-    value: 1204,
-    icon: CalendarClock,
-    trend: '-3%',
-    trendUp: false,
-    iconBg: '#FFF3E0',
-    iconColor: '#E65100',
-  },
-  {
-    label: 'Total Visitors',
-    value: 12450,
-    icon: TrendingUp,
-    trend: '→ 0%',
-    trendUp: null,
-    iconBg: '#F5F5F5',
-    iconColor: '#616161',
-  },
-];
 
 export default function AdminPage() {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isLive, setIsLive] = useState(false);
-
-  // Setup realtime subscription for bookings
-  useRealtimeBookings({
-    onInsert: async (newBooking) => {
-      console.log('[Dashboard] New booking received:', newBooking);
-      
-      // Show in-app toast notification
-      toast.success('🦅 New Booking Received!', {
-        description: `${newBooking.visitor_name || 'Guest'} booked ${newBooking.number_of_guests || 1} slot(s)`,
-        action: {
-          label: 'View',
-          onClick: () => router.push('/admin/bookings')
-        }
-      });
-
-      // Send push notification (if browser is in background)
-      await sendPushNotification({
-        title: '🦅 New Booking!',
-        body: `${newBooking.visitor_name || 'Guest'} booked for ${newBooking.visit_date || 'upcoming date'}`,
-        url: '/admin',
-        tag: 'new-booking'
-      });
-
-      // Trigger refresh of stats and bookings list
-      setRefreshKey(prev => prev + 1);
-      setIsLive(true);
-      
-      // Reset live indicator after animation
-      setTimeout(() => setIsLive(false), 2000);
-    },
-
-    onUpdate: (updatedBooking) => {
-      console.log('[Dashboard] Booking updated:', updatedBooking);
-      toast.info('Booking Updated', {
-        description: `Status changed to ${updatedBooking.status || 'updated'}`
-      });
-      setRefreshKey(prev => prev + 1);
-    },
-
-    onDelete: (bookingId) => {
-      console.log('[Dashboard] Booking deleted:', bookingId);
-      toast.warning('Booking Cancelled', {
-        description: 'A booking was removed'
-      });
-      setRefreshKey(prev => prev + 1);
-    }
+  const [stats, setStats] = useState({
+    todayVisitors: 0,
+    next30Days: 0,
+    last30Days: 0,
+    totalVisitors: 0,
   });
+
+  // Dynamic stat cards based on real data
+  const statCards: StatCardProps[] = useMemo(() => [
+    {
+      label: "Today's Visitors",
+      value: stats.todayVisitors,
+      icon: Users,
+      trend: stats.todayVisitors > 0 ? '+' + stats.todayVisitors : '0',
+      trendUp: true,
+      iconBg: '#E8F5E9',
+      iconColor: '#2E7D32',
+    },
+    {
+      label: 'Next 30 Days',
+      value: stats.next30Days,
+      icon: CalendarCheck,
+      trend: stats.next30Days > 0 ? '+' + stats.next30Days : '0',
+      trendUp: true,
+      iconBg: '#E8F5E9',
+      iconColor: '#2E7D32',
+    },
+    {
+      label: 'Last 30 Days',
+      value: stats.last30Days,
+      icon: CalendarClock,
+      trend: stats.last30Days > 0 ? stats.last30Days.toString() : '0',
+      trendUp: null,
+      iconBg: '#FFF3E0',
+      iconColor: '#E65100',
+    },
+    {
+      label: 'Total Visitors',
+      value: stats.totalVisitors,
+      icon: TrendingUp,
+      trend: '→ All Time',
+      trendUp: null,
+      iconBg: '#F5F5F5',
+      iconColor: '#616161',
+    },
+  ], [stats]);
+
+  // Fetch stats from API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/bookings/stats', {
+          cache: 'no-cache',
+        });
+        const data = await response.json();
+
+        if (data.success && data.stats) {
+          setStats({
+            todayVisitors: data.stats.todayVisitors,
+            next30Days: data.stats.next30Days,
+            last30Days: data.stats.last30Days,
+            totalVisitors: data.stats.totalVisitors,
+          });
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error fetching stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, [refreshKey]);
+
+  // Manual refresh function
+  const handleManualRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    toast.success('Refreshing data...');
+  };
 
   return (
     <div className="max-w-5xl mx-auto">
       {/* Header row */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1
-              className="text-2xl lg:text-3xl font-bold text-[#212121]"
-              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-            >
-              Overview
-            </h1>
-            {/* Live indicator */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#E8F5E9] rounded-full">
-              <div 
-                className={`w-2 h-2 rounded-full transition-all ${
-                  isLive ? 'bg-[#2E7D32] animate-pulse' : 'bg-[#81C784]'
-                }`}
-              />
-              <span 
-                className="text-xs font-medium text-[#2E7D32]"
-                style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-              >
-                LIVE
-              </span>
-            </div>
-          </div>
+          <h1
+            className="text-2xl lg:text-3xl font-bold text-[#212121]"
+            style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          >
+            Overview
+          </h1>
           <p className="text-sm text-[#616161] mt-1">
             Here&apos;s what&apos;s happening at your property today.
           </p>
         </div>
-        <button
-          onClick={() => router.push('/admin/bookings/new')}
-          className="shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
-          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-        >
-          <Plus className="w-4 h-4" />
-          New Booking
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Manual refresh button */}
+          <button
+            onClick={handleManualRefresh}
+            className="shrink-0 p-2.5 rounded-xl bg-white hover:bg-[#F5F5F5] text-[#2E7D32] transition-colors border border-[#E0E0E0]"
+            title="Refresh data"
+            suppressHydrationWarning
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => router.push('/admin/bookings/new')}
+            className="shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
+            style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            suppressHydrationWarning
+          >
+            <Plus className="w-4 h-4" />
+            New Booking
+          </button>
+        </div>
       </div>
 
-      {/* Stat cards — 2 cols on mobile, 4 cols on desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {STAT_CARDS.map((card) => (
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {statCards.map((card) => (
           <StatCard key={card.label} {...card} />
         ))}
       </div>
 
       {/* Recent Bookings section */}
       <div className="mb-8">
-        <RecentBookings key={refreshKey} />
+        <RecentBookings refreshKey={refreshKey} />
       </div>
     </div>
   );

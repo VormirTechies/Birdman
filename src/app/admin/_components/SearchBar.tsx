@@ -31,12 +31,14 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...' 
           placeholder={placeholder}
           className="ml-4 pl-8 py-2.5 flex-1 text-sm text-[#212121] placeholder:text-[#9E9E9E] bg-[#F5F5F5] border-none outline-none rounded-lg"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          suppressHydrationWarning
         />
         {value && (
           <button
             onClick={() => onChange('')}
             className="p-1 hover:bg-[#E0E0E0] rounded-lg transition-colors cursor-pointer z-10 -ml-10"
             aria-label="Clear search"
+            suppressHydrationWarning
           >
             <X className="w-4 h-4 text-[#616161]" />
           </button>
@@ -77,6 +79,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...' 
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="h-11 text-sm text-[#212121] placeholder:text-[#9E9E9E] bg-transparent border-none outline-none pr-2.5"
             style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            suppressHydrationWarning
           />
           
           {value && isExpanded && (

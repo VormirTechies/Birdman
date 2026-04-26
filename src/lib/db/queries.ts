@@ -1,6 +1,6 @@
 import { db } from './index';
 import { bookings, verificationCodes, feedback, galleryImages, type NewBooking, type Booking, type NewFeedback, type Feedback } from './schema';
-import { eq, and, desc, gt, sql } from 'drizzle-orm';
+import { eq, and, desc, gt, gte, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATABASE QUERIES - Birdman of Chennai Booking System
@@ -47,7 +47,7 @@ export async function getBookings(params: {
   const conditions = [];
   if (status) conditions.push(eq(bookings.status, status));
   if (date) conditions.push(eq(bookings.bookingDate, date));
-  if (minDate) conditions.push(gt(bookings.bookingDate, minDate)); // Using gt or gte? User said "don't show past date", so today onwards.
+  if (minDate) conditions.push(gte(bookings.bookingDate, minDate)); // gte = today and onwards
 
   // 2. SEARCH LOGIC (Case Insensitive)
   if (search) {
@@ -229,6 +229,63 @@ export async function getDashboardStats() {
     totalBookings: all.length,
     todayBookings: all.filter(b => b.bookingDate === today).length,
     upcomingBookings: all.filter(b => b.bookingDate > today).length
+  };
+}
+
+// ─── Get Booking Stats (Optimized with SQL Aggregation) ──────────────────────
+
+export async function getBookingStats() {
+  const today = new Date().toISOString().split('T')[0];
+  const next30 = new Date();
+  next30.setDate(next30.getDate() + 30);
+  const next30Str = next30.toISOString().split('T')[0];
+  const last30 = new Date();
+  last30.setDate(last30.getDate() - 30);
+  const last30Str = last30.toISOString().split('T')[0];
+
+  // Execute all stats queries in parallel for performance
+  const [todayResult, next30Result, last30Result, totalResult] = await Promise.all([
+    // Today's visitors (confirmed bookings only)
+    db
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .from(bookings)
+      .where(and(
+        eq(bookings.bookingDate, today),
+        eq(bookings.status, 'confirmed')
+      )),
+    
+    // Next 30 days (confirmed bookings only)
+    db
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .from(bookings)
+      .where(and(
+        sql`${bookings.bookingDate} >= ${today}`,
+        sql`${bookings.bookingDate} <= ${next30Str}`,
+        eq(bookings.status, 'confirmed')
+      )),
+    
+    // Last 30 days (completed + confirmed)
+    db
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .from(bookings)
+      .where(and(
+        sql`${bookings.bookingDate} >= ${last30Str}`,
+        sql`${bookings.bookingDate} < ${today}`,
+        sql`${bookings.status} IN ('completed', 'confirmed')`
+      )),
+    
+    // Total visitors (completed bookings only)
+    db
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .from(bookings)
+      .where(eq(bookings.status, 'completed'))
+  ]);
+
+  return {
+    todayVisitors: Number(todayResult[0]?.total || 0),
+    next30Days: Number(next30Result[0]?.total || 0),
+    last30Days: Number(last30Result[0]?.total || 0),
+    totalVisitors: Number(totalResult[0]?.total || 0),
   };
 }
 

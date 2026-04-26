@@ -71,6 +71,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
         onClick={onMenuClick}
         className="lg:hidden p-2 rounded-lg hover:bg-[#F5F5F5] text-[#616161] transition-colors min-h-11 min-w-11 flex items-center justify-center"
         aria-label="Open menu"
+        suppressHydrationWarning
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -86,6 +87,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
         <button
           className="relative p-2 rounded-lg hover:bg-[#F5F5F5] text-[#616161] transition-colors min-h-11 min-w-11 flex items-center justify-center"
           aria-label="Notifications"
+          suppressHydrationWarning
         >
           <Bell className="w-5 h-5" />
           <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#ba1a1a] rounded-full" />
@@ -97,6 +99,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
           className="ml-1 w-9 h-9 rounded-full bg-[#A5D6A7] flex items-center justify-center text-sm font-semibold text-[#1B5E20] hover:ring-2 hover:ring-[#2E7D32]/30 transition-all"
           aria-label="Account menu"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          suppressHydrationWarning
         >
           {userInitial}
         </button>

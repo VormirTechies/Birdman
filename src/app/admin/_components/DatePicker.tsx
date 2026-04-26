@@ -38,6 +38,7 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
             'flex items-center gap-2 bg-[#F5F5F5] rounded-xl px-4 py-2.5 hover:bg-[#E0E0E0] transition-colors text-sm font-medium text-[#212121] whitespace-nowrap',
           )}
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          suppressHydrationWarning
         >
           <CalendarIcon className="w-4 h-4 text-[#616161]" />
           {format(value, 'MM/dd/yyyy')}

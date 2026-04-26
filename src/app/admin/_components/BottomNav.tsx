@@ -62,6 +62,7 @@ export function AdminBottomNav({ onMoreClick }: BottomNavProps) {
         onClick={onMoreClick}
         className="flex flex-col items-center justify-center gap-1 flex-1 px-1"
         aria-label="More"
+        suppressHydrationWarning
       >
         <MoreHorizontal className="w-5 h-5 text-[#9E9E9E]" />
         <span className="text-[10px] font-medium tracking-wide text-[#9E9E9E]">

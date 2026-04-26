@@ -111,6 +111,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as 'confirmed' | 'cancelled' | 'completed' | null;
     const date = searchParams.get('date');
+    const minDate = searchParams.get('minDate');
+    const search = searchParams.get('search');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -158,9 +160,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch bookings from database
-    const bookings = await getBookings({
+    const { bookings, total } = await getBookings({
       status: status || undefined,
       date: date || undefined,
+      minDate: minDate || undefined,
+      search: search || undefined,
       limit,
       offset,
     });
@@ -169,6 +173,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       bookings,
+      total,
       pagination: {
         limit,
         offset,
