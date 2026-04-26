@@ -118,6 +118,26 @@ export const pushSubscriptions = pgTable(
   })
 );
 
+// ─── Calendar Settings Table ─────────────────────────────────────────────────
+// Stores daily capacity limits, operating hours, and availability for bookings
+
+export const calendarSettings = pgTable(
+  'calendar_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    date: date('date').unique().notNull(), // Specific date for settings
+    maxCapacity: integer('max_capacity').notNull().default(100), // Max visitors (0-200)
+    startTime: time('start_time').notNull().default('16:30:00'), // Operating start time (default 4:30 PM)
+    isOpen: boolean('is_open').notNull().default(true), // Open for bookings toggle
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    // Unique index on date for fast lookups
+    dateIdx: index('calendar_settings_date_idx').on(table.date),
+  })
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPE EXPORTS - TypeScript inference from Drizzle schema
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,3 +153,6 @@ export type NewFeedback = typeof feedback.$inferInsert;
 
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type NewAdminUser = typeof adminUsers.$inferInsert;
+
+export type CalendarSettings = typeof calendarSettings.$inferSelect;
+export type NewCalendarSettings = typeof calendarSettings.$inferInsert;

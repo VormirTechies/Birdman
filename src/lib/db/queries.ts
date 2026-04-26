@@ -1,5 +1,5 @@
 import { db } from './index';
-import { bookings, verificationCodes, feedback, galleryImages, type NewBooking, type Booking, type NewFeedback, type Feedback } from './schema';
+import { bookings, verificationCodes, feedback, galleryImages, calendarSettings, type NewBooking, type Booking, type NewFeedback, type Feedback, type CalendarSettings, type NewCalendarSettings } from './schema';
 import { eq, and, desc, gt, gte, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -357,4 +357,190 @@ export async function addGalleryImage(url: string, caption?: string) {
 
 export async function deleteGalleryImage(id: string) {
   await db.delete(galleryImages).where(eq(galleryImages.id, id));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CALENDAR QUERIES - Monthly view and daily capacity management
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── Get Monthly Booking Statistics ──────────────────────────────────────────
+// Returns aggregated booking data for each day in a given month
+
+export async function getMonthlyBookingStats(year: number, month: number): Promise<Array<{
+  date: string;
+  bookingCount: number;
+  maxCapacity: number;
+  isOpen: boolean;
+  startTime: string;
+  percentage: number;
+}>> {
+  // Calculate first and last day of the month
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const firstDayStr = firstDay.toISOString().split('T')[0];
+  const lastDayStr = lastDay.toISOString().split('T')[0];
+
+  // Get all bookings for the month (confirmed only)
+  const monthBookings = await db
+    .select({
+      date: bookings.bookingDate,
+      count: sql<number>`COUNT(*)::int`,
+      guestSum: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)::int`,
+    })
+    .from(bookings)
+    .where(and(
+      sql`${bookings.bookingDate} >= ${firstDayStr}`,
+      sql`${bookings.bookingDate} <= ${lastDayStr}`,
+      eq(bookings.status, 'confirmed')
+    ))
+    .groupBy(bookings.bookingDate);
+
+  // Get all calendar settings for the month
+  const monthSettings = await db
+    .select()
+    .from(calendarSettings)
+    .where(and(
+      sql`${calendarSettings.date} >= ${firstDayStr}`,
+      sql`${calendarSettings.date} <= ${lastDayStr}`
+    ));
+
+  // Create a map for quick lookup
+  const bookingMap = new Map(monthBookings.map(b => [b.date, b]));
+  const settingsMap = new Map(monthSettings.map(s => [s.date, s]));
+
+  // Generate array for all days in the month
+  const result = [];
+  const currentDate = new Date(firstDay);
+
+  while (currentDate <= lastDay) {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    const booking = bookingMap.get(dateStr);
+    const settings = settingsMap.get(dateStr);
+
+    const maxCapacity = settings?.maxCapacity ?? 100;
+    const bookingCount = booking?.guestSum ?? 0;
+    const percentage = maxCapacity > 0 ? Math.round((bookingCount / maxCapacity) * 100) : 0;
+
+    result.push({
+      date: dateStr,
+      bookingCount,
+      maxCapacity,
+      isOpen: settings?.isOpen ?? true,
+      startTime: settings?.startTime ?? '16:30:00',
+      percentage,
+    });
+
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return result;
+}
+
+// ─── Get Day Details ──────────────────────────────────────────────────────────
+// Returns detailed information for a specific date
+
+export async function getDayDetails(date: string): Promise<{
+  date: string;
+  settings: CalendarSettings | { maxCapacity: number; startTime: string; isOpen: boolean };
+  bookings: Booking[];
+  stats: {
+    totalBooked: number;
+    available: number;
+    percentage: number;
+  };
+}> {
+  // Get settings for this date (or use defaults)
+  const settings = await db.query.calendarSettings.findFirst({
+    where: eq(calendarSettings.date, date),
+  });
+
+  // Get all bookings for this date (confirmed only)
+  const dayBookings = await db.query.bookings.findMany({
+    where: and(
+      eq(bookings.bookingDate, date),
+      eq(bookings.status, 'confirmed')
+    ),
+    orderBy: [desc(bookings.bookingTime)],
+  });
+
+  const maxCapacity = settings?.maxCapacity ?? 100;
+  const totalBooked = dayBookings.reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const available = Math.max(0, maxCapacity - totalBooked);
+  const percentage = maxCapacity > 0 ? Math.round((totalBooked / maxCapacity) * 100) : 0;
+
+  return {
+    date,
+    settings: settings ?? { maxCapacity: 100, startTime: '16:30:00', isOpen: true },
+    bookings: dayBookings,
+    stats: {
+      totalBooked,
+      available,
+      percentage,
+    },
+  };
+}
+
+// ─── Get Calendar Settings ───────────────────────────────────────────────────
+// Returns settings for a specific date (with defaults if not found)
+
+export async function getCalendarSettings(date: string): Promise<CalendarSettings | {
+  date: string;
+  maxCapacity: number;
+  startTime: string;
+  isOpen: boolean;
+}> {
+  const settings = await db.query.calendarSettings.findFirst({
+    where: eq(calendarSettings.date, date),
+  });
+
+  return settings ?? {
+    date,
+    maxCapacity: 100,
+    startTime: '16:30:00',
+    isOpen: true,
+  };
+}
+
+// ─── Upsert Calendar Settings ────────────────────────────────────────────────
+// Create or update calendar settings for a specific date
+
+export async function upsertCalendarSettings(data: {
+  date: string;
+  maxCapacity: number;
+  startTime: string;
+  isOpen: boolean;
+}): Promise<CalendarSettings> {
+  // Check if settings exist for this date
+  const existing = await db.query.calendarSettings.findFirst({
+    where: eq(calendarSettings.date, data.date),
+  });
+
+  if (existing) {
+    // Update existing settings
+    const [updated] = await db
+      .update(calendarSettings)
+      .set({
+        maxCapacity: data.maxCapacity,
+        startTime: data.startTime,
+        isOpen: data.isOpen,
+        updatedAt: new Date(),
+      })
+      .where(eq(calendarSettings.date, data.date))
+      .returning();
+    
+    return updated;
+  } else {
+    // Insert new settings
+    const [inserted] = await db
+      .insert(calendarSettings)
+      .values({
+        date: data.date,
+        maxCapacity: data.maxCapacity,
+        startTime: data.startTime,
+        isOpen: data.isOpen,
+      })
+      .returning();
+    
+    return inserted;
+  }
 }
