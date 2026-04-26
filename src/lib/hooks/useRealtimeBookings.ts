@@ -39,42 +39,29 @@ export function useRealtimeBookings(options: UseRealtimeBookingsOptions) {
       console.log('[Realtime] Setting up bookings subscription...');
 
       // Create a unique channel for this subscription
+      // Using a single wildcard listener to avoid binding mismatch
       const channel = supabase
         .channel('admin-bookings-realtime')
         .on(
           'postgres_changes',
           { 
-            event: 'INSERT', 
+            event: '*',  // Listen to all events
             schema: 'public', 
             table: 'bookings' 
           },
           (payload) => {
-            console.log('🆕 New booking detected:', payload.new);
-            onInsert?.(payload.new);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'bookings' 
-          },
-          (payload) => {
-            console.log('✏️ Booking updated:', payload.new);
-            onUpdate?.(payload.new);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { 
-            event: 'DELETE', 
-            schema: 'public', 
-            table: 'bookings' 
-          },
-          (payload) => {
-            console.log('🗑️ Booking deleted:', payload.old.id);
-            onDelete?.(payload.old.id);
+            console.log('📡 Realtime event received:', payload.eventType);
+            
+            if (payload.eventType === 'INSERT') {
+              console.log('🆕 New booking detected:', payload.new);
+              onInsert?.(payload.new);
+            } else if (payload.eventType === 'UPDATE') {
+              console.log('✏️ Booking updated:', payload.new);
+              onUpdate?.(payload.new);
+            } else if (payload.eventType === 'DELETE') {
+              console.log('🗑️ Booking deleted:', payload.old.id);
+              onDelete?.(payload.old.id);
+            }
           }
         )
         .subscribe((status, err) => {
