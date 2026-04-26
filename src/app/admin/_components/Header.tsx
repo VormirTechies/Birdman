@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Bell, Menu, UserCircle, Settings, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -13,6 +13,22 @@ interface HeaderProps {
 export function AdminHeader({ onMenuClick }: HeaderProps) {
   const avatarRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  const [userInitial, setUserInitial] = useState('A');
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user?.email) {
+        // Extract first letter of email (before @)
+        const initial = user.email.charAt(0).toUpperCase();
+        setUserInitial(initial);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -82,7 +98,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
           aria-label="Account menu"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
         >
-          MB
+          {userInitial}
         </button>
 
         {/* Profile context menu — bound to avatar ref */}
