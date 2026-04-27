@@ -1,6 +1,6 @@
 'use client';
 
-import { Feather } from 'lucide-react';
+import { Ban, Feather } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CalendarCellProps {
@@ -54,76 +54,63 @@ export function CalendarCell({
     return 'text-gray-900';
   };
 
-  // Progress bar color
-  const getProgressColor = () => {
-    if (isDisabled) return 'bg-gray-400';
-    if (percentage <= 70) return 'bg-green-500';
-    return 'bg-green-900';
-  };
-
   return (
     <button
       onClick={onClick}
       disabled={!isCurrentMonth}
       className={cn(
-        'relative min-h-[100px] p-3 border rounded-lg transition-all',
+        'relative h-24 md:h-28 lg:h-32 p-2 md:p-3 border border-gray-200 transition-all',
         'flex flex-col items-start justify-between',
-        'hover:shadow-md hover:scale-105',
+        'hover:shadow-md',
         getCellBackground(),
         isCurrentMonth ? 'cursor-pointer' : 'cursor-default opacity-40',
-        isToday && 'ring-2 ring-blue-500',
+        // isToday && 'ring-2 ring-blue-500',
         !isCurrentMonth && 'pointer-events-none'
       )}
       suppressHydrationWarning
     >
       {/* Date Number */}
-      <div className="flex items-center justify-between w-full">
-        <span 
-          className={cn(
-            'text-sm font-semibold',
-            getTextColor()
-          )}
-        >
-          {day}
-        </span>
-
-        {/* Booking Count Indicator (Feather Icon) */}
-        {isCurrentMonth && bookingCount > 0 && (
-          <div className="flex items-center gap-1">
-            <Feather 
-              className={cn('h-3 w-3', getTextColor())} 
-              strokeWidth={2.5}
-            />
-            <span className={cn('text-xs font-medium', getTextColor())}>
-              {bookingCount}
-            </span>
-          </div>
+      <span 
+        className={cn(
+          'text-lg md:text-xl font-bold',
+          getTextColor()
         )}
-      </div>
+      >
+        {day}
+      </span>
 
-      {/* Capacity Info */}
+      {/* Bottom Section: Booking Count */}
       {isCurrentMonth && !isDisabled && (
-        <div className="w-full space-y-1">
-          {/* Mini Progress Bar */}
-          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className={cn('h-full transition-all', getProgressColor())}
-              style={{ width: `${Math.min(percentage, 100)}%` }}
-            />
-          </div>
-
-          {/* Percentage Text */}
-          <p className={cn('text-xs', getTextColor())}>
-            {bookingCount}/{maxCapacity}
-          </p>
+        <div className="w-full flex items-center justify-between mt-auto">
+          {/* Booking Count with Feather Icon */}
+          {bookingCount > 0 && (
+            <div className="flex items-center gap-1">
+              <span className={cn('text-sm md:text-base font-bold', getTextColor())}>
+                {bookingCount}
+              </span>
+              <Feather 
+                className={cn('h-3 w-3 md:h-4 md:w-4', getTextColor())} 
+                strokeWidth={2}
+              />
+            </div>
+          )}
+          
+          {/* Capacity Indicator for Full/Almost Full */}
+          {percentage >= 90 && (
+            <span className={cn('text-xs md:text-sm font-medium', getTextColor())}>
+              {bookingCount}/{maxCapacity}
+            </span>
+          )}
         </div>
       )}
 
       {/* Disabled Overlay */}
       {isCurrentMonth && isDisabled && (
-        <p className="text-xs text-gray-500 mt-auto">
-          {isPast ? 'Past' : 'Closed'}
-        </p>
+        <div className="flex items-center justify-center">
+          <span className="text-lg md:text-lg text-gray-400">
+            <Ban className="h-5 w-5" />
+          </span>
+        </div>
       )}
     </button>
   );

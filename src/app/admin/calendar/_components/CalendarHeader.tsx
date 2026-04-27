@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../../_components/Button';
 import { CalendarLegend } from './CalendarLegend';
 
 interface CalendarHeaderProps {
@@ -28,38 +28,38 @@ export function CalendarHeader({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Month Navigation */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">
+
+        <h1 className='text-3xl font-bold hidden md:block'>Calendar</h1>
+
+        <h2 className="text-xl font-family-body text-gray-900">
           {monthName}
         </h2>
         
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
+        <div className="flex items-center">
+          <button
             onClick={onPreviousMonth}
             aria-label="Previous month"
+            className="flex items-center justify-center h-10 px-3 text-sm font-medium text-gray-700 bg-[#EEE] rounded-l-lg hover:bg-gray-200 transition-colors cursor-pointer"
             suppressHydrationWarning
           >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
+          </button>
           
-          <Button
-            variant="outline"
-            size="icon"
+          
+          <button
             onClick={onNextMonth}
             aria-label="Next month"
+            className="flex items-center justify-center h-10 px-3 text-sm font-medium text-gray-700 bg-[#EEE] rounded-r-lg hover:bg-gray-200 transition-colors cursor-pointer"
             suppressHydrationWarning
           >
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Legend */}
-      <CalendarLegend />
     </div>
   );
 }

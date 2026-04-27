@@ -32,7 +32,16 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
   const [loading, setLoading] = useState(true);
 
   const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const today = new Date().toISOString().split('T')[0];
+  
+  // Helper to format date in local timezone as YYYY-MM-DD
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const today = formatLocalDate(new Date());
 
   // Fetch monthly data whenever currentMonth changes
   useEffect(() => {
@@ -123,13 +132,13 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-2">
         {/* Weekday Headers */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 bg-gray-300/50 border border-gray-300 rounded-t-md">
           {weekDays.map((day) => (
             <div
               key={day}
-              className="text-center text-sm font-semibold text-gray-700 py-2"
+              className="text-center text-xs font-bold text-gray-600 uppercase py-2"
             >
               {day}
             </div>
@@ -137,11 +146,11 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
         </div>
 
         {/* Loading Skeleton */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 42 }).map((_, i) => (
             <div
               key={i}
-              className="min-h-[100px] bg-gray-100 rounded-lg animate-pulse"
+              className="h-24 md:h-28 lg:h-32 bg-gray-100 animate-pulse"
             />
           ))}
         </div>
@@ -150,13 +159,13 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="">
       {/* Weekday Headers */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 bg-gray-300/50 border border-gray-300 rounded-t-md">
         {weekDays.map((day) => (
           <div
             key={day}
-            className="text-center text-sm font-semibold text-gray-700 py-2"
+            className="text-center text-xs font-bold text-gray-600 uppercase py-2"
           >
             {day}
           </div>
@@ -164,9 +173,9 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 rounded-b-md">
         {calendarDays.map((dayInfo, index) => {
-          const dateStr = dayInfo.date.toISOString().split('T')[0];
+          const dateStr = formatLocalDate(dayInfo.date);
           const dayData = daysData[dateStr];
           const isPast = dateStr < today;
           const isToday = dateStr === today;

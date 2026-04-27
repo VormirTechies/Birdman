@@ -1,25 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Users } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Users, X } from 'lucide-react';
+import { Toggle } from '../../_components/Toggle';
+import { RangeSlider } from '../../_components/RangeSlider';
+import { TimePicker } from '../../_components/TimePicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -71,24 +56,19 @@ export function DayDetailsModal({
     percentage: 0,
   });
 
-  // Generate time options (8 AM to 8 PM in 30-minute intervals)
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 8; hour <= 20; hour++) {
-      for (let minute of [0, 30]) {
-        const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-        const displayTime = new Date(`2000-01-01T${timeStr}`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        });
-        times.push({ value: timeStr, label: displayTime });
-      }
+  // Disable body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
-    return times;
-  };
 
-  const timeOptions = generateTimeOptions();
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   // Fetch day details when modal opens
   useEffect(() => {
@@ -122,7 +102,9 @@ export function DayDetailsModal({
 
   // Format date for display
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00');
+    // Parse YYYY-MM-DD in local timezone
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'short',
@@ -164,54 +146,68 @@ export function DayDetailsModal({
     ? Math.round((stats.totalBooked / settings.maxCapacity) * 100)
     : 0;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]" suppressHydrationWarning>
-        <DialogHeader>
-          <DialogTitle>
-            {date ? formatDate(date) : 'Day Details'}
-          </DialogTitle>
-          <DialogDescription>
-            Manage daily operations and capacity settings
-          </DialogDescription>
-        </DialogHeader>
+  if (!isOpen) return null;
 
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div 
+        className="relative w-full max-w-md bg-white rounded-2xl shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-6 border-b border-gray-200">
+          <div>
+            <h2 className="text-xl font-family-body text-gray-900">
+              {date ? formatDate(date) : 'Day Details'}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Manage daily operations and capacity settings
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            suppressHydrationWarning
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
         {loading ? (
-          <div className="space-y-4 py-6">
+          <div className="space-y-4 p-6">
             <div className="h-20 bg-gray-100 rounded-lg animate-pulse" />
             <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
             <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
             <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
           </div>
         ) : (
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 p-6">
             {/* Status Card */}
             <div className={cn(
-              'p-4 rounded-lg border-2',
-              updatedPercentage >= 100 ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+              'p-4 rounded-lg',
+              updatedPercentage >= 100 ? 'bg-red-100' : 'bg-green-100'
             )}>
               <div className="flex items-center gap-3">
                 <div className={cn(
                   'p-3 rounded-full',
-                  updatedPercentage >= 100 ? 'bg-red-100' : 'bg-blue-100'
+                  updatedPercentage >= 100 ? 'bg-red-100' : 'bg-green-100'
                 )}>
                   <Users className={cn(
-                    'h-6 w-6',
-                    updatedPercentage >= 100 ? 'text-red-600' : 'text-blue-600'
+                    'h-5 w-5',
+                    updatedPercentage >= 100 ? 'text-red-600' : 'text-[#2E7D32]'
                   )} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-gray-600">Current Status</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xs text-gray-600">Current Status</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {stats.totalBooked} / {settings.maxCapacity}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {updatedAvailable} spots available
                   </p>
                 </div>
                 <div className={cn(
-                  'text-3xl font-bold',
-                  updatedPercentage >= 100 ? 'text-red-600' : 'text-blue-600'
+                  'text-2xl font-bold',
+                  updatedPercentage >= 100 ? 'text-red-600' : 'text-[#2E7D32]'
                 )}>
                   {updatedPercentage}%
                 </div>
@@ -219,97 +215,63 @@ export function DayDetailsModal({
             </div>
 
             {/* Open for Bookings Toggle */}
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div>
-                <h4 className="font-semibold text-gray-900">Open for Bookings</h4>
-                <p className="text-sm text-gray-500">
-                  {settings.isOpen ? 'Accepting new bookings' : 'Bookings disabled for this date'}
-                </p>
-              </div>
-              <Switch
+            <div className="p-4 border border-gray-200 rounded-lg">
+              <Toggle
                 checked={settings.isOpen}
-                onCheckedChange={(checked) =>
+                onChange={(checked) =>
                   setSettings({ ...settings, isOpen: checked })
                 }
-                suppressHydrationWarning
+                label="Open for Bookings"
+                description={settings.isOpen ? 'Accepting new bookings' : 'Bookings disabled for this date'}
               />
             </div>
 
             {/* Operating Hours */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-900">
-                Operating Hours
-              </label>
-              <Select
-                value={settings.startTime}
-                onValueChange={(value) =>
-                  setSettings({ ...settings, startTime: value })
-                }
-              >
-                <SelectTrigger suppressHydrationWarning>
-                  <SelectValue placeholder="Select time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeOptions.map((time) => (
-                    <SelectItem key={time.value} value={time.value}>
-                      {time.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                Visitors can start booking from this time
-              </p>
-            </div>
+            <TimePicker
+              value={settings.startTime}
+              onChange={(value) =>
+                setSettings({ ...settings, startTime: value })
+              }
+              label="Visiting Hour"
+              description="Visitors can start booking from this time"
+            />
 
             {/* Maximum Capacity Slider */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold text-gray-900">
-                  Maximum Capacity
-                </label>
-                <span className="text-sm font-bold text-blue-600">
-                  {settings.maxCapacity} visitors
-                </span>
-              </div>
-              <Slider
-                value={[settings.maxCapacity]}
-                onValueChange={([value]) =>
-                  setSettings({ ...settings, maxCapacity: value })
-                }
-                min={0}
-                max={200}
-                step={10}
-                className="w-full"
-                suppressHydrationWarning
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>0</span>
-                <span>100</span>
-                <span>200</span>
-              </div>
-            </div>
+            <RangeSlider
+              value={settings.maxCapacity}
+              onChange={(value) =>
+                setSettings({ ...settings, maxCapacity: value })
+              }
+              min={0}
+              max={200}
+              step={10}
+              label="Maximum Capacity"
+              showValue={true}
+              unit="visitors"
+            />
           </div>
         )}
 
-        <DialogFooter>
-          <Button
-            variant="outline"
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+          <button
             onClick={onClose}
             disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             suppressHydrationWarning
           >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={handleSave}
             disabled={loading || saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#2E7D32] rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             suppressHydrationWarning
           >
             {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

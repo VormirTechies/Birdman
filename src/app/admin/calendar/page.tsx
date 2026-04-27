@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CalendarHeader } from './_components/CalendarHeader';
 import { CalendarGrid } from './_components/CalendarGrid';
 import { DayDetailsModal } from './_components/DayDetailsModal';
+import { CalendarLegend } from './_components/CalendarLegend';
 
 interface DayData {
   date: string;
@@ -64,28 +65,38 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page Header */}
-      <div>
+      {/* <div>
         <h1 className="text-3xl font-bold text-gray-900">Calendar Management</h1>
         <p className="text-gray-600 mt-1">
           Manage daily capacity, operating hours, and booking availability
         </p>
+      </div> */}
+
+      <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
+        
+        {/* Calendar Header with Navigation */}
+        <CalendarHeader
+          currentMonth={currentMonth}
+          onPreviousMonth={handlePreviousMonth}
+          onNextMonth={handleNextMonth}
+        />
+
+        {/* Calendar Grid */}
+        <CalendarGrid
+          key={refreshKey} // Force refresh when settings change
+          currentMonth={currentMonth}
+          onDayClick={handleDayClick}
+        />
+
+        {/* Legend */}
+        <CalendarLegend />
+
       </div>
 
-      {/* Calendar Header with Navigation */}
-      <CalendarHeader
-        currentMonth={currentMonth}
-        onPreviousMonth={handlePreviousMonth}
-        onNextMonth={handleNextMonth}
-      />
-
-      {/* Calendar Grid */}
-      <CalendarGrid
-        key={refreshKey} // Force refresh when settings change
-        currentMonth={currentMonth}
-        onDayClick={handleDayClick}
-      />
+      
+      
 
       {/* Day Details Modal */}
       <DayDetailsModal

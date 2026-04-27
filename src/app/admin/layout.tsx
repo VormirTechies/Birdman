@@ -95,7 +95,7 @@ export default function AdminLayout({
 
   return (
     <NextIntlClientProvider locale="en" messages={enMessages}>
-      <div className={`${workSans.variable} min-h-screen bg-[#F5F5F5]`}>
+      <div className={`${workSans.variable} min-h-screen bg-[#f8f8f8]`}>
         {/* Fixed sidebar (desktop) + drawer (mobile) */}
         <AdminSidebar
           isOpen={isSidebarOpen}

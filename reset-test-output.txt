@@ -1,0 +1,7 @@
+﻿
+> birdman-app@0.1.0 test
+> vitest __tests__/pages/reset-password.test.tsx
+
+
+[1m[44m DEV [49m[22m [34mv4.1.2 [39m[90mD:/Vormir/Birdman[39m
+
