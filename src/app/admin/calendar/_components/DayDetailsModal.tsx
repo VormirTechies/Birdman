@@ -265,7 +265,7 @@ export function DayDetailsModal({
           <button
             onClick={handleSave}
             disabled={loading || saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#2E7D32] rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-[#2E7D32] rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             suppressHydrationWarning
           >
             {saving ? 'Saving...' : 'Save Changes'}

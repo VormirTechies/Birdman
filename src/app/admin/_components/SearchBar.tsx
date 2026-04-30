@@ -8,15 +8,23 @@ interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  id?: string;
+  name?: string;
+  onExpandChange?: (expanded: boolean) => void;
+  /** Always keep mobile input expanded — no collapse on blur */
+  alwaysExpanded?: boolean;
 }
 
-export function SearchBar({ value, onChange, placeholder = 'Search bookings...' }: SearchBarProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function SearchBar({ value, onChange, placeholder = 'Search bookings...', id = 'search', name = 'search', onExpandChange, alwaysExpanded = false }: SearchBarProps) {
+  const [isExpanded, setIsExpanded] = useState(alwaysExpanded);
   const [isFocused, setIsFocused] = useState(false);
 
   const handleClear = () => {
     onChange('');
-    setIsExpanded(false);
+    if (!alwaysExpanded) {
+      setIsExpanded(false);
+      onExpandChange?.(false);
+    }
   };
 
   return (
@@ -26,6 +34,8 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...' 
         <Search className="w-4 h-4 text-[#616161] shrink-0 -mr-12 z-10" />
         <input
           type="text"
+          id={id}
+          name={name}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
@@ -63,14 +73,18 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...' 
             onFocus={() => {
               setIsExpanded(true);
               setIsFocused(true);
+              onExpandChange?.(true);
             }}
             onBlur={() => {
-              if (!value) {
+              if (!value && !alwaysExpanded) {
                 setIsExpanded(false);
+                onExpandChange?.(false);
               }
               setIsFocused(false);
             }}
-            placeholder={isExpanded ? placeholder : ''}
+            id={`${id}-mobile`}
+            name={`${name}-mobile`}
+            placeholder={placeholder}
             initial={false}
             animate={{
               width: isExpanded ? '100%' : '44px',

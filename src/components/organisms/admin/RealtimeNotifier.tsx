@@ -30,14 +30,6 @@ export function RealtimeNotifier() {
           
           // Dispatch custom event for dashboard components to update without refresh
           window.dispatchEvent(new CustomEvent('new-booking', { detail: newBooking }));
-          
-          // Trigger browser notification if supported
-          if (Notification.permission === 'granted') {
-            new Notification('New Booking: Birdman Sanctuary', {
-              body: `${newBooking.visitor_name} has just booked a slot!`,
-              icon: '/icons/bird-icon.png' // Ensure this exists later
-            });
-          }
         }
       )
       .subscribe();

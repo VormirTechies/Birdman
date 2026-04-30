@@ -40,7 +40,23 @@ self.addEventListener('push', function(event) {
       self.registration.showNotification(
         data.title || 'Birdman Sanctuary Alert', 
         options
-      )
+      ).then(() => {
+        // Notify all open admin tabs so they can update the in-app notification badge
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+          for (let i = 0; i < clientList.length; i++) {
+            clientList[i].postMessage({
+              type: 'NEW_NOTIFICATION',
+              payload: {
+                title: data.title || 'Birdman Sanctuary Alert',
+                body: data.body || '',
+                visitorName: data.visitorName || '',
+                bookingDate: data.bookingDate || '',
+                notifType: data.notifType || 'booking',
+              }
+            });
+          }
+        });
+      })
     );
   }
 });

@@ -10,7 +10,6 @@ import {
   History,
   Images,
   UserCircle,
-  HelpCircle,
   LogOut,
   X,
   Bird,
@@ -90,16 +89,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
 
       {/* Bottom actions */}
       <div className="px-3 py-3 border-t border-[#E0E0E0] space-y-0.5 shrink-0">
-        <Link
-          href="/admin/help"
-          onClick={onClose}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#616161] hover:bg-[#F5F5F5] hover:text-[#212121] transition-colors min-h-11"
-          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-          suppressHydrationWarning
-        >
-          <HelpCircle className="w-5 h-5 text-[#9E9E9E] shrink-0" />
-          <span>Help</span>
-        </Link>
         <button
           onClick={handleSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#616161] hover:bg-red-50 hover:text-[#ba1a1a] transition-colors min-h-11"

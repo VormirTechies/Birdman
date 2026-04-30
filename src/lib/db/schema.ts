@@ -22,6 +22,7 @@ export const bookings = pgTable(
     reminderSent: boolean('reminder_sent').notNull().default(false),
     reminderSentAt: timestamp('reminder_sent_at'), // Nullable: only set when reminder sent
     status: varchar('status', { length: 50 }).notNull().default('confirmed'), // confirmed | cancelled | completed
+    visited: boolean('visited').notNull().default(false), // Checklist: has visitor arrived today?
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -29,6 +30,7 @@ export const bookings = pgTable(
     // Performance indexes for common queries
     bookingDateIdx: index('bookings_booking_date_idx').on(table.bookingDate),
     statusIdx: index('bookings_status_idx').on(table.status),
+    visitedIdx: index('bookings_visited_idx').on(table.visited),
   })
 );
 

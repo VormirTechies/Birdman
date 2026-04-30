@@ -1,6 +1,6 @@
 import { db } from './index';
 import { bookings, verificationCodes, feedback, galleryImages, calendarSettings, type NewBooking, type Booking, type NewFeedback, type Feedback, type CalendarSettings, type NewCalendarSettings } from './schema';
-import { eq, and, desc, gt, gte, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, gt, gte, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATABASE QUERIES - Birdman of Chennai Booking System
@@ -40,8 +40,14 @@ export async function getBookings(params: {
   search?: string;  // name, email, or phone
   limit?: number;
   offset?: number;
+  sort?: 'checklist'; // not-visited first, then alphabetical by name
+  // History page filters
+  visitedFilter?: 'visited' | 'not-visited' | 'yet-to-visit'; // omit = All
+  sortBy?: 'name' | 'email' | 'date' | 'guestCount';
+  sortDir?: 'asc' | 'desc';
 }): Promise<{ bookings: Booking[]; total: number }> {
-  const { status, date, minDate, search, limit = 50, offset = 0 } = params;
+  const { status, date, minDate, search, limit = 50, offset = 0, sort, visitedFilter, sortBy, sortDir = 'desc' } = params;
+  const today = new Date().toISOString().split('T')[0];
 
   // 1. BASE CONDITIONS
   const conditions = [];
@@ -49,7 +55,18 @@ export async function getBookings(params: {
   if (date) conditions.push(eq(bookings.bookingDate, date));
   if (minDate) conditions.push(gte(bookings.bookingDate, minDate)); // gte = today and onwards
 
-  // 2. SEARCH LOGIC (Case Insensitive)
+  // 2. VISITED FILTER (History page)
+  if (visitedFilter === 'visited') {
+    conditions.push(eq(bookings.visited, true));
+  } else if (visitedFilter === 'not-visited') {
+    conditions.push(eq(bookings.visited, false));
+    conditions.push(sql`${bookings.bookingDate} < ${today}`);
+  } else if (visitedFilter === 'yet-to-visit') {
+    conditions.push(eq(bookings.visited, false));
+    conditions.push(sql`${bookings.bookingDate} >= ${today}`);
+  }
+
+  // 3. SEARCH LOGIC (Case Insensitive)
   if (search) {
     const searchLower = `%${search.toLowerCase()}%`;
     conditions.push(sql`(
@@ -63,13 +80,39 @@ export async function getBookings(params: {
     ? (conditions.length === 1 ? conditions[0] : and(...conditions)) 
     : undefined;
 
-  // 3. EXECUTE QUERIES (Parallel for speed)
+  // 4. ORDER BY
+  let orderBy;
+  if (sort === 'checklist') {
+    orderBy = [sql`${bookings.visited} ASC`, sql`lower(${bookings.visitorName}) ASC`];
+  } else if (sortBy) {
+    const dir = sortDir === 'asc' ? asc : desc;
+    switch (sortBy) {
+      case 'name':
+        orderBy = [dir(sql`lower(${bookings.visitorName})`)];
+        break;
+      case 'email':
+        orderBy = [dir(sql`lower(COALESCE(${bookings.email}, ''))`)];
+        break;
+      case 'guestCount':
+        orderBy = [dir(bookings.numberOfGuests)];
+        break;
+      case 'date':
+      default:
+        orderBy = sortDir === 'asc'
+          ? [asc(bookings.bookingDate), asc(bookings.bookingTime)]
+          : [desc(bookings.bookingDate), desc(bookings.bookingTime)];
+    }
+  } else {
+    orderBy = [desc(bookings.bookingDate), desc(bookings.bookingTime)];
+  }
+
+  // 5. EXECUTE QUERIES (Parallel for speed)
   const [data, totalCount] = await Promise.all([
     db.query.bookings.findMany({
       where: whereClause,
       limit,
       offset,
-      orderBy: [desc(bookings.createdAt)],
+      orderBy,
     }),
     db.select({ count: sql<number>`count(*)` }).from(bookings).where(whereClause)
   ]);
@@ -343,16 +386,25 @@ export async function getGalleryImages() {
   `);
 
   return db.query.galleryImages.findMany({
-    orderBy: [sql`${galleryImages.order} asc`],
+    orderBy: [desc(galleryImages.uploadedAt)],
   });
 }
 
-export async function addGalleryImage(url: string, caption?: string) {
+export async function addGalleryImage(url: string, altText?: string, caption?: string) {
   const [inserted] = await db
     .insert(galleryImages)
-    .values({ url, caption, order: 0 })
+    .values({ url, altText, caption, order: 0 })
     .returning();
   return inserted;
+}
+
+export async function updateGalleryImage(id: string, data: { altText?: string; caption?: string | null }) {
+  const [updated] = await db
+    .update(galleryImages)
+    .set(data)
+    .where(eq(galleryImages.id, id))
+    .returning();
+  return updated;
 }
 
 export async function deleteGalleryImage(id: string) {
@@ -374,11 +426,19 @@ export async function getMonthlyBookingStats(year: number, month: number): Promi
   startTime: string;
   percentage: number;
 }>> {
+  // Local-timezone date formatter (avoids UTC shift on servers ahead of UTC)
+  const toLocalDateStr = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   // Calculate first and last day of the month
   const firstDay = new Date(year, month - 1, 1);
   const lastDay = new Date(year, month, 0);
-  const firstDayStr = firstDay.toISOString().split('T')[0];
-  const lastDayStr = lastDay.toISOString().split('T')[0];
+  const firstDayStr = toLocalDateStr(firstDay);
+  const lastDayStr = toLocalDateStr(lastDay);
 
   // Get all bookings for the month (confirmed only)
   const monthBookings = await db
@@ -413,7 +473,7 @@ export async function getMonthlyBookingStats(year: number, month: number): Promi
   const currentDate = new Date(firstDay);
 
   while (currentDate <= lastDay) {
-    const dateStr = currentDate.toISOString().split('T')[0];
+    const dateStr = toLocalDateStr(currentDate);
     const booking = bookingMap.get(dateStr);
     const settings = settingsMap.get(dateStr);
 
@@ -543,4 +603,34 @@ export async function upsertCalendarSettings(data: {
     
     return inserted;
   }
+}
+
+// ─── Checklist Queries ────────────────────────────────────────────────────────
+// Daily visitor checklist: fetch visitors for a date and toggle visited status
+
+export async function getChecklistForDate(date: string): Promise<Booking[]> {
+  return db.query.bookings.findMany({
+    where: and(
+      eq(bookings.bookingDate, date),
+      eq(bookings.status, 'confirmed')
+    ),
+    // Sort: not-visited first (name ASC), visited last (name ASC within group)
+    orderBy: [
+      sql`${bookings.visited} ASC`,
+      sql`lower(${bookings.visitorName}) ASC`,
+    ],
+  });
+}
+
+export async function toggleVisited(id: string, visited: boolean): Promise<Booking | undefined> {
+  const [updated] = await db
+    .update(bookings)
+    .set({
+      visited,
+      updatedAt: new Date(),
+    })
+    .where(eq(bookings.id, id))
+    .returning();
+
+  return updated;
 }

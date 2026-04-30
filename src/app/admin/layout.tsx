@@ -8,6 +8,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { AdminSidebar } from './_components/Sidebar';
 import { AdminHeader } from './_components/Header';
 import { AdminBottomNav } from './_components/BottomNav';
+import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { subscribeUser } from '@/lib/push/client';
 import { requestPushPermission } from '@/lib/push/send';
 import { createClient } from '@/lib/supabase/client';
@@ -76,7 +77,8 @@ export default function AdminLayout({
     };
 
     setupPushNotifications();
-  }, [pathname]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Routes that should bypass the layout wrapper
   const isExcludedRoute =
@@ -95,6 +97,7 @@ export default function AdminLayout({
 
   return (
     <NextIntlClientProvider locale="en" messages={enMessages}>
+      <NotificationProvider>
       <div className={`${workSans.variable} min-h-screen bg-[#f8f8f8]`}>
         {/* Fixed sidebar (desktop) + drawer (mobile) */}
         <AdminSidebar
@@ -118,6 +121,7 @@ export default function AdminLayout({
 
         <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />
       </div>
+      </NotificationProvider>
     </NextIntlClientProvider>
   );
 }

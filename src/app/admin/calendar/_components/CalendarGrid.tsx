@@ -192,8 +192,8 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
               isToday={isToday}
               isPast={isPast}
               onClick={() => {
-                if (dayInfo.isCurrentMonth && dayData) {
-                  onDayClick(dateStr, dayData);
+                if (dayInfo.isCurrentMonth) {
+                  onDayClick(dateStr, dayData ?? { bookingCount: 0, maxCapacity: 100, percentage: 0, isOpen: true, startTime: '16:30:00' });
                 }
               }}
             />

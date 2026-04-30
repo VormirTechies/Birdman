@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
     await sendPushToAllAdmins({
       title: 'New Parakeet Visit Booked!',
       body: `${booking.visitorName} scheduled ${booking.numberOfGuests} guests for ${booking.bookingDate}.`,
-      url: '/admin'
+      url: '/admin',
+      visitorName: booking.visitorName,
+      bookingDate: booking.bookingDate,
     });
 
     // Send confirmation email (non-blocking - failure should not fail booking)
@@ -113,6 +115,10 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const minDate = searchParams.get('minDate');
     const search = searchParams.get('search');
+    const sort = searchParams.get('sort') as 'checklist' | null;
+    const visitedFilter = searchParams.get('visitedFilter') as 'visited' | 'not-visited' | 'yet-to-visit' | null;
+    const sortBy = searchParams.get('sortBy') as 'name' | 'email' | 'date' | 'guestCount' | null;
+    const sortDir = searchParams.get('sortDir') as 'asc' | 'desc' | null;
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -165,6 +171,10 @@ export async function GET(request: NextRequest) {
       date: date || undefined,
       minDate: minDate || undefined,
       search: search || undefined,
+      sort: sort || undefined,
+      visitedFilter: visitedFilter || undefined,
+      sortBy: sortBy || undefined,
+      sortDir: sortDir || undefined,
       limit,
       offset,
     });
