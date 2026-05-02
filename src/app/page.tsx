@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Image from 'next/image';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import Image from "next/image";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   Bird,
   Calendar,
@@ -13,52 +13,77 @@ import {
   ArrowRight,
   Heart,
   Camera,
-} from 'lucide-react';
-import { Header } from '@/components/organisms/Header';
-import { Footer } from '@/components/organisms/Footer';
-import { FloatingParticles } from '@/components/ui/floating-particles';
-import { Counter } from '@/components/ui/counter';
+  Leaf,
+} from "lucide-react";
+import { Header } from "@/components/organisms/Header";
+import { Footer } from "@/components/organisms/Footer";
+import { FloatingParticles } from "@/components/ui/floating-particles";
+import { Counter } from "@/components/ui/counter";
 import {
   AnimatedSection,
   StaggerContainer,
   StaggerItem,
-} from '@/components/ui/animated-section';
+} from "@/components/ui/animated-section";
 
 /* ════════════════════════════════════════════════════════════════════════════
    HOMEPAGE — Cinematic Landing Page
    ════════════════════════════════════════════════════════════════════════════ */
 
 const stats = [
-  { icon: Calendar, value: 16, suffix: '+', label: 'Years of Dedication', color: 'text-golden-hour' },
-  { icon: Bird, value: 4000, suffix: '', label: 'Daily Parakeets', color: 'text-sanctuary-green' },
-  { icon: Users, value: 14000, suffix: '+', label: 'Happy Visitors', color: 'text-sanctuary-green-light' },
-  { icon: Clock, value: 1, suffix: '', label: 'Session Daily', color: 'text-sunset-amber' },
+  {
+    icon: Calendar,
+    value: 16,
+    suffix: "+",
+    label: "Years of Dedication",
+    color: "text-golden-hour",
+  },
+  {
+    icon: Bird,
+    value: 4000,
+    suffix: "",
+    label: "Daily Parakeets",
+    color: "text-sanctuary-green",
+  },
+  {
+    icon: Users,
+    value: 14000,
+    suffix: "+",
+    label: "Happy Visitors",
+    color: "text-sanctuary-green-light",
+  },
+  {
+    icon: Clock,
+    value: 1,
+    suffix: "",
+    label: "Session Daily",
+    color: "text-sunset-amber",
+  },
 ];
 
 const galleryPreview = [
-  { src: '/images/gallery/005.jpeg', alt: 'Parakeets feeding on rooftop' },
-  { src: '/images/gallery/006.jpeg', alt: 'Flock of parakeets in flight' },
-  { src: '/images/gallery/014.jpeg', alt: 'Green parakeets gathering' },
+  { src: "/images/gallery/005.jpeg", alt: "Parakeets feeding on rooftop" },
+  { src: "/images/gallery/006.jpeg", alt: "Flock of parakeets in flight" },
+  { src: "/images/gallery/014.jpeg", alt: "Green parakeets gathering" },
 ];
 
 const testimonials = [
   {
-    name: 'Priya Sundaram',
+    name: "Priya Sundaram",
     rating: 5,
-    text: 'An absolutely magical experience! Watching thousands of parakeets arrive at feeding time is something I will never forget. Mr. Sah is truly an inspiration.',
-    date: 'March 2026',
+    text: "An absolutely magical experience! Watching thousands of parakeets arrive at feeding time is something I will never forget. Mr. Sah is truly an inspiration.",
+    date: "March 2026",
   },
   {
-    name: 'Raj Krishnamurthy',
+    name: "Raj Krishnamurthy",
     rating: 5,
-    text: 'We visited during the evening session and it was breathtaking. The birds know him by heart. A must-visit for anyone in Chennai.',
-    date: 'February 2026',
+    text: "We visited during the evening session and it was breathtaking. The birds know him by heart. A must-visit for anyone in Chennai.",
+    date: "February 2026",
   },
   {
-    name: 'Sarah Mitchell',
+    name: "Sarah Mitchell",
     rating: 5,
-    text: 'I traveled from London specifically to see this. It exceeded all expectations. The connection between Mr. Sah and these birds is truly extraordinary.',
-    date: 'January 2026',
+    text: "I traveled from London specifically to see this. It exceeded all expectations. The connection between Mr. Sah and these birds is truly extraordinary.",
+    date: "January 2026",
   },
 ];
 
@@ -161,7 +186,7 @@ export default function HomePage() {
         {/* Scroll indicator */}
         <motion.div
           animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
         >
           <ChevronDown className="w-7 h-7 text-white/50" />
@@ -174,12 +199,18 @@ export default function HomePage() {
           <div className="bg-white rounded-2xl shadow-card p-6 md:p-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
               {stats.map((stat, i) => (
-                <AnimatedSection key={stat.label} delay={i * 0.1} className="text-center">
+                <AnimatedSection
+                  key={stat.label}
+                  delay={i * 0.1}
+                  className="text-center"
+                >
                   <stat.icon className={`w-7 h-7 ${stat.color} mx-auto mb-2`} />
                   <div className="font-display font-bold text-2xl md:text-3xl text-canopy-dark">
                     <Counter target={stat.value} suffix={stat.suffix} />
                   </div>
-                  <div className="text-sm text-canopy-dark/50 mt-1">{stat.label}</div>
+                  <div className="text-sm text-canopy-dark/50 mt-1">
+                    {stat.label}
+                  </div>
                 </AnimatedSection>
               ))}
             </div>
@@ -216,7 +247,7 @@ export default function HomePage() {
               </span>
 
               <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-canopy-dark leading-tight">
-                A Man Who Became{' '}
+                A Man Who Became{" "}
                 <span className="text-gradient-green">a Sanctuary</span>
               </h2>
 
@@ -225,7 +256,7 @@ export default function HomePage() {
                   For over 16 years, Mr. Sudarson Sah has opened his rooftop in
                   Chintadripet, Chennai, to thousands of wild parakeets. What
                   began as feeding a handful of birds with rice has blossomed
-                  into an extraordinary daily gathering of up to{' '}
+                  into an extraordinary daily gathering of up to{" "}
                   <strong className="text-canopy-dark">4,000 parakeets</strong>.
                 </p>
                 <p>
@@ -290,6 +321,69 @@ export default function HomePage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </AnimatedSection>
+        </div>
+      </section>
+
+      {/* ── VISIT INFO ───────────────────────────────────────────────────── */}
+      <section className="py-14 md:py-16 bg-white">
+        <div className="container-wide">
+          <div className="grid sm:grid-cols-2 gap-5">
+            {/* Best Season */}
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <div className="flex items-start gap-5 bg-amber-50 border border-golden-hour/20 rounded-2xl p-6">
+                <div className="w-12 h-12 bg-golden-hour/15 rounded-xl flex items-center justify-center shrink-0">
+                  <Leaf className="w-6 h-6 text-golden-hour" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-golden-hour/80 uppercase tracking-wider mb-1">
+                    Best Time to Visit
+                  </p>
+                  <h3 className="font-display font-bold text-xl text-canopy-dark mb-1.5">
+                    November &ndash; March
+                  </h3>
+                  <p className="text-sm text-canopy-dark/60 leading-relaxed">
+                    The cooler months bring the largest flocks. Witness up to
+                    4,000 parakeets gathering in perfect Chennai weather.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Food Donations */}
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.12, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <div className="flex items-start gap-5 bg-sanctuary-green/5 border border-sanctuary-green/20 rounded-2xl p-6">
+                <div className="w-12 h-12 bg-sanctuary-green/15 rounded-xl flex items-center justify-center shrink-0">
+                  <Bird className="w-6 h-6 text-sanctuary-green" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-sanctuary-green/80 uppercase tracking-wider mb-1">
+                    Support the Sanctuary
+                  </p>
+                  <h3 className="font-display font-bold text-xl text-canopy-dark mb-1.5">
+                    Food Donations Welcome
+                  </h3>
+                  <p className="text-sm text-canopy-dark/60 leading-relaxed">
+                    Visitors may bring{" "}
+                    <strong className="text-canopy-dark">
+                      raw peanuts (0.5&ndash;1 kg)
+                    </strong>{" "}
+                    to donate &mdash; the parakeets&apos; favourite treat
+                    alongside Mr. Sah&apos;s daily feed.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 

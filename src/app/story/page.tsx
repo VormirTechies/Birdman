@@ -104,7 +104,7 @@ export default function StoryPage() {
       <Header />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative pt-20 pb-0 overflow-hidden">
+      <section className="relative overflow-hidden">
         <div className="relative h-[50vh] md:h-[60vh] min-h-[400px]">
           <Image
             src="/images/gallery/sudarson-002.jpeg"
@@ -236,6 +236,141 @@ export default function StoryPage() {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── THE PEOPLE ───────────────────────────────────────────────────── */}
+      <section className="py-20 md:py-28 bg-feather-cream">
+        <div className="container-wide">
+          <AnimatedSection className="text-center mb-14">
+            <span className="inline-block bg-sanctuary-green/10 text-sanctuary-green text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
+              Meet the Team
+            </span>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-canopy-dark">
+              The People Behind the Sanctuary
+            </h2>
+          </AnimatedSection>
+
+          <StaggerContainer className="grid md:grid-cols-2 gap-8">
+            {/* Sudarson Sah */}
+            <StaggerItem>
+              <div className="bg-white rounded-3xl shadow-card overflow-hidden hover:shadow-card-hover transition-shadow duration-300">
+                <div className="relative aspect-4/3">
+                  <Image
+                    src="/images/gallery/sudarson-001.png"
+                    alt="Sudarson Sah — The Birdman of Chennai"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-canopy-dark/60 to-transparent" />
+                  <div className="absolute bottom-4 left-5">
+                    <span className="inline-block bg-golden-hour text-canopy-dark text-xs font-bold px-3 py-1 rounded-full">
+                      Founder
+                    </span>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <h3 className="font-display font-bold text-2xl text-canopy-dark mb-1">
+                    Sudarson Sah
+                  </h3>
+                  <p className="text-sanctuary-green font-medium text-sm mb-3">
+                    The Birdman of Chennai
+                  </p>
+                  <p className="text-canopy-dark/60 text-sm leading-relaxed">
+                    A retired man who turned his rooftop into a haven for thousands of wild
+                    parakeets. For 16+ years, he has risen every morning before dawn — rain
+                    or shine — spending his own pension to feed the birds. A living legend
+                    of compassion and an unbreakable bond between man and nature.
+                  </p>
+                </div>
+              </div>
+            </StaggerItem>
+
+            {/* Vidhya Aunty */}
+            <StaggerItem>
+              <div className="bg-white rounded-3xl shadow-card overflow-hidden hover:shadow-card-hover transition-shadow duration-300">
+                <div className="relative aspect-4/3 bg-sanctuary-green/8 flex items-center justify-center">
+                  <div className="w-28 h-28 bg-sanctuary-green/20 rounded-full flex items-center justify-center">
+                    <Users className="w-14 h-14 text-sanctuary-green/50" />
+                  </div>
+                  <div className="absolute inset-0 bg-linear-to-t from-canopy-dark/60 to-transparent" />
+                  <div className="absolute bottom-4 left-5">
+                    <span className="inline-block bg-golden-hour text-white text-xs font-bold px-3 py-1 rounded-full">
+                      Wife
+                    </span>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <h3 className="font-display font-bold text-2xl text-canopy-dark mb-1">
+                    Vidhya
+                  </h3>
+                  <p className="text-golden-hour font-medium text-sm mb-3">
+                    Sudarson&apos;s Beloved Partner
+                  </p>
+                  <p className="text-canopy-dark/60 text-sm leading-relaxed">
+                    The quiet force who shows up every single day to help Sudarson prepare
+                    the feed and lay out the platforms. She also ensures every visitor feels
+                    genuinely welcomed — and leaves with a memory they will treasure for life.
+                  </p>
+                </div>
+              </div>
+            </StaggerItem>
+          </StaggerContainer>
+        </div>
+      </section>
+
+      {/* ── VOLUNTEERS ───────────────────────────────────────────────────── */}
+      <section className="py-20 md:py-28 bg-morning-mist">
+        <div className="container-wide">
+          <AnimatedSection className="text-center mb-14">
+            <span className="inline-block bg-sanctuary-green/10 text-sanctuary-green text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
+              Community
+            </span>
+            <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-canopy-dark">
+              Powered by Volunteers
+            </h2>
+            <p className="text-canopy-dark/60 text-base md:text-lg mt-4 max-w-xl mx-auto">
+              This sanctuary runs on the goodwill of people who give their time and heart freely.
+            </p>
+          </AnimatedSection>
+
+          <StaggerContainer className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
+            {[
+              { initials: 'VN', name: 'Volunteer Name', role: 'Daily Feeding Support', bg: '#C8E6C9', text: '#2E7D32' },
+              { initials: 'VN', name: 'Volunteer Name', role: 'Visitor Coordination', bg: '#FFE0B2', text: '#E65100' },
+              { initials: 'VN', name: 'Volunteer Name', role: 'Sanctuary Upkeep', bg: '#BBDEFB', text: '#1976D2' },
+              { initials: 'VN', name: 'Volunteer Name', role: 'Community Outreach', bg: '#E1BEE7', text: '#7B1FA2' },
+            ].map((v, i) => (
+              <StaggerItem key={i}>
+                <div className="bg-white rounded-2xl shadow-card p-6 text-center hover:shadow-card-hover transition-shadow duration-300">
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-display font-bold"
+                    style={{ backgroundColor: v.bg, color: v.text }}
+                  >
+                    {v.initials}
+                  </div>
+                  <h4 className="font-display font-bold text-canopy-dark text-base">{v.name}</h4>
+                  <p className="text-sanctuary-green text-xs font-semibold mt-1 mb-2">{v.role}</p>
+                  <p className="text-canopy-dark/50 text-xs leading-relaxed">
+                    Placeholder — real name coming soon
+                  </p>
+                </div>
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
+
+          <AnimatedSection className="text-center">
+            <p className="text-canopy-dark/50 text-sm">
+              Want to volunteer?{' '}
+              <a
+                href="mailto:sudarsonsah@gmail.com"
+                className="text-sanctuary-green font-medium hover:underline"
+              >
+                Reach out to Sudarson
+              </a>
+            </p>
+          </AnimatedSection>
         </div>
       </section>
 

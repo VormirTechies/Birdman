@@ -390,6 +390,19 @@ export async function getGalleryImages() {
   });
 }
 
+export async function getGalleryImagesPaginated(offset = 0, limit = 15) {
+  return db.query.galleryImages.findMany({
+    orderBy: [desc(galleryImages.uploadedAt)],
+    limit,
+    offset,
+  });
+}
+
+export async function getGalleryCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(galleryImages);
+  return row?.count ?? 0;
+}
+
 export async function addGalleryImage(url: string, altText?: string, caption?: string) {
   const [inserted] = await db
     .insert(galleryImages)

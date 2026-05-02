@@ -27,6 +27,8 @@ export function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === '/';
+  // Pages with a full-bleed hero — header starts transparent and goes white on scroll
+  const isTransparentTop = !pathname.startsWith('/admin');
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -41,7 +43,7 @@ export function Header() {
       transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-500',
-        isScrolled || !isHome
+        isScrolled || !isTransparentTop
           ? 'bg-white/90 backdrop-blur-xl shadow-[0_1px_3px_rgba(0,0,0,0.08)] border-b border-sanctuary-green/10'
           : 'bg-transparent'
       )}
@@ -56,7 +58,7 @@ export function Header() {
             <Bird
               className={cn(
                 'w-7 h-7 transition-colors duration-300',
-                isScrolled || !isHome
+                isScrolled || !isTransparentTop
                   ? 'text-sanctuary-green'
                   : 'text-white'
               )}
@@ -65,7 +67,7 @@ export function Header() {
           <span
             className={cn(
               'font-display font-bold text-lg md:text-xl tracking-tight transition-colors duration-300',
-              isScrolled || !isHome ? 'text-canopy-dark' : 'text-white'
+              isScrolled || !isTransparentTop ? 'text-canopy-dark' : 'text-white'
             )}
           >
             Birdman<span className="hidden sm:inline"> of Chennai</span>
@@ -82,7 +84,7 @@ export function Header() {
                 href={link.href}
                 className={cn(
                   'relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-300',
-                  isScrolled || !isHome
+                  isScrolled || !isTransparentTop
                     ? isActive
                       ? 'text-sanctuary-green bg-morning-mist'
                       : 'text-canopy-dark/70 hover:text-sanctuary-green hover:bg-morning-mist/50'
@@ -97,7 +99,7 @@ export function Header() {
                     layoutId="nav-indicator"
                     className={cn(
                       'absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full',
-                      isScrolled || !isHome ? 'bg-sanctuary-green' : 'bg-white'
+                      isScrolled || !isTransparentTop ? 'bg-sanctuary-green' : 'bg-white'
                     )}
                     transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                   />
@@ -127,7 +129,7 @@ export function Header() {
               <button
                 className={cn(
                   'p-2.5 rounded-xl transition-colors',
-                  isScrolled || !isHome
+                  isScrolled || !isTransparentTop
                     ? 'text-canopy-dark hover:bg-morning-mist'
                     : 'text-white hover:bg-white/10'
                 )}
