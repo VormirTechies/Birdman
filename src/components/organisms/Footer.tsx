@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Bird, MapPin, Phone, Mail, Heart, ArrowUp } from 'lucide-react';
+import { MapPin, Mail, Heart, ArrowUp } from 'lucide-react';
 import { AnimatedSection } from '@/components/ui/animated-section';
 import { FloatingParticles } from '@/components/ui/floating-particles';
+import Image from 'next/image';
 
 const quickLinks = [
   { href: '/story', label: 'His Story' },
@@ -56,7 +57,9 @@ export function Footer() {
             href="/book"
             className="inline-flex items-center gap-2 bg-golden-hour hover:bg-sunset-amber text-canopy-dark font-semibold px-8 py-3.5 rounded-full transition-all duration-300 hover:shadow-glow-gold text-base"
           >
-            <Bird className="w-5 h-5" />
+            {/* <Bird className="w-5 h-5" /> */}
+
+            <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={28} height={28} />
             Book Your Visit
           </Link>
         </div>
@@ -69,7 +72,8 @@ export function Footer() {
             {/* Brand */}
             <div>
               <Link href="/" className="flex items-center gap-2 mb-4">
-                <Bird className="w-6 h-6 text-sanctuary-green-light" />
+                {/* <Bird className="w-6 h-6 text-sanctuary-green-light" /> */}
+                <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={28} height={28} />
                 <span className="font-display font-bold text-lg">
                   Birdman of Chennai
                 </span>
@@ -131,13 +135,6 @@ export function Footer() {
                 >
                   <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-sanctuary-green-light group-hover:scale-110 transition-transform" />
                   <span>{process.env.NEXT_PUBLIC_MAP_ADDRESS}</span>
-                </a>
-                <a
-                  href="tel:+919876543210"
-                  className="flex items-center gap-2.5 text-white/60 hover:text-sanctuary-green-light transition-colors text-sm"
-                >
-                  <Phone className="w-4 h-4 shrink-0" />
-                  <span>+91 98765 43210</span>
                 </a>
                 <a
                   href="mailto:info@birdmanofchennai.com"

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getBookingById, updateBooking } from '@/lib/db/queries';
+import { getBookingById, updateBooking, toggleVisited } from '@/lib/db/queries';
 import { updateBookingSchema } from '@/lib/validations';
 import { sendRescheduleNotification } from '@/lib/email';
 import { ZodError } from 'zod';
@@ -93,6 +93,15 @@ export async function PATCH(
       );
     }
 
+    // Parse request body
+    const body = await request.json();
+
+    // ── Visited toggle (checklist feature) ──────────────────────────────────
+    if (typeof body.visited === 'boolean' && Object.keys(body).length === 1) {
+      const updated = await toggleVisited(id, body.visited);
+      return NextResponse.json({ success: true, booking: updated });
+    }
+
     // Check if booking can be rescheduled
     if (existingBooking.status === 'cancelled') {
       return NextResponse.json(
@@ -115,7 +124,6 @@ export async function PATCH(
     }
 
     // Parse and validate request body
-    const body = await request.json();
     const validatedData = updateBookingSchema.parse(body);
 
     // Store old booking details for email

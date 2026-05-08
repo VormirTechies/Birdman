@@ -1,28 +1,87 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bird, Lock, Loader2, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Eye, EyeOff, Bird, Mail, Lock, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { FloatingParticles } from '@/components/ui/floating-particles';
+import Carousel from '../_components/Carousel';
+import OTPInput from '../_components/OTPInput';
 
-export default function LoginPage() {
+type CardView = 'login' | 'forgot' | 'verify' | 'reset' | 'success';
+
+// Gallery images for carousel
+const GALLERY_IMAGES = [
+  '/images/gallery/001.jpeg',
+  '/images/gallery/002.jpeg',
+  '/images/gallery/003.jpeg',
+  '/images/gallery/004.jpeg',
+  '/images/gallery/005.jpeg',
+  '/images/gallery/006.jpeg',
+  '/images/gallery/007.jpeg',
+  '/images/gallery/008.jpeg',
+  '/images/gallery/009.jpeg',
+  '/images/gallery/010.jpeg',
+];
+
+export default function AdminLoginPage() {
   const router = useRouter();
+  const [currentView, setCurrentView] = useState<CardView>('login');
+  
+  // Login state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const supabase = createClient();
+
+  // Forgot password state
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  // OTP state
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  // Reset password state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+
+  // Slide animation variants
+  const slideVariants = {
+    enter: {
+      x: '100%',
+      opacity: 0,
+    },
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: {
+      x: '-100%',
+      opacity: 0,
+    },
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
+    setIsLoading(true);
 
     try {
+      const supabase = createClient();
+      
+      // Validate inputs
+      if (!email || !password) {
+        throw new Error('Please fill in all fields');
+      }
+
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -30,8 +89,8 @@ export default function LoginPage() {
 
       if (authError) throw authError;
 
+      // Successful login - redirect to dashboard
       router.push('/admin');
-      router.refresh();
     } catch (err: any) {
       setError(err.message || 'Invalid login credentials');
     } finally {
@@ -39,116 +98,652 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-canopy-dark flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Ambience */}
-      <FloatingParticles />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-sanctuary-green/5 blur-[120px] rounded-full -z-10" />
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotLoading(true);
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full max-w-[420px] relative z-10"
-      >
-        {/* Logo Section */}
-        <div className="text-center mb-10">
-          <motion.div 
-            initial={{ scale: 0.8, rotate: -10 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-            className="w-20 h-20 bg-gradient-to-br from-sanctuary-green to-canopy-light rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-sanctuary-green/20 relative group"
-          >
-            <Bird className="w-10 h-10 text-white" />
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-sunset-amber rounded-full border-4 border-canopy-dark flex items-center justify-center">
-              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-            </div>
-          </motion.div>
-          <h1 className="font-display font-black text-3xl text-white tracking-tight mb-2">
-            Secure Access
-          </h1>
-          <p className="text-white/40 text-sm font-medium tracking-wide uppercase">
-            Birdman Sanctuary Control
+    try {
+      const supabase = createClient();
+
+      // Validate email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(forgotEmail)) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      // Send magic link for password reset
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        forgotEmail,
+        {
+          redirectTo: `${window.location.origin}/admin/reset-password`,
+        }
+      );
+
+      if (resetError) throw resetError;
+
+      // Show success state
+      setCurrentView('success');
+    } catch (err: any) {
+      setForgotError(err.message || 'Failed to send reset email. Please try again.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOtpError('');
+    setOtpLoading(true);
+
+    if (otp.length !== 6) {
+      setOtpError('Please enter the complete 6-digit code');
+      setOtpLoading(false);
+      return;
+    }
+
+    // TODO: Verify OTP
+    setTimeout(() => {
+      setOtpLoading(false);
+      setCurrentView('reset');
+    }, 1000);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError('');
+    setResetLoading(true);
+
+    // Validate passwords
+    if (newPassword.length < 8) {
+      setResetError('Password must be at least 8 characters');
+      setResetLoading(false);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setResetError('Passwords do not match');
+      setResetLoading(false);
+      return;
+    }
+
+    // TODO: Reset password
+    setTimeout(() => {
+      setResetLoading(false);
+      setCurrentView('success');
+    }, 1000);
+  };
+
+  const handleBackToLogin = () => {
+    setCurrentView('login');
+    // Reset all states
+    setForgotEmail('');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+    setForgotError('');
+    setOtpError('');
+    setResetError('');
+  };
+
+  const handleResendOTP = () => {
+    // TODO: Resend OTP
+    setOtpError('');
+    setOtp('');
+  };
+
+  return (
+    <div className="min-h-screen flex bg-white overflow-hidden">
+      {/* Left Side - Carousel (Desktop) / Background (Mobile) */}
+      <div className="hidden lg:block lg:w-1/2 relative">
+        <Carousel images={GALLERY_IMAGES} interval={4000} />
+        
+        {/* Overlay gradient */}
+        <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] z-10 opacity-50" />
+        
+        {/* Content overlay */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-end p-12">
+          {/* Main content */}
+          <div className="max-w-md">
+            <h1 
+              className="text-4xl lg:text-5xl font-bold text-white mb-4"
+              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            >
+              Where the sky turns green.
+            </h1>
+            <p className="text-lg text-white/90 leading-relaxed">
+              The administrative heart of Chennai&apos;s urban bird sanctuary. Manage the daily miracle and protect the legacy of a 16-year bond with nature.
+            </p>
+          </div>
+
+          {/* Indicators moved to bottom of carousel content */}
+          <div className="h-8" />
+        </div>
+      </div>
+
+      {/* Right Side - Login Form (Desktop) / Full screen with background (Mobile) */}
+      <div className="w-full lg:w-1/2 relative flex items-center justify-center p-6 lg:p-12">
+        {/* Mobile background carousel */}
+        <div className="lg:hidden absolute inset-0 z-0">
+          <Carousel images={GALLERY_IMAGES} interval={4000} />
+          <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] opacity-75" />
+        </div>
+
+        {/* Card container with AnimatePresence */}
+        <div className="relative z-10 w-full max-w-sm">
+          <AnimatePresence mode="wait">
+            {/* LOGIN CARD */}
+            {currentView === 'login' && (
+              <motion.div
+                key="login"
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    {/* Logo */}
+                    <div className="flex justify-center items-center gap-3 mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-[#2E7D32] flex items-center justify-center">
+                        <Bird className="w-7 h-7 text-white" />
+                      </div>
+                    </div>
+                    
+                    <h2 
+                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      Birdman of Chennai
+                    </h2>
+                    <p className="text-xs lg:text-sm text-[#616161]">
+                      Sign in to manage your properties
+                    </p>
+                  </div>
+
+                  {/* Error message */}
+                  {error && (
+                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Form */}
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    {/* Email field */}
+                    <div>
+                      <label 
+                        htmlFor="email" 
+                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      >
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
+                        <input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="admin@example.com"
+                          required
+                          className="w-full pl-10 pr-3 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password field */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label 
+                          htmlFor="password" 
+                          className="text-xs lg:text-sm font-semibold text-[#212121]"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                        >
+                          Password
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView('forgot')}
+                          className="text-xs lg:text-sm font-medium text-[#2E7D32] hover:text-[#1B5E20] transition-colors cursor-pointer"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
+                        <input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                          suppressHydrationWarning
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      {isLoading ? 'Logging in...' : 'Log In'}
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* FORGOT PASSWORD CARD */}
+            {currentView === 'forgot' && (
+              <motion.div
+                key="forgot"
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    {/* Icon */}
+                    <div className="flex justify-center items-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
+                        <KeyRound className="w-6 h-6 text-[#2E7D32]" />
+                      </div>
+                    </div>
+                    
+                    <h2 
+                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      Forgot Password
+                    </h2>
+                    <p className="text-xs lg:text-sm text-[#616161]">
+                      Enter your email address to receive a 6-digit OTP.
+                    </p>
+                  </div>
+
+                  {/* Error message */}
+                  {forgotError && (
+                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
+                      {forgotError}
+                    </div>
+                  )}
+
+                  {/* Form */}
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    {/* Email field */}
+                    <div>
+                      <label 
+                        htmlFor="forgot-email" 
+                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      >
+                        Email address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
+                        <input
+                          id="forgot-email"
+                          type="email"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          placeholder="e.g. manager@hotel.com"
+                          required
+                          className="w-full pl-10 pr-3 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        />
+                      </div>
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      {forgotLoading ? 'Sending...' : 'Get OTP'}
+                    </button>
+
+                    {/* Back to login */}
+                    <button
+                      type="button"
+                      onClick={handleBackToLogin}
+                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to Login
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* VERIFY OTP CARD */}
+            {currentView === 'verify' && (
+              <motion.div
+                key="verify"
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    {/* Icon */}
+                    <div className="flex justify-center items-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
+                        <Mail className="w-6 h-6 text-[#2E7D32]" />
+                      </div>
+                    </div>
+                    
+                    <h2 
+                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      Verify OTP
+                    </h2>
+                    <p className="text-xs lg:text-sm text-[#616161]">
+                      Enter the 6-digit code sent to your email.
+                    </p>
+                    {forgotEmail && (
+                      <p className="text-xs lg:text-sm text-[#2E7D32] font-medium mt-1">
+                        {forgotEmail}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Error message */}
+                  {otpError && (
+                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
+                      {otpError}
+                    </div>
+                  )}
+
+                  {/* Form */}
+                  <form onSubmit={handleVerifyOTP} className="space-y-4">
+                    {/* OTP Input */}
+                    <div className="py-2">
+                      <OTPInput 
+                        length={6}
+                        value={otp}
+                        onChange={setOtp}
+                        onComplete={(code) => setOtp(code)}
+                      />
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={otpLoading}
+                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      {otpLoading ? 'Verifying...' : 'Verify OTP'}
+                    </button>
+
+                    {/* Resend code */}
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={handleResendOTP}
+                        className="text-xs lg:text-sm font-medium text-[#2E7D32] hover:text-[#1B5E20] transition-colors cursor-pointer"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                        suppressHydrationWarning
+                      >
+                        Resend Code
+                      </button>
+                    </div>
+
+                    {/* Back to login */}
+                    <button
+                      type="button"
+                      onClick={handleBackToLogin}
+                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to Login
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* RESET PASSWORD CARD */}
+            {currentView === 'reset' && (
+              <motion.div
+                key="reset"
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    {/* Icon */}
+                    <div className="flex justify-center items-center mb-4">
+                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
+                        <Lock className="w-6 h-6 text-[#2E7D32]" />
+                      </div>
+                    </div>
+                    
+                    <h2 
+                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      Reset Password
+                    </h2>
+                    <p className="text-xs lg:text-sm text-[#616161]">
+                      Please enter your new password below.
+                    </p>
+                  </div>
+
+                  {/* Error message */}
+                  {resetError && (
+                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
+                      {resetError}
+                    </div>
+                  )}
+
+                  {/* Form */}
+                  <form onSubmit={handleResetPassword} className="space-y-4">
+                    {/* New Password field */}
+                    <div>
+                      <label 
+                        htmlFor="new-password" 
+                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      >
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
+                        <input
+                          id="new-password"
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                          suppressHydrationWarning
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-[#616161] mt-1">
+                        At least 8 characters with a mix of letters and numbers.
+                      </p>
+                    </div>
+
+                    {/* Confirm Password field */}
+                    <div>
+                      <label 
+                        htmlFor="confirm-password" 
+                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      >
+                        Confirm Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
+                        <input
+                          id="confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
+                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                          suppressHydrationWarning
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                          suppressHydrationWarning
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      {resetLoading ? 'Resetting...' : 'Submit'}
+                    </button>
+
+                    {/* Back to login */}
+                    <button
+                      type="button"
+                      onClick={handleBackToLogin}
+                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      suppressHydrationWarning
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to Login
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+
+            {/* SUCCESS CARD */}
+            {currentView === 'success' && (
+              <motion.div
+                key="success"
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
+                  {/* Header */}
+                  <div className="text-center mb-6">
+                    {/* Icon */}
+                    <div className="flex justify-center items-center mb-4">
+                      <div className="w-16 h-16 rounded-full bg-[#2E7D32] flex items-center justify-center">
+                        <CheckCircle2 className="w-9 h-9 text-white" />
+                      </div>
+                    </div>
+                    
+                    <h2 
+                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      Check Your Email
+                    </h2>
+                    <p className="text-xs lg:text-sm text-[#616161]">
+                      We&apos;ve sent a password reset link to your email. Click the link in the email to reset your password.
+                    </p>
+                  </div>
+
+                  {/* Log In button */}
+                  <button
+                    type="button"
+                    onClick={handleBackToLogin}
+                    className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer"
+                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    suppressHydrationWarning
+                  >
+                    Log In
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Copyright */}
+          <p className="text-center text-xs text-[#616161] lg:text-[#9E9E9E] mt-4">
+            © 2026 Vormir Techies. All rights reserved.
           </p>
         </div>
-
-        {/* Login Card */}
-        <div className="bg-white/[0.03] backdrop-blur-2xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl overflow-hidden relative group">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
-          
-          <form onSubmit={handleLogin} className="space-y-6 relative">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4">
-                Identity
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@official.com"
-                  required
-                  className="rounded-2xl h-14 bg-white/5 border-white/5 text-white placeholder:text-white/20 pl-12 focus:border-sanctuary-green/50 transition-all text-base"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-white/30 ml-4">
-                Access Key
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="rounded-2xl h-14 bg-white/5 border-white/5 text-white placeholder:text-white/20 pl-12 focus:border-sanctuary-green/50 transition-all text-base"
-                />
-              </div>
-            </div>
-
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl flex items-center gap-3"
-                >
-                  <ShieldCheck className="w-4 h-4 text-red-400 shrink-0" />
-                  <p className="text-red-400 text-xs font-medium leading-tight">
-                    {error}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-sanctuary-green hover:bg-sanctuary-green/90 text-white rounded-2xl h-14 text-base font-bold gap-3 shadow-lg shadow-sanctuary-green/10 transition-all active:scale-[0.98]"
-            >
-              {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  Enter Dashboard
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </Button>
-          </form>
-        </div>
-
-        {/* Footer Link */}
-        <p className="text-center mt-10 text-white/20 text-xs font-medium">
-          Authorized Personnel Only • &copy; 2026 Birdman of Chennai
-        </p>
-      </motion.div>
+      </div>
     </div>
   );
 }
