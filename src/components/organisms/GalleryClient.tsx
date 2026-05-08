@@ -1,11 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, X, ChevronLeft, ChevronRight, Camera } from 'lucide-react';
-import Link from 'next/link';
-import { AnimatedSection } from '@/components/ui/animated-section';
+import { useState, useEffect, useRef, useCallback } from "react";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Volume2,
+  VolumeX,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Camera,
+} from "lucide-react";
+import Link from "next/link";
+import { AnimatedSection } from "@/components/ui/animated-section";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,7 +21,7 @@ interface GalleryImage {
   src: string;
   title: string;
   description?: string;
-  aspect: 'square' | 'landscape' | 'portrait';
+  aspect: "square" | "landscape" | "portrait";
 }
 
 interface GalleryClientProps {
@@ -27,12 +34,12 @@ interface GalleryClientProps {
 
 function getBentoClass(i: number): string {
   const p = i % 10;
-  if (p === 0) return 'col-span-2 row-span-2';
-  if (p === 2) return 'col-span-1 row-span-2';
-  if (p === 5) return 'col-span-2 row-span-1';
-  if (p === 7) return 'col-span-1 row-span-2';
-  if (p === 9) return 'col-span-2 row-span-1';
-  return 'col-span-1 row-span-1';
+  if (p === 0) return "col-span-2 row-span-2";
+  if (p === 2) return "col-span-1 row-span-2";
+  if (p === 5) return "col-span-2 row-span-1";
+  if (p === 7) return "col-span-1 row-span-2";
+  if (p === 9) return "col-span-2 row-span-1";
+  return "col-span-1 row-span-1";
 }
 
 function SkeletonCard({ index }: { index: number }) {
@@ -47,9 +54,12 @@ function SkeletonCard({ index }: { index: number }) {
 
 const PAGE_SIZE = 15;
 const VIDEO_URL =
-  'https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan.mp4';
+  "https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan_wide.mp4";
 
-export function GalleryClient({ initialImages, totalCount }: GalleryClientProps) {
+export function GalleryClient({
+  initialImages,
+  totalCount,
+}: GalleryClientProps) {
   const [images, setImages] = useState<GalleryImage[]>(initialImages);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialImages.length < totalCount);
@@ -79,8 +89,10 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
     if (loading || !hasMore) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/gallery?offset=${offsetRef.current}&limit=${PAGE_SIZE}`);
-      if (!res.ok) throw new Error('Fetch failed');
+      const res = await fetch(
+        `/api/gallery?offset=${offsetRef.current}&limit=${PAGE_SIZE}`,
+      );
+      if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
       const fetched: GalleryImage[] = (data.images ?? []).map(
         (img: {
@@ -92,9 +104,9 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
         }) => ({
           id: img.id,
           src: img.url,
-          title: img.altText || img.caption || 'Parakeet at Birdman Sanctuary',
+          title: img.altText || img.caption || "Parakeet at Birdman Sanctuary",
           description: img.caption ?? undefined,
-          aspect: (img.aspect as GalleryImage['aspect']) || 'square',
+          aspect: (img.aspect as GalleryImage["aspect"]) || "square",
         }),
       );
       if (fetched.length === 0) {
@@ -129,14 +141,17 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
   useEffect(() => {
     if (!lightbox.open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight')
+      if (e.key === "ArrowRight")
         setLightbox((l) => ({ ...l, index: (l.index + 1) % images.length }));
-      else if (e.key === 'ArrowLeft')
-        setLightbox((l) => ({ ...l, index: (l.index - 1 + images.length) % images.length }));
-      else if (e.key === 'Escape') setLightbox((l) => ({ ...l, open: false }));
+      else if (e.key === "ArrowLeft")
+        setLightbox((l) => ({
+          ...l,
+          index: (l.index - 1 + images.length) % images.length,
+        }));
+      else if (e.key === "Escape") setLightbox((l) => ({ ...l, open: false }));
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [lightbox.open, images.length]);
 
   const currentImage = images[lightbox.index];
@@ -144,7 +159,7 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
   return (
     <main className="min-h-screen bg-feather-cream">
       {/* ── VIDEO HERO ────────────────────────────────────────────────────── */}
-      <section className="relative h-[60vh] md:h-[78vh] overflow-hidden bg-canopy-dark">
+      <section className="relative h-[89vh] md:h-[85vh] overflow-hidden bg-canopy-dark">
         {/* Fallback gradient visible while video loads */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,176,140,0.08),transparent_70%)]" />
 
@@ -156,7 +171,7 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
           loop
           playsInline
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-            videoReady ? 'opacity-100' : 'opacity-0'
+            videoReady ? "opacity-100" : "opacity-0"
           }`}
           onCanPlay={() => setVideoReady(true)}
         />
@@ -167,10 +182,14 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
         {/* Mute toggle — top right below header */}
         <button
           onClick={toggleMute}
-          aria-label={muted ? 'Unmute video' : 'Mute video'}
+          aria-label={muted ? "Unmute video" : "Mute video"}
           className="absolute top-24 right-5 z-20 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10 transition-all duration-200"
         >
-          {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          {muted ? (
+            <VolumeX className="w-4 h-4" />
+          ) : (
+            <Volume2 className="w-4 h-4" />
+          )}
         </button>
 
         {/* Hero copy — bottom left */}
@@ -186,13 +205,13 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
                 {totalCount} Moments Captured
               </span>
               <h1 className="font-display font-black text-white text-4xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tight">
-                One Man. One Rooftop.{' '}
+                One Man. One Rooftop.{" "}
                 <span className="text-golden-hour">14,000 Wings.</span>
               </h1>
               <p className="text-white/50 text-base md:text-lg max-w-xl mt-4 leading-relaxed">
-                Every sunrise above Chintadripet, Sudarson Sah steps onto his rooftop — and
-                thousands of parakeets descend from the Chennai sky to greet him. These are the
-                moments visitors never forget.
+                Every sunrise above Chintadripet, Sudarson Sah steps onto his
+                rooftop — and thousands of parakeets descend from the Chennai
+                sky to greet him. These are the moments visitors never forget.
               </p>
             </motion.div>
           </div>
@@ -266,12 +285,12 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(62,176,140,0.1),transparent_70%)] pointer-events-none" />
               <div className="relative z-10 max-w-2xl mx-auto">
                 <h2 className="font-display text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
-                  Be Part of the{' '}
+                  Be Part of the{" "}
                   <span className="text-sanctuary-green">Emerald Arrival</span>
                 </h2>
                 <p className="text-white/50 text-xl mb-12 leading-relaxed">
-                  The lens captures the beauty, but the soul feels the wonder. Stand on the rooftop
-                  at dawn as the sky turns green.
+                  The lens captures the beauty, but the soul feels the wonder.
+                  Stand on the rooftop at dawn as the sky turns green.
                 </p>
                 <Link
                   href="/book"
@@ -348,7 +367,7 @@ export function GalleryClient({ initialImages, totalCount }: GalleryClientProps)
             >
               <Image
                 src={currentImage.src}
-                alt={currentImage.title || 'Parakeet at Birdman Sanctuary'}
+                alt={currentImage.title || "Parakeet at Birdman Sanctuary"}
                 width={1200}
                 height={800}
                 className="w-auto h-auto max-w-full max-h-[70vh] mx-auto rounded-2xl object-contain"

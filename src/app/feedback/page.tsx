@@ -1,4 +1,6 @@
 import { getApprovedFeedback } from '@/lib/db/queries';
+
+export const revalidate = 1800;
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
 import { FeedbackClient } from '@/components/organisms/FeedbackClient';

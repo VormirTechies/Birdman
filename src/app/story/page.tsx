@@ -1,8 +1,5 @@
-'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
   Bird,
   Calendar,
@@ -18,12 +15,15 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
+import { StoryHeroSection } from '@/components/organisms/StoryHeroSection';
 import { Counter } from '@/components/ui/counter';
 import {
   AnimatedSection,
   StaggerContainer,
   StaggerItem,
 } from '@/components/ui/animated-section';
+
+export const dynamic = 'force-static';
 
 /* ════════════════════════════════════════════════════════════════════════════
    STORY PAGE — The Birdman's Journey
@@ -67,9 +67,9 @@ const timeline = [
   },
   {
     year: 'Today',
-    title: '4,000 Daily Visitors',
+    title: '~6,000 Daily Visitors',
     description:
-      'Up to 4,000 wild parakeets gather every evening. The sanctuary has become Chennai\'s most unique urban wildlife experience.',
+      'Up to ~6,000 wild parakeets gather every evening. The sanctuary has become Chennai\'s most unique urban wildlife experience.',
     icon: Heart,
   },
 ];
@@ -104,37 +104,7 @@ export default function StoryPage() {
       <Header />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="relative h-[50vh] md:h-[60vh] min-h-[400px]">
-          <Image
-            src="/images/gallery/sudarson-002.jpeg"
-            alt="Mr. Sudarson Sah with parakeets"
-            fill
-            priority
-            className="object-cover"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-canopy-dark/70 via-canopy-dark/40 to-feather-cream" />
-
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-center max-w-3xl px-4"
-            >
-              <span className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm text-white/90 text-sm font-medium px-4 py-1.5 rounded-full mb-5">
-                <Heart className="w-4 h-4 fill-current" />
-                A Story of Love & Dedication
-              </span>
-              <h1 className="font-display font-black text-white text-4xl md:text-5xl lg:text-6xl leading-tight drop-shadow-xl">
-                The Man Behind{' '}
-                <span className="text-golden-hour">the Miracle</span>
-              </h1>
-            </motion.div>
-          </div>
-        </div>
-      </section>
+      <StoryHeroSection />
 
       {/* ── INTRODUCTION ─────────────────────────────────────────────────── */}
       <section className="py-20 md:py-28 bg-feather-cream">
@@ -420,9 +390,9 @@ export default function StoryPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { value: 4000, label: 'Parakeets Daily', suffix: '' },
+              { value: 6000, label: 'Parakeets Daily', suffix: '' },
               { value: 16, label: 'Years of Service', suffix: '+' },
-              { value: 40, label: 'Kg Rice Daily', suffix: '' },
+              { value: 60, label: 'Kg Rice Daily', suffix: '' },
               { value: 14000, label: 'Visitors Served', suffix: '+' },
             ].map((stat, i) => (
               <AnimatedSection key={stat.label} delay={i * 0.1} className="text-center">
@@ -473,8 +443,9 @@ export default function StoryPage() {
       {/* ── CTA ───────────────────────────────────────────────────────────── */}
       <AnimatedSection>
         <section className="py-20 md:py-24 bg-morning-mist text-center">
-          <div className="container-wide max-w-2xl">
-            <Bird className="w-10 h-10 text-sanctuary-green mx-auto mb-4" />
+          <div className="container-wide max-w-2xl flex flex-col justify-center items-center gap-3">
+            {/* <Bird className="w-10 h-10 text-sanctuary-green mx-auto mb-4" /> */}
+             <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={35} height={35} />
             <h2 className="font-display text-3xl md:text-4xl font-bold text-canopy-dark mb-4">
               Come See for Yourself
             </h2>

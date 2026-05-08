@@ -13,6 +13,7 @@ import { subscribeUser } from '@/lib/push/client';
 import { requestPushPermission } from '@/lib/push/send';
 import { createClient } from '@/lib/supabase/client';
 import enMessages from '@/../messages/en.json';
+import { PWAInstallBanner } from '@/components/admin/PWAInstallBanner';
 
 const workSans = Work_Sans({
   subsets: ['latin'],
@@ -28,6 +29,12 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Swap to admin-specific PWA manifest
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    if (link) link.href = '/admin-manifest.json';
+  }, []);
 
   // Setup push notifications on mount
   useEffect(() => {
@@ -117,6 +124,7 @@ export default function AdminLayout({
         </div>
 
         {/* Fixed bottom nav — mobile only */}
+        <PWAInstallBanner />
         <AdminBottomNav onMoreClick={() => setIsSidebarOpen(true)} />
 
         <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />

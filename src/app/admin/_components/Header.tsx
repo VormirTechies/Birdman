@@ -70,7 +70,6 @@ function NotificationItem({ n }: { n: AppNotification }) {
 }
 
 // ─── Header ─────────────────────────────────────────────────────────────────
-
 interface HeaderProps {
   onMenuClick: () => void;
 }

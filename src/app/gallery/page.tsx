@@ -1,4 +1,6 @@
 import { getGalleryImagesPaginated, getGalleryCount } from '@/lib/db/queries';
+
+export const revalidate = 3600;
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
 import { GalleryClient } from '@/components/organisms/GalleryClient';

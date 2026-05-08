@@ -23,7 +23,7 @@ if (!DATABASE_URL) {
 }
 
 async function checkAndFixRLS() {
-  const sql = postgres(DATABASE_URL, {
+  const sql = postgres(DATABASE_URL!, {
     max: 1,
   });
 

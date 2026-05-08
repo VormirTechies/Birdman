@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import Image from 'next/image';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
@@ -44,8 +45,9 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
     <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 h-16 border-b border-[#E0E0E0] shrink-0">
-        <div className="w-9 h-9 rounded-lg bg-[#2E7D32] flex items-center justify-center shrink-0">
-          <Bird className="w-5 h-5 text-white" />
+        <div className="w-9 h-9 rounded-md bg-white shadow-2xl shadow-canopy-dark flex items-center justify-center shrink-0">
+          {/* <Bird className="w-5 h-5 text-white" /> */}
+          <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={28} height={28} />
         </div>
         <span className="font-semibold text-[#212121] text-base" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
           Booking Admin
