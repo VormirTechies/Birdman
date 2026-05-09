@@ -34,7 +34,8 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   // Session-scoped: React state only — clears on tab close (no localStorage)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const supabaseRef = useRef(createClient());
+  // Null initially — createClient() must never run during SSR/prerender
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
   const addNotification = useCallback((n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => {
     setNotifications(prev => {
@@ -93,6 +94,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // ─── Realtime Subscriptions ─────────────────────────────────────────────
 
   useEffect(() => {
+    // Initialize lazily — this only runs on the client, never during SSR
+    if (!supabaseRef.current) supabaseRef.current = createClient();
     const supabase = supabaseRef.current;
 
     // New bookings
