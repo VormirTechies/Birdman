@@ -159,6 +159,7 @@ export function Footer() {
             onClick={scrollToTop}
             className="text-white/40 hover:text-sanctuary-green-light transition-colors flex items-center justify-center gap-1.5 text-xs w-full md:w-auto"
             aria-label="Scroll to top"
+            suppressHydrationWarning
           >
             <ArrowUp className="w-3.5 h-3.5" />
             Back to top

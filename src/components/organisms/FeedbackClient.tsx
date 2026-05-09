@@ -49,6 +49,7 @@ function StarRatingSelector({
           onMouseLeave={() => setHover(0)}
           className="p-1 transition-transform hover:scale-110"
           aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
+          suppressHydrationWarning
         >
           <Star
             className={`w-8 h-8 transition-colors ${
