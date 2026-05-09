@@ -11,7 +11,7 @@ if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   );
 }
 
-export async function sendPushToAllAdmins(payload: { title: string; body: string; url?: string }) {
+export async function sendPushToAllAdmins(payload: { title: string; body: string; url?: string; visitorName?: string; bookingDate?: string }) {
   console.log('[PUSH] Sending alerts to all registered admins...');
 
   try {

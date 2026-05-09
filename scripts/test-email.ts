@@ -23,6 +23,7 @@ async function main() {
     reminderSent: false,
     reminderSentAt: null,
     status: 'confirmed' as const,
+    visited: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

@@ -40,7 +40,7 @@ export async function getRegistration() {
 }
 
 /**
- * Robustly retrieves or creates a push subscription.
+ * Robustly retrieves or creates a push subscription and saves it to the server.
  */
 export async function subscribeUser() {
     if (!VAPID_PUBLIC_KEY) throw new Error('VAPID Public Key missing.');
@@ -66,6 +66,27 @@ export async function subscribeUser() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
+      console.log('[Push Client] New subscription created');
+    }
+
+    // Save subscription to server database
+    try {
+      const response = await fetch('/api/admin/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription.toJSON() })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('[Push Client] Failed to save subscription to server:', error);
+        throw new Error('Failed to save subscription');
+      }
+
+      console.log('[Push Client] Subscription saved to server database');
+    } catch (error) {
+      console.error('[Push Client] Error saving subscription:', error);
+      throw error;
     }
 
     return subscription;
