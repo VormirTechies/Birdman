@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     // Upload to Supabase Storage (admin client bypasses RLS)
     const adminClient = getAdminClient();
     const ext = file.name.split('.').pop() ?? 'jpg';
-    const storagePath = `gallery/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const storagePath = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const { error: uploadError } = await adminClient.storage

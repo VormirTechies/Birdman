@@ -56,6 +56,31 @@ const PAGE_SIZE = 15;
 const VIDEO_URL =
   "https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan_wide.mp4";
 
+// ── Module-level blob-URL cache ────────────────────────────────────────────────
+// Module variables survive re-renders, Strict-Mode double-mounts, and in-tab
+// navigations — the video is fetched at most ONCE per tab session.
+let _galleryBlobUrl: string | null = null;
+let _galleryFetch: Promise<string> | null = null;
+
+function loadGalleryVideo(): Promise<string> {
+  if (_galleryBlobUrl) return Promise.resolve(_galleryBlobUrl);
+  if (!_galleryFetch) {
+    _galleryFetch = fetch(VIDEO_URL)
+      .then((r) => r.blob())
+      .then((blob) => {
+        _galleryBlobUrl = URL.createObjectURL(blob);
+        _galleryFetch = null;
+        return _galleryBlobUrl;
+      })
+      .catch(() => {
+        _galleryFetch = null;
+        return VIDEO_URL; // fallback to direct URL on error
+      });
+  }
+  return _galleryFetch;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 export function GalleryClient({
   initialImages,
   totalCount,
@@ -63,7 +88,8 @@ export function GalleryClient({
   const [images, setImages] = useState<GalleryImage[]>(initialImages);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialImages.length < totalCount);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({
     open: false,
@@ -73,7 +99,11 @@ export function GalleryClient({
   const videoRef = useRef<HTMLVideoElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(initialImages.length);
+  // ── Load video blob once per session ─────────────────────────────────────────
 
+  useEffect(() => {
+    loadGalleryVideo().then(setVideoSrc);
+  }, []);
   // ── Mute toggle ──────────────────────────────────────────────────────────────
 
   const toggleMute = () => {
@@ -163,18 +193,20 @@ export function GalleryClient({
         {/* Fallback gradient visible while video loads */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,176,140,0.08),transparent_70%)]" />
 
-        <video
-          ref={videoRef}
-          src={VIDEO_URL}
-          autoPlay
-          muted
-          loop
-          playsInline
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-            videoReady ? "opacity-100" : "opacity-0"
-          }`}
-          onCanPlay={() => setVideoReady(true)}
-        />
+        {videoSrc && (
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            autoPlay
+            loop
+            playsInline
+            muted
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+              videoReady ? "opacity-100" : "opacity-0"
+            }`}
+            onCanPlay={() => setVideoReady(true)}
+          />
+        )}
 
         {/* Overlay gradient */}
         <div className="absolute inset-0 bg-linear-to-t from-canopy-dark/85 via-canopy-dark/20 to-transparent" />
@@ -236,6 +268,7 @@ export function GalleryClient({
                   src={img.src}
                   alt={img.title}
                   fill
+                  unoptimized
                   className="object-cover transition-transform duration-700 group-hover:scale-105"
                   sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
                 />
@@ -370,6 +403,7 @@ export function GalleryClient({
                 alt={currentImage.title || "Parakeet at Birdman Sanctuary"}
                 width={1200}
                 height={800}
+                unoptimized
                 className="w-auto h-auto max-w-full max-h-[70vh] mx-auto rounded-2xl object-contain"
                 priority
               />

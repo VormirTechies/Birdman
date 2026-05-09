@@ -8,14 +8,45 @@ import { Heart, Volume2, VolumeX } from 'lucide-react';
 const STORY_VIDEO =
   'https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Birdman_story_wide.mp4';
 
+// ── Module-level blob-URL cache ────────────────────────────────────────────────
+// Module variables survive re-renders, Strict-Mode double-mounts, and in-tab
+// navigations — the video is fetched at most ONCE per tab session.
+let _storyBlobUrl: string | null = null;
+let _storyFetch: Promise<string> | null = null;
+
+function loadStoryVideo(): Promise<string> {
+  if (_storyBlobUrl) return Promise.resolve(_storyBlobUrl);
+  if (!_storyFetch) {
+    _storyFetch = fetch(STORY_VIDEO)
+      .then((r) => r.blob())
+      .then((blob) => {
+        _storyBlobUrl = URL.createObjectURL(blob);
+        _storyFetch = null;
+        return _storyBlobUrl;
+      })
+      .catch(() => {
+        _storyFetch = null;
+        return STORY_VIDEO; // fallback to direct URL on error
+      });
+  }
+  return _storyFetch;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 export function StoryHeroSection() {
-  const [showVideo, setShowVideo] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [muted, setMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowVideo(true), 5_000);
+    // Start blob fetch immediately so it's ready (or close to ready)
+    // when the 5 s reveal timer fires.
+    const fetchPromise = loadStoryVideo();
+    const timer = setTimeout(async () => {
+      const src = await fetchPromise;
+      setVideoSrc(src);
+    }, 5_000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -37,16 +68,16 @@ export function StoryHeroSection() {
           fill
           priority
           className={`object-cover object-top transition-opacity duration-1000 ${
-            showVideo ? 'opacity-0' : 'opacity-100'
+            videoSrc ? 'opacity-0' : 'opacity-100'
           }`}
           sizes="100vw"
         />
 
-        {/* Video — mounts after 15 s, fades in once ready */}
-        {showVideo && (
+        {/* Video — mounts after 5 s using cached blob URL */}
+        {videoSrc && (
           <video
             ref={videoRef}
-            src={STORY_VIDEO}
+            src={videoSrc}
             autoPlay
             playsInline
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
@@ -57,7 +88,7 @@ export function StoryHeroSection() {
               if (videoRef.current) videoRef.current.muted = false;
             }}
             onEnded={() => {
-              setShowVideo(false);
+              setVideoSrc(null);
               setVideoReady(false);
             }}
           />
@@ -65,7 +96,7 @@ export function StoryHeroSection() {
 
         {/* Mute toggle — appears once video is playing */}
         <AnimatePresence>
-          {showVideo && videoReady && (
+          {videoSrc !== null && videoReady && (
             <motion.button
               key="mute"
               initial={{ opacity: 0, scale: 0.8 }}
