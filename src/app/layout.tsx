@@ -57,10 +57,10 @@ export const metadata: Metadata = {
     locale: "en_IN",
     images: [
       {
-        url: "/images/banner_hd.png",
+        url: "/images/og-image.png",
         width: 1200,
-        height: 630,
-        alt: "Thousands of wild rose-ringed parakeets feeding on Sudarson Sah's rooftop in Chintadripet, Chennai",
+        height: 1200,
+        alt: "Artistic depiction of Sudarson Sah (The Birdman of Chennai) feeding thousands of rose-ringed parakeets on his rooftop sanctuary",
       },
     ],
   },
@@ -69,7 +69,7 @@ export const metadata: Metadata = {
     title: "The Birdman of Chennai — Where 6,000 Parakeets Come Home",
     description:
       "Every evening, ~6,000 wild parakeets land on one man's rooftop in Chennai. Sudarson Sah has fed them daily for 16 years. Book a free visit.",
-    images: ["/images/banner_hd.png"],
+    images: ["/images/og-image.png"],
   },
 };
 
