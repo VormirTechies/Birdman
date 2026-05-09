@@ -116,7 +116,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => router.push('/admin/bookings/new')}
-            className="shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
+            className="hidden shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
             style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
             suppressHydrationWarning
           >

@@ -15,7 +15,7 @@ export function StoryHeroSection() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowVideo(true), 15_000);
+    const timer = setTimeout(() => setShowVideo(true), 5_000);
     return () => clearTimeout(timer);
   }, []);
 

@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, Images, UserCircle, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, UserCircle, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BOTTOM_NAV_ITEMS = [
-  { label: 'HOME', icon: Home, href: '/admin' },
+  { label: 'DASHBOARD', icon: LayoutDashboard, href: '/admin' },
   { label: 'CALENDAR', icon: Calendar, href: '/admin/calendar' },
-  { label: 'PHOTOS', icon: Images, href: '/admin/gallery' },
+  { label: 'CHECKLIST', icon: ClipboardList, href: '/admin/checklist' },
   { label: 'PROFILE', icon: UserCircle, href: '/admin/profile' },
 ];
 
@@ -21,7 +21,7 @@ export function AdminBottomNav({ onMoreClick }: BottomNavProps) {
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 h-16 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.08)] z-20 flex items-stretch justify-around"
+      className="lg:hidden fixed bottom-0 inset-x-0 h-16 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.08)] z-40 flex items-stretch justify-around"
       style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
     >
       {BOTTOM_NAV_ITEMS.map((item) => {

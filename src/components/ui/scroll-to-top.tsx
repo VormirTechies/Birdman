@@ -39,7 +39,7 @@ export function ScrollToTop() {
           transition={{ duration: 0.2 }}
           onClick={scrollToTop}
           className={cn(
-            'fixed bottom-6 right-6 z-60 flex h-12 w-12 items-center justify-center rounded-full bg-sanctuary-green text-white shadow-xl hover:bg-canopy-dark hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-sanctuary-green focus:ring-offset-2'
+            'fixed bottom-24 right-6 z-60 flex h-12 w-12 items-center justify-center rounded-full bg-sanctuary-green text-white shadow-xl hover:bg-canopy-dark hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-sanctuary-green focus:ring-offset-2 lg:bottom-6'
           )}
           aria-label="Scroll to top"
         >

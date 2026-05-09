@@ -154,7 +154,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   ];
 
   return (
-    <header className="fixed top-0 right-0 left-0 lg:left-65 h-16 bg-white shadow-sm z-20 flex items-center px-4 lg:px-8">
+    <header className="fixed top-0 right-0 left-0 lg:left-65 h-16 bg-white shadow-sm z-40 flex items-center px-4 lg:px-8">
       {/* Burger menu — mobile only */}
       <button
         onClick={onMenuClick}
