@@ -1,15 +1,23 @@
 import { getGalleryImagesPaginated, getGalleryCount } from '@/lib/db/queries';
-
-export const revalidate = 3600;
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
 import { GalleryClient } from '@/components/organisms/GalleryClient';
 
+// Never prerender at build time — DATABASE_URL is only available at request
+// time in Vercel's serverless runtime, not in the build container.
+export const dynamic = 'force-dynamic';
+
 export default async function GalleryPage() {
-  const [images, totalCount] = await Promise.all([
-    getGalleryImagesPaginated(0, 15),
-    getGalleryCount(),
-  ]);
+  let images: Awaited<ReturnType<typeof getGalleryImagesPaginated>> = [];
+  let totalCount = 0;
+  try {
+    [images, totalCount] = await Promise.all([
+      getGalleryImagesPaginated(0, 15),
+      getGalleryCount(),
+    ]);
+  } catch {
+    // DB unavailable during build — render with empty list
+  }
 
   const initialImages = images.map((img) => ({
     id: img.id,
