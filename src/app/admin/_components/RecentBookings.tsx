@@ -239,7 +239,7 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E0E0E0]">
         <p
-          className="text-sm font-medium text-[#424242]"
+          className="text-xs md:text-sm font-medium text-[#424242]"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
         >
           {startIndex + 1} to {endIndex} of {totalEntries}

@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Users, CalendarCheck, CalendarClock, TrendingUp, Plus, RefreshCw } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Users, CalendarCheck, CalendarClock, TrendingUp, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatCard } from './_components/StatCard';
 import { RecentBookings } from './_components/RecentBookings';
 import type { StatCardProps } from './_components/StatCard';
 
 export default function AdminPage() {
-  const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [stats, setStats] = useState({
     todayVisitors: 0,
@@ -123,11 +121,11 @@ export default function AdminPage() {
             <Plus className="w-4 h-4" />
             New Booking
           </button> */}
-        </div>x
+        </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statCards.map((card) => (
           <StatCard key={card.label} {...card} />
         ))}

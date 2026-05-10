@@ -38,7 +38,7 @@ export function AdminBottomNav({ onMoreClick }: BottomNavProps) {
             <item.icon
               className={cn(
                 'w-5 h-5 transition-colors',
-                isActive ? 'text-[#2E7D32]' : 'text-[#9E9E9E]'
+                isActive ? 'text-[#2E7D32]' : 'text-gray-400'
               )}
             />
             <span

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Bell, Menu, UserCircle, Settings, LogOut, Bird, MessageSquare, CheckCheck } from 'lucide-react';
+import { Bell, Menu, UserCircle, LogOut, Bird, MessageSquare, CheckCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { createClient } from '@/lib/supabase/client';
@@ -133,12 +133,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
           label: 'Profile',
           icon: UserCircle,
           onClick: () => router.push('/admin/profile'),
-        },
-        {
-          label: 'Settings',
-          icon: Settings,
-          onClick: () => router.push('/admin/settings'),
-        },
+        }
       ],
     },
     {

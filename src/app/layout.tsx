@@ -82,6 +82,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${playfair.variable} ${inter.variable} ${notoSansTamil.variable} h-full`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col antialiased overflow-x-hidden" suppressHydrationWarning>
         {children}

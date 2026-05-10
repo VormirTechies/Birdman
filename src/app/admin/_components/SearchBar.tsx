@@ -23,6 +23,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...',
     onChange('');
     if (!alwaysExpanded) {
       setIsExpanded(false);
+      setIsFocused(false);
       onExpandChange?.(false);
     }
   };
@@ -62,7 +63,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...',
             isFocused ? 'border-2 border-[#2E7D32]' : 'border-2 border-transparent'
           }`}
         >
-          <div className="absolute left-2.5 pointer-events-none z-10">
+          <div className="absolute left-3 pointer-events-none z-10">
             <Search className="w-5 h-5 text-[#616161]" />
           </div>
           
@@ -84,7 +85,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search bookings...',
             }}
             id={`${id}-mobile`}
             name={`${name}-mobile`}
-            placeholder={placeholder}
+            placeholder={isExpanded ? placeholder : ''}
             initial={false}
             animate={{
               width: isExpanded ? '100%' : '44px',

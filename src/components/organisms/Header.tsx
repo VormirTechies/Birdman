@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, Bird, Calendar, Home, BookOpen, ImageIcon, MessageSquare, Heart } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Menu, Calendar, Home, BookOpen, ImageIcon, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -27,7 +27,6 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const isHome = pathname === '/';
   // Pages with a full-bleed hero — header starts transparent and goes white on scroll
   const isTransparentTop = !pathname.startsWith('/admin');
 
@@ -133,19 +132,19 @@ export function Header() {
                 <Menu className="w-5 h-5" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[90vw] sm:w-100 bg-feather-cream  backdrop-blur-md  p-0 flex flex-col h-full shadow-2xl shadow-canopy-dark overflow-hidden [&>button]:hidden">
+            <SheetContent side="right" className="w-[95vw] sm:w-full bg-emerald-50/80 backdrop-blur-md  p-0 flex flex-col h-full shadow-2xl shadow-canopy-dark overflow-hidden [&>button]:hidden">
               <div className="flex flex-col h-full max-h-dvh">
 
                 {/* Compact Green Header Strip */}
                 <div className="flex items-center justify-between px-5 h-20 bg-transparent shrink-0">
                   <SheetHeader className="p-0">
                     <SheetTitle className="flex items-center gap-2">
-                      <div className="p-2 bg-white/15 rounded-xl">
-                        <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={24} height={24} />
+                      <div className="p-2 bg-white/15 rounded-xl shadow-2xl">
+                        <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={30} height={30} />
                       </div>
-                      <span className="font-display font-bold text-lg text-sanctuary-green tracking-tight leading-none">
+                      {/* <span className="font-display font-bold text-lg text-sanctuary-green tracking-tight leading-none">
                         Birdman of Chennai
-                      </span>
+                      </span> */}
                     </SheetTitle>
                   </SheetHeader>
                   <button
@@ -195,7 +194,7 @@ export function Header() {
                             )} />
                           </div>
                           <span className={cn(
-                            'font-display font-semibold',
+                            'font-family-body font-bold',
                             isActive ? 'text-sanctuary-green' : 'text-canopy-dark'
                           )}>
                             {link.label}

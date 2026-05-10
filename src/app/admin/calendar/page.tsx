@@ -66,15 +66,7 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-4">
-      {/* Page Header */}
-      {/* <div>
-        <h1 className="text-3xl font-bold text-gray-900">Calendar Management</h1>
-        <p className="text-gray-600 mt-1">
-          Manage daily capacity, operating hours, and booking availability
-        </p>
-      </div> */}
-
-      <div className="bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
+      <div className="flex flex-col gap-2">
         
         {/* Calendar Header with Navigation */}
         <CalendarHeader

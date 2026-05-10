@@ -9,7 +9,6 @@ import {
   Users,
   Award,
   Film,
-  ArrowRight,
   Clock,
   Leaf,
 } from 'lucide-react';
