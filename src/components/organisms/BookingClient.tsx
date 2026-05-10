@@ -860,10 +860,10 @@ export function BookingClient() {
                   </p>
                 </div>
 
-                {/* Booking ID + Location */}
-                <div className="grid grid-cols-2 gap-4 mb-5">
+                {/* Booking ID + Guests */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-morning-mist rounded-xl p-5 text-center">
-                    <div className="text-[11px] font-bold text-canopy-dark/40 uppercase tracking-wider mb-2">
+                    <div className="text-[11px] font-bold text-canopy-dark/60 uppercase tracking-wider mb-2">
                       Booking ID
                     </div>
                     <div className="font-mono font-bold text-lg text-sanctuary-green tracking-wider">
@@ -871,42 +871,42 @@ export function BookingClient() {
                     </div>
                   </div>
                   <div className="bg-morning-mist rounded-xl p-5 text-center">
-                    <div className="text-[11px] font-bold text-canopy-dark/40 uppercase tracking-wider mb-2">
-                      Location
+                    <div className="text-[11px] font-bold text-canopy-dark/60 uppercase tracking-wider mb-2">
+                      Guests
                     </div>
-                    <div className="text-sm font-medium text-canopy-dark leading-snug">
-                      2/3, Iyya Mudali St,<br />Chintadripet, Chennai
+                    <div className="font-bold text-lg text-canopy-dark">
+                      {bookingResult.guests}
                     </div>
                   </div>
                 </div>
 
-                {/* Booking summary strip */}
-                <div className="bg-morning-mist rounded-xl p-5 mb-5">
-                  <div className="grid grid-cols-3 divide-x divide-canopy-dark/5 text-center">
-                    <div className="px-3">
-                      <div className="text-[11px] text-canopy-dark/40 uppercase tracking-wider mb-1">
-                        Date
-                      </div>
-                      <div className="text-sm font-semibold text-canopy-dark leading-tight">
-                        {bookingResult.date}
-                      </div>
+                {/* Date + Session */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-morning-mist rounded-xl p-5 text-center">
+                    <div className="text-[11px] font-bold text-canopy-dark/60 uppercase tracking-wider mb-2">
+                      Date
                     </div>
-                    <div className="px-3">
-                      <div className="text-[11px] text-canopy-dark/40 uppercase tracking-wider mb-1">
-                        Session
-                      </div>
-                      <div className="text-sm font-semibold text-canopy-dark leading-tight">
-                        {formatSessionTime(bookingResult.startTime)}
-                      </div>
+                    <div className="text-sm font-semibold text-canopy-dark leading-tight">
+                      {bookingResult.date}
                     </div>
-                    <div className="px-3">
-                      <div className="text-[11px] text-canopy-dark/40 uppercase tracking-wider mb-1">
-                        Guests
-                      </div>
-                      <div className="text-sm font-semibold text-canopy-dark">
-                        {bookingResult.guests}
-                      </div>
+                  </div>
+                  <div className="bg-morning-mist rounded-xl p-5 text-center">
+                    <div className="text-[11px] font-bold text-canopy-dark/60 uppercase tracking-wider mb-2">
+                      Session
                     </div>
+                    <div className="text-sm font-semibold text-canopy-dark leading-tight">
+                      {formatSessionTime(bookingResult.startTime)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location - Full Width */}
+                <div className="bg-morning-mist rounded-xl p-5 text-center mb-5">
+                  <div className="text-[11px] font-bold text-canopy-dark/60 uppercase tracking-wider mb-2">
+                    Location
+                  </div>
+                  <div className="text-sm font-medium text-canopy-dark leading-snug">
+                    2/3, Iyya Mudali St, Chintadripet, Chennai
                   </div>
                 </div>
 

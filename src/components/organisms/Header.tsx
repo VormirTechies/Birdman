@@ -106,7 +106,7 @@ export function Header() {
             <Button
               asChild
               size="sm"
-              className="bg-sanctuary-green hover:bg-canopy-dark text-white rounded-full px-5 gap-2 shadow-glow-green transition-all duration-300 hover:shadow-lg"
+              className="bg-sanctuary-green hover:bg-canopy-dark text-white rounded-full px-5 py-4 gap-2 shadow-glow-green transition-all duration-300 hover:shadow-lg"
             >
               <Link href="/book">
                 <Calendar className="w-4 h-4" />
