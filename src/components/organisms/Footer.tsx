@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { MapPin, Mail, Heart, ArrowUp } from 'lucide-react';
-import { AnimatedSection } from '@/components/ui/animated-section';
 import { FloatingParticles } from '@/components/ui/floating-particles';
 import Image from 'next/image';
 
@@ -44,7 +43,7 @@ export function Footer() {
       <FloatingParticles count={8} color="rgba(255, 255, 255, 0.15)" />
 
       {/* CTA Section */}
-      <AnimatedSection className="pt-24 pb-16 relative z-10">
+      <div className="pt-24 pb-16 relative z-10">
         <div className="container-wide text-center">
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-white">
             Ready to Witness the Magic?
@@ -63,7 +62,7 @@ export function Footer() {
             Book Your Visit
           </Link>
         </div>
-      </AnimatedSection>
+      </div>
 
       {/* Footer Grid */}
       <div className="border-t border-white/10">
@@ -128,13 +127,13 @@ export function Footer() {
               </h3>
               <div className="space-y-3">
                 <a
-                  href={process.env.NEXT_PUBLIC_MAP_LINK}
+                  href="https://maps.app.goo.gl/yTxPBBwY1X3A3bda6"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-start gap-2.5 text-white/60 hover:text-sanctuary-green-light transition-all text-sm group"
                 >
                   <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-sanctuary-green-light group-hover:scale-110 transition-transform" />
-                  <span>{process.env.NEXT_PUBLIC_MAP_ADDRESS}</span>
+                  <span>2/3, Iyya Mudali St, Adikesavarpuram, Chintadripet, Chennai, Tamil Nadu 600002</span>
                 </a>
                 <a
                   href="mailto:info@birdmanofchennai.com"

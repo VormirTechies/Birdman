@@ -180,10 +180,28 @@ export function BookingClient() {
   const startDow = getDay(firstOfMonth);
 
   const getDayStatus = (date: Date): DayStatus => {
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    // Check if date is in the past
     if (isBefore(date, today)) return 'past';
+    
+    // Check if it's today and within 1 hour of session start time
     const dateStr = format(date, 'yyyy-MM-dd');
+    const todayStr = format(now, 'yyyy-MM-dd');
+    if (dateStr === todayStr) {
+      const data = calendarData[dateStr];
+      const sessionTime = data?.startTime ?? '16:30:00';
+      const [hours, minutes] = sessionTime.split(':').map(Number);
+      const sessionStart = new Date();
+      sessionStart.setHours(hours, minutes, 0, 0);
+      
+      // If current time is within 1 hour before session start, block the date
+      const oneHourBefore = new Date(sessionStart.getTime() - 60 * 60 * 1000);
+      if (now >= oneHourBefore) return 'blocked';
+    }
+    
     const data = calendarData[dateStr];
     if (!data) return 'available';
     if (!data.isOpen) return 'blocked';

@@ -23,8 +23,36 @@ export const createBookingSchema = z.object({
       const bookingDate = new Date(date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return bookingDate > today;
-    }, 'Booking date must be in the future'),
+      
+      // Reject past dates
+      if (bookingDate < today) {
+        return false;
+      }
+      
+      // Allow future dates (tomorrow onwards)
+      if (bookingDate > today) {
+        return true;
+      }
+      
+      // For today's date, check if we're within 1 hour of session start
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const bookingDateStr = date;
+      
+      if (bookingDateStr === todayStr) {
+        // Default session start time is 16:30 (4:30 PM)
+        const sessionStart = new Date();
+        sessionStart.setHours(16, 30, 0, 0);
+        
+        // Block if current time is within 1 hour before session start
+        const oneHourBefore = new Date(sessionStart.getTime() - 60 * 60 * 1000);
+        if (now >= oneHourBefore) {
+          return false;
+        }
+      }
+      
+      return true;
+    }, 'Booking date must be in the future or at least 1 hour before today\'s session'),
   bookingTime: z
     .string()
     .min(5, 'Time must be provided'),
@@ -42,8 +70,36 @@ export const updateBookingSchema = z.object({
       const bookingDate = new Date(date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      return bookingDate > today;
-    }, 'Booking date must be in the future')
+      
+      // Reject past dates
+      if (bookingDate < today) {
+        return false;
+      }
+      
+      // Allow future dates (tomorrow onwards)
+      if (bookingDate > today) {
+        return true;
+      }
+      
+      // For today's date, check if we're within 1 hour of session start
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const bookingDateStr = date;
+      
+      if (bookingDateStr === todayStr) {
+        // Default session start time is 16:30 (4:30 PM)
+        const sessionStart = new Date();
+        sessionStart.setHours(16, 30, 0, 0);
+        
+        // Block if current time is within 1 hour before session start
+        const oneHourBefore = new Date(sessionStart.getTime() - 60 * 60 * 1000);
+        if (now >= oneHourBefore) {
+          return false;
+        }
+      }
+      
+      return true;
+    }, 'Booking date must be in the future or at least 1 hour before today\'s session')
     .optional(),
   bookingTime: z
     .string()

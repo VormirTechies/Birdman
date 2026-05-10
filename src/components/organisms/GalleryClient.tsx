@@ -12,7 +12,6 @@ import {
   Camera,
 } from "lucide-react";
 import Link from "next/link";
-import { AnimatedSection } from "@/components/ui/animated-section";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -311,11 +310,10 @@ export function GalleryClient({
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
-      <AnimatedSection>
-        <section className="pb-24 pt-12 text-center">
-          <div className="container-wide">
-            <div className="bg-canopy-dark rounded-[4rem] p-12 md:p-24 relative overflow-hidden shadow-2xl">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(62,176,140,0.1),transparent_70%)] pointer-events-none" />
+      <section className="pb-24 pt-12 text-center">
+        <div className="container-wide">
+          <div className="bg-canopy-dark rounded-[4rem] p-12 md:p-24 relative overflow-hidden shadow-2xl">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(62,176,140,0.1),transparent_70%)] pointer-events-none" />
               <div className="relative z-10 max-w-2xl mx-auto">
                 <h2 className="font-display text-4xl md:text-6xl font-black text-white mb-6 leading-tight">
                   Be Part of the{" "}
@@ -329,14 +327,13 @@ export function GalleryClient({
                   href="/book"
                   className="group inline-flex items-center gap-4 bg-white hover:bg-sanctuary-green text-canopy-dark hover:text-white font-black px-12 py-5 rounded-full text-lg transition-all duration-500 shadow-[0_0_50px_rgba(255,255,255,0.1)] active:scale-95"
                 >
-                  Schedule Your Flight
+                  Book to visit
                   <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
             </div>
           </div>
         </section>
-      </AnimatedSection>
 
       {/* ── LIGHTBOX ─────────────────────────────────────────────────────── */}
       <AnimatePresence>
