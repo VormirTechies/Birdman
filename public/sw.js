@@ -5,8 +5,8 @@
 
 // ─── Cache Configuration ─────────────────────────────────────────────────────
 
-const CACHE_STATIC = 'birdman-static-v1';
-const CACHE_PAGES  = 'birdman-pages-v1';
+const CACHE_STATIC = 'birdman-static-v2';
+const CACHE_PAGES  = 'birdman-pages-v2';
 
 // Admin shell pages to pre-cache on install
 const PRECACHE_PAGES = [

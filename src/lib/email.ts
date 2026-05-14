@@ -3,6 +3,7 @@ import { render } from '@react-email/render';
 import BookingConfirmation from '../../emails/booking-confirmation';
 import BookingReminder from '../../emails/booking-reminder';
 import BookingReschedule from '../../emails/booking-reschedule';
+import BookingCancellation from '../../emails/booking-cancellation';
 import type { Booking } from './db/schema';
 import React from 'react';
 
@@ -203,4 +204,98 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
     console.error('[Email Service] Admin OTP failed:', error);
     return { success: false, error: 'Failed to send verification code' };
   }
+}
+
+// ─── Send Booking Cancellation ───────────────────────────────────────────────
+
+export async function sendBookingCancellation(booking: Booking): Promise<{
+  success: boolean;
+  error?: string;
+  messageId?: string;
+}> {
+  try {
+    if (!booking.email) {
+      console.warn('[Email Service] No email address provided for booking:', booking.id);
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const transporter = getTransporter();
+    
+    // Render React component to HTML
+    const emailHtml = await render(
+        React.createElement(BookingCancellation, {
+            visitorName: booking.visitorName,
+            bookingDate: booking.bookingDate,
+            bookingTime: booking.bookingTime,
+            numberOfGuests: booking.numberOfGuests,
+            bookingId: booking.id,
+        })
+    );
+
+    const info = await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: booking.email,
+      subject: '🦜 Booking Cancellation Notice — Birdman of Chennai',
+      html: emailHtml,
+    });
+
+    console.log('[Email Service] Cancellation email sent via Gmail:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Email Service] Cancellation email exception:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+// ─── Bulk Send Cancellation Emails ───────────────────────────────────────────
+// Used by admin settings page when blocking dates
+
+export async function sendCancellationEmails(
+  bookings: Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; numberOfGuests: number }>
+): Promise<{ sent: number; failed: number; errors: string[] }> {
+  let sent = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  console.log(`[Email Service] Sending cancellation emails to ${bookings.length} booking(s)...`);
+
+  for (const booking of bookings) {
+    if (!booking.email) {
+      console.warn(`[Email Service] Skipping booking ${booking.id} - no email`);
+      failed++;
+      continue;
+    }
+
+    try {
+      const result = await sendBookingCancellation({
+        id: booking.id,
+        email: booking.email,
+        visitorName: booking.visitorName,
+        bookingDate: booking.bookingDate,
+        bookingTime: '16:30:00', // Default time
+        numberOfGuests: booking.numberOfGuests,
+      } as Booking);
+
+      if (result.success) {
+        sent++;
+      } else {
+        failed++;
+        errors.push(`${booking.id}: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      failed++;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      errors.push(`${booking.id}: ${errorMsg}`);
+      console.error(`[Email Service] Failed to send cancellation to ${booking.email}:`, error);
+    }
+
+    // Add small delay between emails to avoid rate limiting
+    if (bookings.length > 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  console.log(`[Email Service] Cancellation emails complete: ${sent} sent, ${failed} failed`);
+  return { sent, failed, errors };
 }

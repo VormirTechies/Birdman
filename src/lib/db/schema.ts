@@ -131,12 +131,14 @@ export const calendarSettings = pgTable(
     maxCapacity: integer('max_capacity').notNull().default(100), // Max visitors (0-200)
     startTime: time('start_time').notNull().default('16:30:00'), // Operating start time (default 4:30 PM)
     isOpen: boolean('is_open').notNull().default(true), // Open for bookings toggle
+    updatedBy: uuid('updated_by').references(() => adminUsers.id, { onDelete: 'set null' }), // Last editor (nullable)
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   (table) => ({
     // Unique index on date for fast lookups
     dateIdx: index('calendar_settings_date_idx').on(table.date),
+    updatedByIdx: index('calendar_settings_updated_by_idx').on(table.updatedBy),
   })
 );
 
