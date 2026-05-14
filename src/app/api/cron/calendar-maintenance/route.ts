@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       FROM calendar_settings
     `);
 
-    const stats = countResult.rows[0] as { min_date: string; max_date: string; total_rows: number };
+    const stats = countResult[0] as { min_date: string; max_date: string; total_rows: number };
 
     console.log('✅ Maintenance complete');
     console.log(`📊 Window: ${stats.min_date} to ${stats.max_date} (${stats.total_rows} rows)`);
