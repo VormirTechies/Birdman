@@ -10,6 +10,7 @@ import {
   History,
   Images,
   UserCircle,
+  Settings,
   LogOut,
   X,
   Bird,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: 'Checklist', icon: ClipboardList, href: '/admin/checklist' },
   { label: 'History', icon: History, href: '/admin/history' },
   { label: 'Gallery', icon: Images, href: '/admin/gallery' },
+  { label: 'Settings', icon: Settings, href: '/admin/settings' },
   { label: 'Profile', icon: UserCircle, href: '/admin/profile' },
 ];
 

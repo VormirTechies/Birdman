@@ -12,9 +12,18 @@ interface DatePickerProps {
   onChange: (date: Date) => void;
   showText?: boolean;
   hideTextOnMobile?: boolean;
+  disabled?: (date: Date) => boolean;
+  outline?: boolean;
 }
 
-export function DatePicker({ value, onChange, showText = true, hideTextOnMobile = false }: DatePickerProps) {
+export function DatePicker({ 
+  value, 
+  onChange, 
+  showText = true, 
+  hideTextOnMobile = false,
+  disabled,
+  outline = false
+}: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSelect = (date: Date | undefined) => {
@@ -24,8 +33,8 @@ export function DatePicker({ value, onChange, showText = true, hideTextOnMobile 
     }
   };
 
-  // Disable dates outside the current month (today's month)
-  const disabledDates = (date: Date) => {
+  // Default: Disable dates outside the current month (today's month)
+  const defaultDisabledDates = (date: Date) => {
     const today = new Date();
     const monthStart = startOfMonth(today);
     const monthEnd = endOfMonth(today);
@@ -37,7 +46,10 @@ export function DatePicker({ value, onChange, showText = true, hideTextOnMobile 
       <PopoverTrigger asChild>
         <button
           className={cn(
-            'flex items-center gap-2 bg-[#F5F5F5] rounded-xl h-11 hover:bg-[#E0E0E0] transition-colors text-sm font-medium text-[#212121] whitespace-nowrap',
+            'flex items-center gap-2 rounded-xl h-11 transition-colors text-sm font-medium text-[#212121] whitespace-nowrap',
+            outline 
+              ? 'bg-white border-2 border-[#E0E0E0] hover:border-[#2E7D32] hover:bg-[#F1F8F4]'
+              : 'bg-[#F5F5F5] hover:bg-[#E0E0E0]',
             // icon-only: perfect square; mobile-hide-text: square on mobile, pill on sm+
             !showText
               ? 'w-11 justify-center'
@@ -61,7 +73,7 @@ export function DatePicker({ value, onChange, showText = true, hideTextOnMobile 
           mode="single"
           selected={value}
           onSelect={handleSelect}
-          disabled={disabledDates}
+          disabled={disabled || defaultDisabledDates}
           initialFocus
         />
       </PopoverContent>

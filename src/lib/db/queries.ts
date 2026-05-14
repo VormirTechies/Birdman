@@ -647,3 +647,35 @@ export async function toggleVisited(id: string, visited: boolean): Promise<Booki
 
   return updated;
 }
+
+// ─── Cancel Bookings for Date Range ──────────────────────────────────────────
+// Used by admin settings page when blocking dates
+// Returns cancelled bookings with email addresses for notification service
+
+export async function cancelBookingsForDates(
+  startDate: string,
+  endDate: string
+): Promise<Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; numberOfGuests: number }>> {
+  const cancelled = await db
+    .update(bookings)
+    .set({
+      status: 'cancelled',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        gte(bookings.bookingDate, startDate),
+        sql`${bookings.bookingDate} <= ${endDate}`,
+        eq(bookings.status, 'confirmed')
+      )
+    )
+    .returning();
+
+  return cancelled.map(booking => ({
+    id: booking.id,
+    email: booking.email,
+    visitorName: booking.visitorName,
+    bookingDate: booking.bookingDate,
+    numberOfGuests: booking.numberOfGuests,
+  }));
+}
