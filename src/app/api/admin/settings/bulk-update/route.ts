@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
           const maxDateResult = await db.execute(sql`
             SELECT MAX(date)::text as max_date FROM calendar_settings
           `);
-          const maxDate = (maxDateResult.rows[0] as { max_date: string }).max_date;
+          const maxDate = (maxDateResult[0] as { max_date: string }).max_date;
 
           cancelledBookings = await cancelBookingsForDates(today, maxDate);
           cancelledBookingsCount = cancelledBookings.length;
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
           RETURNING *
         `);
 
-        affectedCount = result.count ?? 0;
+        affectedCount = result.length ?? 0;
 
         // If blocking this date, cancel its bookings
         if (settings.isOpen === false) {
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
               updated_at = NOW(),
               updated_by = NULL
           `);
-          upsertCount += result.count ?? 0;
+          upsertCount += result.length ?? 0;
         }
 
         affectedCount = upsertCount;
