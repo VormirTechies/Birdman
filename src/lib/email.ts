@@ -51,7 +51,9 @@ export async function sendBookingConfirmation(booking: Booking): Promise<{
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
             bookingTime: booking.bookingTime,
-            numberOfGuests: booking.numberOfGuests,
+            adults: booking.adults,
+            children: booking.children,
+            numberOfGuests: booking.numberOfGuests, // Backward compatibility
             bookingId: booking.id,
         })
     );
@@ -91,7 +93,9 @@ export async function sendBookingReminder(booking: Booking): Promise<{
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
             bookingTime: booking.bookingTime,
-            numberOfGuests: booking.numberOfGuests,
+            adults: booking.adults,
+            children: booking.children,
+            numberOfGuests: booking.numberOfGuests, // Backward compatibility
         })
     );
 
@@ -135,7 +139,9 @@ export async function sendRescheduleNotification(
             oldTime: oldBooking.bookingTime,
             newDate: booking.bookingDate,
             newTime: booking.bookingTime,
-            numberOfGuests: booking.numberOfGuests,
+            adults: booking.adults,
+            children: booking.children,
+            numberOfGuests: booking.numberOfGuests, // Backward compatibility
             bookingId: booking.id,
         })
     );
@@ -227,7 +233,9 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
             bookingTime: booking.bookingTime,
-            numberOfGuests: booking.numberOfGuests,
+            adults: booking.adults,
+            children: booking.children,
+            numberOfGuests: booking.numberOfGuests, // Backward compatibility
             bookingId: booking.id,
         })
     );
@@ -252,7 +260,7 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
 // Used by admin settings page when blocking dates
 
 export async function sendCancellationEmails(
-  bookings: Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; numberOfGuests: number }>
+  bookings: Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; adults: number; children: number; numberOfGuests: number }>
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
   let sent = 0;
   let failed = 0;
@@ -274,6 +282,8 @@ export async function sendCancellationEmails(
         visitorName: booking.visitorName,
         bookingDate: booking.bookingDate,
         bookingTime: '16:30:00', // Default time
+        adults: booking.adults,
+        children: booking.children,
         numberOfGuests: booking.numberOfGuests,
       } as Booking);
 

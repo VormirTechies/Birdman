@@ -21,15 +21,22 @@ export async function POST(request: NextRequest) {
       visitorName: validatedData.visitorName,
       phone: validatedData.phone,
       email: validatedData.email,
-      numberOfGuests: validatedData.numberOfGuests,
+      adults: validatedData.adults,
+      children: validatedData.children,
+      numberOfGuests: validatedData.numberOfGuests || (validatedData.adults + validatedData.children), // Backward compatibility
       bookingDate: validatedData.bookingDate,
       bookingTime: validatedData.bookingTime,
     });
 
+    // Format guest count for display
+    const guestCount = booking.children > 0 
+      ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
+      : `${booking.adults} guest(s)`;
+
     // Notify Admins Immediately
     await sendPushToAllAdmins({
       title: 'New Parakeet Visit Booked!',
-      body: `${booking.visitorName} scheduled ${booking.numberOfGuests} guests for ${booking.bookingDate}.`,
+      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
       url: '/admin',
       visitorName: booking.visitorName,
       bookingDate: booking.bookingDate,
@@ -59,7 +66,9 @@ export async function POST(request: NextRequest) {
           visitorName: booking.visitorName,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
-          numberOfGuests: booking.numberOfGuests,
+          adults: booking.adults,
+          children: booking.children,
+          numberOfGuests: booking.numberOfGuests, // Keep for backward compatibility
           status: booking.status,
         },
         emailSent,

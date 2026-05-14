@@ -69,6 +69,8 @@ export default function ChecklistPage() {
           visitorName: (b.visitor_name ?? b.visitorName) as string,
           phone: b.phone as string,
           visited: (b.visited ?? false) as boolean,
+          adults: (b.adults ?? 1) as number,
+          children: (b.children ?? 0) as number,
           numberOfGuests: (b.number_of_guests ?? b.numberOfGuests ?? 1) as number,
         }));
 

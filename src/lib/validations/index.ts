@@ -11,11 +11,24 @@ export const createBookingSchema = z.object({
     .string()
     .min(10, 'Phone must be at least 10 digits'),
   email: z.string().email('Invalid email address').or(z.literal('')),
+  // New guest count fields
+  adults: z
+    .number()
+    .int('Number of adults must be an integer')
+    .min(1, 'At least 1 adult required')
+    .max(10, 'Maximum 10 adults per booking'),
+  children: z
+    .number()
+    .int('Number of children must be an integer')
+    .min(0, 'Number of children cannot be negative')
+    .max(10, 'Maximum 10 children per booking'),
+  // DEPRECATED: Keep for backward compatibility during migration
   numberOfGuests: z
     .number()
     .int('Number of guests must be an integer')
     .min(1, 'At least 1 guest required')
-    .max(10, 'Maximum 10 guests per booking'),
+    .max(10, 'Maximum 10 guests per booking')
+    .optional(),
   bookingDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
@@ -56,6 +69,12 @@ export const createBookingSchema = z.object({
   bookingTime: z
     .string()
     .min(5, 'Time must be provided'),
+}).refine((data) => {
+  // Ensure total guest count (adults + children) does not exceed 10
+  return data.adults + data.children <= 10;
+}, {
+  message: 'Total number of guests (adults + children) cannot exceed 10',
+  path: ['adults'], // Error will be shown on adults field
 });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;

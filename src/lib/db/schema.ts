@@ -15,7 +15,9 @@ export const bookings = pgTable(
     visitorName: varchar('visitor_name', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }).notNull(), // Indian format: +91-XXXXXXXXXX
     email: varchar('email', { length: 255 }),
-    numberOfGuests: integer('number_of_guests').notNull().default(1),
+    numberOfGuests: integer('number_of_guests').notNull().default(1), // DEPRECATED: Use adults + children instead
+    adults: integer('adults').notNull().default(1), // Number of adult visitors (13+)
+    children: integer('children').notNull().default(0), // Number of child visitors (0-12)
     bookingDate: date('booking_date').notNull(), // Simplified: direct date, no sessions
     bookingTime: time('booking_time').notNull(), // Morning or evening time slot
     confirmationSent: boolean('confirmation_sent').notNull().default(false),

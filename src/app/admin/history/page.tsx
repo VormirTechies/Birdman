@@ -23,6 +23,8 @@ interface ApiBooking {
   visitorName?: string;
   phone: string;
   email: string | null;
+  adults?: number;
+  children?: number;
   number_of_guests?: number;
   numberOfGuests?: number;
   booking_date?: string;
@@ -39,6 +41,8 @@ function normalise(b: ApiBooking): HistoryBooking {
     visitorName: b.visitor_name ?? b.visitorName ?? '',
     phone: b.phone,
     email: b.email,
+    adults: b.adults ?? 1,
+    children: b.children ?? 0,
     numberOfGuests: b.number_of_guests ?? b.numberOfGuests ?? 1,
     bookingDate: b.booking_date ?? b.bookingDate ?? '',
     bookingTime: b.booking_time ?? b.bookingTime ?? '00:00',

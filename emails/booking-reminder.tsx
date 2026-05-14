@@ -13,13 +13,17 @@ interface BookingReminderProps {
   visitorName: string;
   bookingDate: string;
   bookingTime: string;
-  numberOfGuests: number;
+  adults: number;
+  children: number;
+  numberOfGuests?: number; // Deprecated
 }
 
 export default function BookingReminder({
   visitorName,
   bookingDate,
   bookingTime,
+  adults,
+  children,
   numberOfGuests,
 }: BookingReminderProps) {
   return (
@@ -44,7 +48,7 @@ export default function BookingReminder({
             </Text>
             
             <Text style={styles.detail}>
-              <strong>Number of Guests:</strong> {numberOfGuests}
+              <strong>Number of Guests:</strong> {children > 0 ? `${adults} Adult${adults !== 1 ? 's' : ''} + ${children} Child${children !== 1 ? 'ren' : ''}` : `${adults} Adult${adults !== 1 ? 's' : ''}`}
             </Text>
           </Section>
 

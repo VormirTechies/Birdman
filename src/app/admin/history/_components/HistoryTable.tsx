@@ -12,7 +12,9 @@ export interface HistoryBooking {
   visitorName: string;
   phone: string;
   email: string | null;
-  numberOfGuests: number;
+  adults: number;
+  children: number;
+  numberOfGuests: number; // Deprecated
   bookingDate: string;
   bookingTime: string;
   visited: boolean;

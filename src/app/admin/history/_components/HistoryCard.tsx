@@ -115,7 +115,10 @@ export function HistoryCard({ booking: b }: HistoryCardProps) {
         <div className="flex items-center gap-2 text-[#616161]">
           <Users className="w-3.5 h-3.5 shrink-0" />
           <span className="text-xs" style={{ fontFamily: FONT }}>
-            {b.numberOfGuests} {b.numberOfGuests === 1 ? 'Guest' : 'Guests'}
+            {b.children > 0 
+              ? `${b.adults} Adult${b.adults !== 1 ? 's' : ''} + ${b.children} Child${b.children !== 1 ? 'ren' : ''}`
+              : `${b.adults} ${b.adults === 1 ? 'Adult' : 'Adults'}`
+            }
           </span>
         </div>
       </div>

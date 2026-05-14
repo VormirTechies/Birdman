@@ -63,7 +63,9 @@ interface FormData {
   name: string;
   email: string;
   phone: string;
-  guests: number;
+  adults: number;
+  children: number;
+  guests: number; // Computed: adults + children (kept for backward compatibility)
   rulesAccepted: boolean;
 }
 
@@ -116,7 +118,9 @@ export function BookingClient() {
     name: '',
     email: '',
     phone: '',
-    guests: 1,
+    adults: 1,
+    children: 0,
+    guests: 1, // Computed value
     rulesAccepted: false,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
@@ -125,7 +129,9 @@ export function BookingClient() {
   const [bookingResult, setBookingResult] = useState<{
     id: string;
     date: string;
-    guests: number;
+    adults: number;
+    children: number;
+    guests: number; // Total guests (backward compatibility)
     startTime: string;
   } | null>(null);
 
@@ -214,17 +220,32 @@ export function BookingClient() {
     const status = getDayStatus(date);
     if (status === 'past' || status === 'blocked' || status === 'full') return;
     updateField('date', date);
-    // Cap guests to remaining capacity when date changes
+    // Cap total guests to remaining capacity when date changes
     const dateStr = format(date, 'yyyy-MM-dd');
     const dayData = calendarData[dateStr];
-    if (dayData && formData.guests > dayData.remaining) {
-      setFormData((prev) => ({ ...prev, date, guests: Math.max(1, dayData.remaining) }));
+    const currentTotal = formData.adults + formData.children;
+    if (dayData && currentTotal > dayData.remaining) {
+      const newTotal = Math.max(1, dayData.remaining);
+      setFormData((prev) => ({ 
+        ...prev, 
+        date, 
+        adults: newTotal, 
+        children: 0,
+        guests: newTotal,
+      }));
     }
   };
 
   // ── Form helpers ───────────────────────────────────────────────────────────
   const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [key]: value };
+      // Update computed guests total when adults or children change
+      if (key === 'adults' || key === 'children') {
+        updated.guests = updated.adults + updated.children;
+      }
+      return updated;
+    });
     setErrors((prev) => ({ ...prev, [key]: undefined }));
     setSubmitError('');
   };
@@ -237,7 +258,9 @@ export function BookingClient() {
       errs.email = 'Please enter a valid email address';
     if (formData.phone.replace(/\D/g, '').length < 10)
       errs.phone = 'Please enter a valid 10-digit phone number';
-    if (formData.guests < 1) errs.guests = 'At least 1 guest is required';
+    if (formData.adults < 1) errs.adults = 'At least 1 adult is required';
+    if (formData.children < 0) errs.children = 'Number of children cannot be negative';
+    if ((formData.adults + formData.children) > 10) errs.adults = 'Total guests cannot exceed 10';
     return errs;
   };
 
@@ -266,7 +289,9 @@ export function BookingClient() {
           visitorName: formData.name,
           phone: formData.phone,
           email: formData.email || undefined,
-          numberOfGuests: formData.guests,
+          adults: formData.adults,
+          children: formData.children,
+          numberOfGuests: formData.adults + formData.children, // Computed for backward compatibility
           bookingDate: formData.date ? format(formData.date, 'yyyy-MM-dd') : '',
           bookingTime: sessionTime,
         }),
@@ -278,7 +303,9 @@ export function BookingClient() {
       setBookingResult({
         id: result.booking?.id ?? result.id ?? '',
         date: formData.date ? format(formData.date, 'PPP') : '',
-        guests: formData.guests,
+        adults: formData.adults,
+        children: formData.children,
+        guests: formData.adults + formData.children,
         startTime: sessionTime,
       });
       setStep(3);
@@ -602,40 +629,91 @@ export function BookingClient() {
                           )}
                         </div>
 
-                        {/* Guests */}
+                        {/* Adults & Children Guest Count */}
                         <div>
-                          <label className="text-[11px] font-bold text-canopy-dark/50 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                          <label className="text-[11px] font-bold text-canopy-dark/50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5" /> Number of Guests
                           </label>
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              suppressHydrationWarning
-                              onClick={() =>
-                                updateField('guests', Math.max(1, formData.guests - 1))
-                              }
-                              className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
-                            >
-                              −
-                            </button>
-                            <span className="w-10 text-center font-bold text-xl text-canopy-dark">
-                              {formData.guests}
+                          
+                          {/* Adults */}
+                          <div className="mb-4">
+                            <div className="text-[10px] font-semibold text-canopy-dark/60 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                              <User className="w-3 h-3" /> Adults (13+)
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                suppressHydrationWarning
+                                onClick={() =>
+                                  updateField('adults', Math.max(1, formData.adults - 1))
+                                }
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                              >
+                                −
+                              </button>
+                              <span className="w-10 text-center font-bold text-xl text-canopy-dark">
+                                {formData.adults}
+                              </span>
+                              <button
+                                type="button"
+                                suppressHydrationWarning
+                                onClick={() => {
+                                  const newAdults = formData.adults + 1;
+                                  const newTotal = newAdults + formData.children;
+                                  if (newTotal <= 10 && newTotal <= remaining) {
+                                    updateField('adults', newAdults);
+                                  }
+                                }}
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Children */}
+                          <div>
+                            <div className="text-[10px] font-semibold text-canopy-dark/60 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                              <Baby className="w-3 h-3" /> Children (0-12)
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                suppressHydrationWarning
+                                onClick={() =>
+                                  updateField('children', Math.max(0, formData.children - 1))
+                                }
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                              >
+                                −
+                              </button>
+                              <span className="w-10 text-center font-bold text-xl text-canopy-dark">
+                                {formData.children}
+                              </span>
+                              <button
+                                type="button"
+                                suppressHydrationWarning
+                                onClick={() => {
+                                  const newChildren = formData.children + 1;
+                                  const newTotal = formData.adults + newChildren;
+                                  if (newTotal <= 10 && newTotal <= remaining) {
+                                    updateField('children', newChildren);
+                                  }
+                                }}
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Total & Limit Display */}
+                          <div className="mt-3 pt-3 border-t border-canopy-dark/5 flex items-center justify-between text-[11px]">
+                            <span className="text-canopy-dark/40 font-semibold uppercase tracking-wider">
+                              Total Guests
                             </span>
-                            <button
-                              type="button"
-                              suppressHydrationWarning
-                              onClick={() =>
-                                updateField(
-                                  'guests',
-                                  Math.min(10, maxGuests, remaining, formData.guests + 1)
-                                )
-                              }
-                              className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
-                            >
-                              +
-                            </button>
-                            <span className="text-[11px] text-canopy-dark/40 font-semibold uppercase tracking-wider">
-                              LIMIT: 10
+                            <span className="font-bold text-canopy-dark">
+                              {formData.adults + formData.children} / 10
                             </span>
                           </div>
 
@@ -875,7 +953,10 @@ export function BookingClient() {
                       Guests
                     </div>
                     <div className="font-bold text-lg text-canopy-dark">
-                      {bookingResult.guests}
+                      {bookingResult.children > 0 
+                        ? `${bookingResult.adults}A + ${bookingResult.children}C`
+                        : `${bookingResult.adults} Adult${bookingResult.adults !== 1 ? 's' : ''}`
+                      }
                     </div>
                   </div>
                 </div>

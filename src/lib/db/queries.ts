@@ -257,13 +257,13 @@ export async function getDashboardStats() {
   
   const all = await db.query.bookings.findMany();
   
-  const totalVisitors = all.reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const totalVisitors = all.reduce((sum, b) => sum + (b.adults + b.children), 0);
   const todayVisitors = all
     .filter(b => b.bookingDate === today && b.status === 'confirmed')
-    .reduce((sum, b) => sum + b.numberOfGuests, 0);
+    .reduce((sum, b) => sum + (b.adults + b.children), 0);
   const upcomingVisitors = all
     .filter(b => b.bookingDate > today && b.status === 'confirmed')
-    .reduce((sum, b) => sum + b.numberOfGuests, 0);
+    .reduce((sum, b) => sum + (b.adults + b.children), 0);
 
   return {
     totalVisitors,
@@ -537,7 +537,7 @@ export async function getDayDetails(date: string): Promise<{
   });
 
   const maxCapacity = settings?.maxCapacity ?? 100;
-  const totalBooked = dayBookings.reduce((sum, b) => sum + b.numberOfGuests, 0);
+  const totalBooked = dayBookings.reduce((sum, b) => sum + (b.adults + b.children), 0);
   const available = Math.max(0, maxCapacity - totalBooked);
   const percentage = maxCapacity > 0 ? Math.round((totalBooked / maxCapacity) * 100) : 0;
 
@@ -655,7 +655,15 @@ export async function toggleVisited(id: string, visited: boolean): Promise<Booki
 export async function cancelBookingsForDates(
   startDate: string,
   endDate: string
-): Promise<Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; numberOfGuests: number }>> {
+): Promise<Array<{ 
+  id: string; 
+  email: string | null; 
+  visitorName: string; 
+  bookingDate: string; 
+  adults: number;
+  children: number;
+  numberOfGuests: number;
+}>> {
   const cancelled = await db
     .update(bookings)
     .set({
@@ -676,6 +684,8 @@ export async function cancelBookingsForDates(
     email: booking.email,
     visitorName: booking.visitorName,
     bookingDate: booking.bookingDate,
+    adults: booking.adults,
+    children: booking.children,
     numberOfGuests: booking.numberOfGuests,
   }));
 }

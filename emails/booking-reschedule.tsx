@@ -15,7 +15,9 @@ interface BookingRescheduleProps {
   oldTime: string;
   newDate: string;
   newTime: string;
-  numberOfGuests: number;
+  adults: number;
+  children: number;
+  numberOfGuests?: number; // Deprecated
   bookingId: string;
 }
 
@@ -25,6 +27,8 @@ export default function BookingReschedule({
   oldTime,
   newDate,
   newTime,
+  adults,
+  children,
   numberOfGuests,
   bookingId,
 }: BookingRescheduleProps) {
@@ -62,7 +66,7 @@ export default function BookingReschedule({
               <strong>Time:</strong> {newTime}
             </Text>
             <Text style={styles.detail}>
-              <strong>Number of Guests:</strong> {numberOfGuests}
+              <strong>Number of Guests:</strong> {children > 0 ? `${adults} Adult${adults !== 1 ? 's' : ''} + ${children} Child${children !== 1 ? 'ren' : ''}` : `${adults} Adult${adults !== 1 ? 's' : ''}`}
             </Text>
             <Text style={styles.detail}>
               <strong>Booking ID:</strong> {bookingId}
