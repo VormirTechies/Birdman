@@ -2,13 +2,14 @@
 
 import { Clock, Phone, Mail, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatLocalDate } from '@/lib/utils';
 import type { HistoryBooking } from './HistoryTable';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
 function getVisitedStatus(b: HistoryBooking): 'visited' | 'no-show' | 'upcoming' {
   if (b.visited) return 'visited';
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalDate(new Date());
   return b.bookingDate < today ? 'no-show' : 'upcoming';
 }
 

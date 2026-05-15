@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Phone, Calendar } from 'lucide-react';
+import { Phone, Calendar, User, Baby } from 'lucide-react';
 import type { Booking } from './BookingsTable';
 
 interface BookingsListProps {
@@ -54,8 +54,8 @@ export function BookingsList({ data }: BookingsListProps) {
               </div>
             </div>
 
-            {/* Bottom row: Phone + Date */}
-            <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#E0E0E0]">
+            {/* Bottom row: Phone + Guests + Date */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#E0E0E0]">
               <div className="flex items-center gap-2 text-[#616161]">
                 <Phone className="w-4 h-4 shrink-0" />
                 <span
@@ -64,6 +64,28 @@ export function BookingsList({ data }: BookingsListProps) {
                 >
                   {booking.mobile}
                 </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-[#616161]">
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                  >
+                    {booking.adults}
+                  </span>
+                </div>
+                {booking.children > 0 && (
+                  <div className="flex items-center gap-1 text-[#616161]">
+                    <Baby className="w-3.5 h-3.5 shrink-0" />
+                    <span
+                      className="text-xs font-medium"
+                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                    >
+                      {booking.children}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 text-[#616161]">
                 <Calendar className="w-4 h-4 shrink-0" />

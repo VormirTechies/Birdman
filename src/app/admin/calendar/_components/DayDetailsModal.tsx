@@ -78,7 +78,16 @@ export function DayDetailsModal({
       setLoading(true);
       try {
         const response = await fetch(`/api/calendar/day/${date}`);
-        if (!response.ok) throw new Error('Failed to fetch day details');
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('[DayDetailsModal] API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData
+          });
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
 
         const data = await response.json();
 
@@ -91,7 +100,7 @@ export function DayDetailsModal({
         setStats(data.stats);
       } catch (error) {
         console.error('[DayDetailsModal] Error:', error);
-        toast.error('Failed to load day details');
+        toast.error(error instanceof Error ? error.message : 'Failed to load day details');
       } finally {
         setLoading(false);
       }

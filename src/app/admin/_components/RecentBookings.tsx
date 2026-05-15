@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X, User, Baby } from 'lucide-react';
 import { SearchBar } from './SearchBar';
 import { DatePicker } from './DatePicker';
 import { BookingsTable } from './BookingsTable';
 import { BookingsList } from './BookingsList';
 import type { Booking } from './BookingsTable';
+import { formatLocalDate } from '@/lib/utils';
 
 interface RecentBookingsProps {
   refreshKey?: number;
@@ -27,23 +28,25 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
     const fetchBookings = async () => {
       setIsLoading(true);
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatLocalDate(new Date());
         const params = new URLSearchParams({
           limit: ITEMS_PER_PAGE.toString(),
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
-          minDate: today, // Only show today and upcoming bookings
           status: 'confirmed', // Only show confirmed bookings (not completed/cancelled)
         });
+
+        // Add date filter if selected, otherwise show upcoming bookings
+        if (selectedDate) {
+          const dateStr = formatLocalDate(selectedDate);
+          params.append('date', dateStr);
+        } else {
+          // Only show today and upcoming bookings when no specific date is selected
+          params.append('minDate', today);
+        }
 
         // Add search filter (server-side)
         if (searchQuery) {
           params.append('search', searchQuery);
-        }
-
-        // Add date filter if selected
-        if (selectedDate) {
-          const dateStr = selectedDate.toISOString().split('T')[0];
-          params.append('date', dateStr);
         }
 
         const response = await fetch(`/api/bookings?${params.toString()}`, {
@@ -60,6 +63,8 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
             mobile: b.phone,
             email: b.email || '',
             checkInDate: new Date(b.booking_date || b.bookingDate),
+            adults: b.adults ?? 1,
+            children: b.children ?? 0,
             initials: (b.visitor_name || b.visitorName || 'XX')
               .split(' ')
               .map((n: string) => n[0])
@@ -114,7 +119,10 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
               </div>
             </div>
           </td>
-          <td className="py-3 px-4 hidden lg:table-cell">
+          <td className="py-3 px-4">
+            <div className="h-4 w-16 bg-[#F5F5F5] rounded animate-pulse" />
+          </td>
+          <td className="py-3 px-4">
             <div className="h-4 w-24 bg-[#F5F5F5] rounded animate-pulse" />
           </td>
         </tr>
@@ -137,7 +145,18 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
         {/* Search + Date Picker row */}
         <div className="flex items-center gap-3 mb-4">
           <SearchBar value={searchQuery} onChange={setSearchQuery} />
-          <DatePicker value={selectedDate || new Date()} onChange={setSelectedDate} />
+          <div className="flex items-center gap-1">
+            <DatePicker value={selectedDate || new Date()} onChange={setSelectedDate} />
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="p-1 text-[#9E9E9E] hover:text-[#616161] transition-colors"
+                aria-label="Clear date filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {paginatedBookings.length === 0 && !isLoading ? (
@@ -157,6 +176,12 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
                         style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
                       >
                         Guest Name
+                      </th>
+                      <th
+                        className="text-left px-6 py-3.5 text-xs font-semibold text-[#616161] uppercase tracking-wider"
+                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                      >
+                        Guests
                       </th>
                       <th
                         className="text-left px-6 py-3.5 text-xs font-semibold text-[#616161] uppercase tracking-wider"
@@ -196,6 +221,24 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
                                   </p>
                                   <p className="text-sm text-[#616161]">{booking.email}</p>
                                 </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1.5">
+                                  <User className="w-4 h-4 text-[#616161]" />
+                                  <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
+                                    {booking.adults}
+                                  </span>
+                                </div>
+                                {booking.children > 0 && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Baby className="w-4 h-4 text-[#616161]" />
+                                    <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
+                                      {booking.children}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="py-3 px-4">

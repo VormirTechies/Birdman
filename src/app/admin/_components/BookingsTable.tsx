@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Calendar } from 'lucide-react';
+import { Calendar, User, Baby } from 'lucide-react';
 
 export interface Booking {
   id: string;
@@ -11,6 +11,8 @@ export interface Booking {
   checkInDate: Date;
   initials: string;
   avatarColor: string;
+  adults: number;
+  children: number;
 }
 
 interface BookingsTableProps {
@@ -48,6 +50,12 @@ export function BookingsTable({ data }: BookingsTableProps) {
               style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
             >
               Email
+            </th>
+            <th
+              className="text-left px-6 py-3.5 text-xs font-semibold text-[#616161] uppercase tracking-wider"
+              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            >
+              Guests
             </th>
             <th
               className="text-left px-6 py-3.5 text-xs font-semibold text-[#616161] uppercase tracking-wider"
@@ -97,6 +105,24 @@ export function BookingsTable({ data }: BookingsTableProps) {
                   >
                     {booking.email}
                   </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-4 h-4 text-[#616161]" />
+                      <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
+                        {booking.adults}
+                      </span>
+                    </div>
+                    {booking.children > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Baby className="w-4 h-4 text-[#616161]" />
+                        <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
+                          {booking.children}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2 text-sm text-[#616161]">
