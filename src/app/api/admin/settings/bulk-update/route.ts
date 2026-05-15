@@ -47,7 +47,15 @@ export async function POST(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
     let affectedCount = 0;
     let cancelledBookingsCount = 0;
-    let cancelledBookings: Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; numberOfGuests: number }> = [];
+    let cancelledBookings: Array<{ 
+      id: string; 
+      email: string | null; 
+      visitorName: string; 
+      bookingDate: string; 
+      adults: number;
+      children: number;
+      numberOfGuests: number; 
+    }> = [];
 
     // Prepare update values
     // Note: updatedBy is null because admin uses Supabase auth, not admin_users table

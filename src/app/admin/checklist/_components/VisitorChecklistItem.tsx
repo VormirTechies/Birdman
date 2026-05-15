@@ -8,7 +8,9 @@ export interface ChecklistVisitor {
   visitorName: string;
   phone: string;
   visited: boolean;
-  numberOfGuests: number;
+  adults: number;
+  children: number;
+  numberOfGuests: number; // Deprecated, kept for backward compatibility
 }
 
 interface VisitorChecklistItemProps {
@@ -94,7 +96,10 @@ export function VisitorChecklistItem({
             className="text-xs font-semibold text-[#2E7D32]"
             style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
           >
-            {visitor.numberOfGuests} {visitor.numberOfGuests === 1 ? 'guest' : 'guests'}
+            {visitor.children > 0 
+              ? `${visitor.adults}A / ${visitor.children}C`
+              : `${visitor.adults} ${visitor.adults === 1 ? 'adult' : 'adults'}`
+            }
           </span>
         </div>
       </div>

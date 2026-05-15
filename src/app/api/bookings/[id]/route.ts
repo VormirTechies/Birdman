@@ -168,7 +168,9 @@ export async function PATCH(
         visitorName: updatedBooking.visitorName,
         bookingDate: updatedBooking.bookingDate,
         bookingTime: updatedBooking.bookingTime,
-        numberOfGuests: updatedBooking.numberOfGuests,
+        adults: updatedBooking.adults,
+        children: updatedBooking.children,
+        numberOfGuests: updatedBooking.numberOfGuests, // Keep for backward compatibility
         status: updatedBooking.status,
       },
       emailSent,

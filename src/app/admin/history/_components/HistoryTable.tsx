@@ -1,8 +1,8 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn, formatLocalDate } from '@/lib/utils';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, Baby } from 'lucide-react';
 import { Select } from '@/app/admin/_components/Select';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
@@ -12,7 +12,9 @@ export interface HistoryBooking {
   visitorName: string;
   phone: string;
   email: string | null;
-  numberOfGuests: number;
+  adults: number;
+  children: number;
+  numberOfGuests: number; // Deprecated
   bookingDate: string;
   bookingTime: string;
   visited: boolean;
@@ -21,7 +23,7 @@ export interface HistoryBooking {
 
 function getVisitedStatus(booking: HistoryBooking): 'visited' | 'no-show' | 'upcoming' {
   if (booking.visited) return 'visited';
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalDate(new Date());
   return booking.bookingDate < today ? 'no-show' : 'upcoming';
 }
 
@@ -200,9 +202,22 @@ export function HistoryTable({
                     </td>
                     {/* Guest Count */}
                     <td className="px-6 py-4">
-                      <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: FONT }}>
-                        {b.numberOfGuests}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-4 h-4 text-[#616161]" />
+                          <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: FONT }}>
+                            {b.adults}
+                          </span>
+                        </div>
+                        {b.children > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Baby className="w-4 h-4 text-[#616161]" />
+                            <span className="text-sm font-medium text-[#212121]" style={{ fontFamily: FONT }}>
+                              {b.children}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     {/* Visited Status */}
                     <td className="px-6 py-4">

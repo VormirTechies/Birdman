@@ -2,13 +2,14 @@
 
 import { Clock, Phone, Mail, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatLocalDate } from '@/lib/utils';
 import type { HistoryBooking } from './HistoryTable';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
 function getVisitedStatus(b: HistoryBooking): 'visited' | 'no-show' | 'upcoming' {
   if (b.visited) return 'visited';
-  const today = new Date().toISOString().split('T')[0];
+  const today = formatLocalDate(new Date());
   return b.bookingDate < today ? 'no-show' : 'upcoming';
 }
 
@@ -115,7 +116,10 @@ export function HistoryCard({ booking: b }: HistoryCardProps) {
         <div className="flex items-center gap-2 text-[#616161]">
           <Users className="w-3.5 h-3.5 shrink-0" />
           <span className="text-xs" style={{ fontFamily: FONT }}>
-            {b.numberOfGuests} {b.numberOfGuests === 1 ? 'Guest' : 'Guests'}
+            {b.children > 0 
+              ? `${b.adults} Adult${b.adults !== 1 ? 's' : ''} + ${b.children} Child${b.children !== 1 ? 'ren' : ''}`
+              : `${b.adults} ${b.adults === 1 ? 'Adult' : 'Adults'}`
+            }
           </span>
         </div>
       </div>

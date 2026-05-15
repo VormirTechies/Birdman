@@ -60,12 +60,16 @@ export function DatePicker({
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
           suppressHydrationWarning
         >
-          <CalendarIcon className="w-4 h-4 text-[#616161]" />
-          {showText && (
-            hideTextOnMobile
-              ? <span className="hidden sm:inline">{format(value, 'MM/dd/yyyy')}</span>
-              : format(value, 'MM/dd/yyyy')
-          )}
+          <CalendarIcon className="w-4 h-4 text-[#616161]" suppressHydrationWarning />
+          <span 
+            className={cn(
+              !showText && 'sr-only',
+              hideTextOnMobile && 'hidden sm:inline'
+            )}
+            suppressHydrationWarning
+          >
+            {format(value, 'MM/dd/yyyy')}
+          </span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 bg-white shadow-xl rounded-2xl border border-[#E0E0E0]" align="end">

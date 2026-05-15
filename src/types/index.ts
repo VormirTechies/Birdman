@@ -24,7 +24,12 @@ export interface Booking {
   visitorName: string;
   phone: string;
   email?: string;
-  numberOfVisitors: number;
+  // New guest count fields
+  adults: number;
+  children: number;
+  // DEPRECATED: Use adults + children instead
+  numberOfGuests?: number;
+  numberOfVisitors?: number; // Legacy alias for numberOfGuests
   locale: 'en' | 'ta';
   rulesAccepted: boolean;
   createdAt: string;
@@ -44,7 +49,12 @@ export interface BookingFormData {
   visitorName: string;
   phone: string;
   email: string;
-  numberOfVisitors: number;
+  // New guest count fields
+  adults: number;
+  children: number;
+  // DEPRECATED: Use adults + children instead
+  numberOfGuests?: number;
+  numberOfVisitors?: number; // Legacy alias for numberOfGuests
   date: string;
   time: string;
   rulesAccepted: boolean;
