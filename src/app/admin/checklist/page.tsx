@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format, addDays, subDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { DatePicker } from '@/app/admin/_components/DatePicker';
+import { InstantBookingModal } from '@/app/admin/_components/InstantBookingModal';
 import { VisitorChecklistList } from './_components/VisitorChecklistList';
 import type { ChecklistVisitor } from './_components/VisitorChecklistItem';
 
@@ -30,6 +31,7 @@ export default function ChecklistPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   // Refs for IntersectionObserver (avoid stale closures)
   const offsetRef = useRef(0);
@@ -150,6 +152,17 @@ export default function ChecklistPage() {
   })();
 
   const monthLabel = format(selectedDate, 'MMM dd').toUpperCase();
+
+  // Handle successful booking creation
+  const handleBookingSuccess = () => {
+    // Refresh the checklist
+    offsetRef.current = 0;
+    hasMoreRef.current = false;
+    setHasMore(false);
+    setVisitors([]);
+    setTotal(0);
+    fetchPage(selectedDate, debouncedSearch, 0, false);
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -278,6 +291,24 @@ export default function ChecklistPage() {
           <div ref={sentinelRef} className="h-1" />
         </div>
       </div>
+
+      {/* FAB (Floating Action Button) for New Booking */}
+      <button
+        onClick={() => setIsBookingModalOpen(true)}
+        className="fixed bottom-24 right-6 w-14 h-14 rounded-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white shadow-lg hover:shadow-xl transition-all flex items-center justify-center z-30"
+        title="New Booking"
+        aria-label="Create new booking"
+        suppressHydrationWarning
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
+      {/* Instant Booking Modal */}
+      <InstantBookingModal
+        open={isBookingModalOpen}
+        onOpenChange={setIsBookingModalOpen}
+        onSuccess={handleBookingSuccess}
+      />
     </div>
   );
 }

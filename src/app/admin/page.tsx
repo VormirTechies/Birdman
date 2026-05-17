@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Users, CalendarCheck, CalendarClock, TrendingUp, RefreshCw } from 'lucide-react';
+import { Users, CalendarCheck, CalendarClock, TrendingUp, RefreshCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatCard } from './_components/StatCard';
 import { RecentBookings } from './_components/RecentBookings';
+import { InstantBookingModal } from './_components/InstantBookingModal';
 import type { StatCardProps } from './_components/StatCard';
 
 export default function AdminPage() {
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [stats, setStats] = useState({
     todayVisitors: 0,
     next30Days: 0,
@@ -87,6 +89,12 @@ export default function AdminPage() {
     toast.success('Refreshing data...');
   };
 
+  // Handle successful booking creation
+  const handleBookingSuccess = () => {
+    // Refresh both stats and bookings table
+    setRefreshKey(prev => prev + 1);
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       {/* Header row */}
@@ -106,21 +114,22 @@ export default function AdminPage() {
           {/* Manual refresh button */}
           <button
             onClick={handleManualRefresh}
-            className="shrink-0 p-2.5 rounded-xl bg-white hover:bg-[#F5F5F5] text-[#2E7D32] transition-colors border border-[#E0E0E0]"
+            className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white hover:bg-[#F5F5F5] text-[#2E7D32] transition-colors border border-[#E0E0E0]"
             title="Refresh data"
             suppressHydrationWarning
           >
             <RefreshCw className="w-5 h-5" />
           </button>
-          {/* <button
-            onClick={() => router.push('/admin/bookings/new')}
-            className="hidden shrink-0 inline-flex items-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors min-h-11"
+          {/* New Booking button for walk-in visitors */}
+          <button
+            onClick={() => setIsBookingModalOpen(true)}
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-[#2E7D32] hover:bg-[#1B5E20] text-white text-sm font-semibold rounded-xl transition-colors h-11 w-11 sm:w-auto sm:px-4 sm:py-2.5"
             style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
             suppressHydrationWarning
           >
             <Plus className="w-4 h-4" />
-            New Booking
-          </button> */}
+            <span className="hidden sm:inline">New Booking</span>
+          </button>
         </div>
       </div>
 
@@ -135,6 +144,13 @@ export default function AdminPage() {
       <div className="mb-8">
         <RecentBookings refreshKey={refreshKey} />
       </div>
+
+      {/* Instant Booking Modal */}
+      <InstantBookingModal
+        open={isBookingModalOpen}
+        onOpenChange={setIsBookingModalOpen}
+        onSuccess={handleBookingSuccess}
+      />
     </div>
   );
 }

@@ -79,6 +79,53 @@ export const createBookingSchema = z.object({
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 
+// ─── Admin Booking Validation (Relaxed Rules) ────────────────────────────────
+
+export const createAdminBookingSchema = z.object({
+  visitorName: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be less than 100 characters'),
+  phone: z
+    .string()
+    .min(10, 'Phone must be at least 10 digits'),
+  // For admin: email is truly optional (can be undefined or empty string)
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  adults: z
+    .number()
+    .int('Number of adults must be an integer')
+    .min(1, 'At least 1 adult required')
+    .max(10, 'Maximum 10 adults per booking'),
+  children: z
+    .number()
+    .int('Number of children must be an integer')
+    .min(0, 'Number of children cannot be negative')
+    .max(10, 'Maximum 10 children per booking'),
+  // Admin can book for today (same-day) - no time restriction
+  bookingDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+    .refine((date) => {
+      const bookingDate = new Date(date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // For admin, only reject past dates (allow today and future)
+      return bookingDate >= today;
+    }, 'Booking date cannot be in the past'),
+  bookingTime: z
+    .string()
+    .min(5, 'Time must be provided'),
+}).refine((data) => {
+  // Ensure total guest count (adults + children) does not exceed 10
+  return data.adults + data.children <= 10;
+}, {
+  message: 'Total number of guests (adults + children) cannot exceed 10',
+  path: ['adults'],
+});
+
+export type CreateAdminBookingInput = z.infer<typeof createAdminBookingSchema>;
+
 // ─── Update Booking Validation ───────────────────────────────────────────────
 
 export const updateBookingSchema = z.object({
