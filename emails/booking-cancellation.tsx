@@ -11,8 +11,8 @@ import {
   Heading,
   Text,
   Section,
-  Hr,
-  Button,
+  Img,
+  Link,
 } from '@react-email/components';
 
 interface BookingCancellationProps {
@@ -25,210 +25,499 @@ interface BookingCancellationProps {
   bookingId: string;
 }
 
-// Helper function to format date
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 export default function BookingCancellation({
   visitorName,
   bookingDate,
   bookingTime,
-  adults,
-  children,
-  numberOfGuests,
   bookingId,
 }: BookingCancellationProps) {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL || "https://birdmanofchennai.com";
+
   return (
     <Html>
       <Head />
       <Body style={styles.body}>
         <Container style={styles.container}>
-          <Heading style={styles.heading}>🦜 Booking Cancellation Notice</Heading>
-          
+          {/* Hero Image */}
+          <Img
+            src={`https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/gallery/009.jpeg`}
+            alt="Parakeets at Birdman of Chennai"
+            width="540"
+            height="300"
+            style={styles.heroImage}
+          />
+
+          {/* Calendar X Icon */}
+          <div style={styles.iconWrapper}>
+            <div style={styles.cancelIcon}>
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ display: "block" }}
+              >
+                <rect
+                  x="3"
+                  y="4"
+                  width="18"
+                  height="18"
+                  rx="2"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                />
+                <path
+                  d="M8 2V6M16 2V6"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M3 10H21"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M9 14L15 20M15 14L9 20"
+                  stroke="#DC2626"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          </div>
+
+          {/* Heading */}
+          <Heading style={styles.heading}>Booking Cancelled</Heading>
+
+          {/* Subtitle */}
+          <Text style={styles.subtitle}>
+            Notice of cancellation for your upcoming visit.
+          </Text>
+
+          {/* Greeting */}
           <Text style={styles.greeting}>Dear {visitorName},</Text>
-          
+
+          {/* Message */}
           <Text style={styles.text}>
-            We sincerely apologize, but we need to inform you that your booking to visit 
-            the Birdman of Chennai has been cancelled due to unforeseen circumstances on the scheduled date.
+            We regret to inform you that your booking has been cancelled. We
+            understand this might be disappointing, but we hope to welcome you
+            another time to witness the rhythm of urban nature.
           </Text>
 
+          {/* Cancelled Details Box */}
           <Section style={styles.detailsBox}>
-            <Text style={styles.detailsHeading}>Cancelled Booking Details</Text>
-            
-            <Text style={styles.detail}>
-              <strong>Date:</strong> {formatDate(bookingDate)}
-            </Text>
-            
-            <Text style={styles.detail}>
-              <strong>Time:</strong> {bookingTime}
-            </Text>
-            
-            <Text style={styles.detail}>
-              <strong>Number of Guests:</strong> {children > 0 ? `${adults} Adult${adults !== 1 ? 's' : ''} + ${children} Child${children !== 1 ? 'ren' : ''}` : `${adults} Adult${adults !== 1 ? 's' : ''}`}
-            </Text>
-            
-            <Text style={styles.detail}>
-              <strong>Booking ID:</strong> {bookingId}
-            </Text>
+            <Text style={styles.detailsHeading}>CANCELLED DETAILS</Text>
+
+            <table width="100%" cellPadding="0" cellSpacing="0">
+              <tr>
+                <td style={styles.detailRow}>
+                  <div style={styles.detailIcon}>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <rect
+                        x="3"
+                        y="4"
+                        width="18"
+                        height="18"
+                        rx="2"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M8 2V6M16 2V6"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M3 10H21"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                  <div style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Original Date</Text>
+                    <Text style={styles.detailValue}>{formatDate(bookingDate)}</Text>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style={styles.detailRow}>
+                  <div style={styles.detailIcon}>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M12 6V12L16 14"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </div>
+                  <div style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Original Time</Text>
+                    <Text style={styles.detailValue}>{formatTime(bookingTime)}</Text>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td style={styles.detailRow}>
+                  <div style={styles.detailIcon}>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M7 17L17 7M7 7L7 17L17 17"
+                        stroke="#9CA3AF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Booking ID</Text>
+                    <Text style={styles.detailValue}>{bookingId.toUpperCase()}</Text>
+                  </div>
+                </td>
+              </tr>
+            </table>
           </Section>
 
-          <Hr style={styles.hr} />
+          {/* Rebook Message */}
+          <Text style={styles.rebookText}>
+            We&apos;d love to welcome you another time. Please feel free to book a new
+            time slot when you are ready.
+          </Text>
 
-          <Section>
-            <Text style={styles.sectionHeading}>🔄 Rebook Your Visit</Text>
-            <Text style={styles.text}>
-              We would love to have you visit us on another date! Please use the link below 
-              to select a new date that works for you and your guests.
-            </Text>
-
-            <Button
-              href={`${process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.com'}/booking`}
-              style={styles.button}
+          {/* CTA Button */}
+          <Section style={styles.buttonContainer}>
+            <Link
+              href={`${baseUrl}/book`}
+              style={styles.primaryButton}
             >
-              Rebook Another Date
-            </Button>
+              Book New Visit
+            </Link>
           </Section>
 
-          <Hr style={styles.hr} />
-
-          <Section>
-            <Text style={styles.sectionHeading}>📍 Location</Text>
-            <Text style={styles.text}>
-              <strong>Birdman of Chennai</strong><br />
-              2/3, Iyya Mudali St, Adikesavarpuram,<br />
-              Chintadripet, Chennai, Tamil Nadu 600002
-            </Text>
-            <Text style={styles.text}>
-              <a href="https://maps.app.goo.gl/yTxPBBwY1X3A3bda6" style={styles.link}>
-                🗺️ View on Google Maps
-              </a>
-            </Text>
+          {/* Contact Information */}
+          <Section style={styles.contactSection}>
+            <table width="100%" cellPadding="8" cellSpacing="0">
+              <tr>
+                <td style={styles.contactItem}>
+                  <span style={styles.contactIcon}>
+                    <svg
+                      fill="#00A36C"
+                      width="20px"
+                      height="20px"
+                      viewBox="0 0 32 32"
+                      version="1.1"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M16.114-0.011c-6.559 0-12.114 5.587-12.114 12.204 0 6.93 6.439 14.017 10.77 18.998 0.017 0.020 0.717 0.797 1.579 0.797h0.076c0.863 0 1.558-0.777 1.575-0.797 4.064-4.672 10-12.377 10-18.998 0-6.618-4.333-12.204-11.886-12.204zM16.515 29.849c-0.035 0.035-0.086 0.074-0.131 0.107-0.046-0.032-0.096-0.072-0.133-0.107l-0.523-0.602c-4.106-4.71-9.729-11.161-9.729-17.055 0-5.532 4.632-10.205 10.114-10.205 6.829 0 9.886 5.125 9.886 10.205 0 4.474-3.192 10.416-9.485 17.657zM16.035 6.044c-3.313 0-6 2.686-6 6s2.687 6 6 6 6-2.687 6-6-2.686-6-6-6zM16.035 16.044c-2.206 0-4.046-1.838-4.046-4.044s1.794-4 4-4c2.207 0 4 1.794 4 4 0.001 2.206-1.747 4.044-3.954 4.044z"></path>
+                    </svg>
+                  </span>
+                  <Text style={styles.contactText}>
+                    Birdman of Chennai, 2 Iyya Mudali St, Adikesavarpuram,
+                    Chintadripet, Chennai, Tamil Nadu 600002
+                  </Text>
+                </td>
+              </tr>
+              <tr>
+                <td style={styles.contactItem}>
+                  <span style={styles.contactIcon}>
+                    <svg
+                      width="20px"
+                      height="20px"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M16.5562 12.9062L16.1007 13.359C16.1007 13.359 15.0181 14.4355 12.0631 11.4972C9.10812 8.55901 10.1907 7.48257 10.1907 7.48257L10.4775 7.19738C11.1841 6.49484 11.2507 5.36691 10.6342 4.54348L9.37326 2.85908C8.61028 1.83992 7.13596 1.70529 6.26145 2.57483L4.69185 4.13552C4.25823 4.56668 3.96765 5.12559 4.00289 5.74561C4.09304 7.33182 4.81071 10.7447 8.81536 14.7266C13.0621 18.9492 17.0468 19.117 18.6763 18.9651C19.1917 18.9171 19.6399 18.6546 20.0011 18.2954L21.4217 16.883C22.3806 15.9295 22.1102 14.2949 20.8833 13.628L18.9728 12.5894C18.1672 12.1515 17.1858 12.2801 16.5562 12.9062Z"
+                        fill="#00A36C"
+                      />
+                    </svg>
+                  </span>
+                  <Text style={styles.contactText}>+91 98765 43210</Text>
+                </td>
+              </tr>
+              <tr>
+                <td style={styles.contactItem}>
+                  <span style={styles.contactIcon}>
+                    <svg
+                      width="20px"
+                      height="20px"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <g id="Complete">
+                        <g id="mail">
+                          <g>
+                            <polyline
+                              fill="none"
+                              points="4 8.2 12 14.1 20 8.2"
+                              stroke="#00A36C"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                            />
+                            <rect
+                              fill="none"
+                              height="14"
+                              rx="2"
+                              ry="2"
+                              stroke="#00A36C"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              width="18"
+                              x="3"
+                              y="6.5"
+                            />
+                          </g>
+                        </g>
+                      </g>
+                    </svg>
+                  </span>
+                  <Text style={styles.contactText}>
+                    admin@birdmanofchennai.com
+                  </Text>
+                </td>
+              </tr>
+            </table>
           </Section>
 
-          <Section>
-            <Text style={styles.sectionHeading}>💬 Need Help?</Text>
-            <Text style={styles.text}>
-              If you have any questions or concerns, please don't hesitate to reach out to us. 
-              We're here to help make your visit memorable!
-            </Text>
-            <Text style={styles.text}>
-              <strong>Contact:</strong> Sudarson Sah<br />
-              <strong>Phone:</strong> +91 98765 43210<br />
-              <strong>Email:</strong> <a href="mailto:birdman@chennai.com" style={styles.link}>birdman@chennai.com</a>
+          {/* Footer */}
+          <Section style={styles.footer}>
+            <Text style={styles.brandName}>Birdman of Chennai</Text>
+            <Text style={styles.copyright}>
+              © 2026 Birdman of Chennai. Capturing the rhythm of urban nature.
             </Text>
           </Section>
-
-          <Hr style={styles.hr} />
-
-          <Text style={styles.footer}>
-            We deeply apologize for any inconvenience caused and hope to see you soon with 
-            the 6,000+ parakeets at the Birdman of Chennai! 🦜
-          </Text>
-
-          <Text style={styles.subfooter}>
-            This is an automated message regarding your booking cancellation. 
-            Please do not reply to this email.
-          </Text>
         </Container>
       </Body>
     </Html>
   );
 }
 
-// Inline styles (similar to booking-confirmation)
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatTime(timeString: string): string {
+  // Convert 24-hour format (HH:MM:SS) to 12-hour format
+  const [hours, minutes] = timeString.split(":");
+  const hour = parseInt(hours, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${minutes} ${ampm}`;
+}
+
 const styles = {
   body: {
-    backgroundColor: '#f6f9fc',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    backgroundColor: "#EEEBE5",
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    margin: 0,
+    padding: 0,
   },
   container: {
-    backgroundColor: '#ffffff',
-    margin: '40px auto',
-    padding: '40px',
-    borderRadius: '8px',
-    maxWidth: '600px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    backgroundColor: "#FEFDF5",
+    margin: "0 auto",
+    padding: "0",
+    maxWidth: "540px",
+  },
+  heroImage: {
+    width: "100%",
+    display: "block",
+    margin: 0,
+    padding: 0,
+  },
+  iconWrapper: {
+    textAlign: "center" as const,
+    margin: "24px 0 16px",
+  },
+  cancelIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "64px",
+    height: "64px",
+    backgroundColor: "#F3F4F6",
+    borderRadius: "50%",
+    margin: "0 auto",
   },
   heading: {
-    color: '#dc2626', // Red color for cancellation
-    fontSize: '28px',
-    fontWeight: 'bold',
-    textAlign: 'center' as const,
-    margin: '0 0 24px 0',
+    color: "#6B7280",
+    fontSize: "28px",
+    fontWeight: "700",
+    textAlign: "center" as const,
+    margin: "0 0 12px",
+    padding: "0 20px",
+  },
+  subtitle: {
+    fontSize: "14px",
+    color: "#8B6914",
+    textAlign: "center" as const,
+    margin: "0 0 24px",
+    padding: "0 20px",
   },
   greeting: {
-    fontSize: '16px',
-    margin: '0 0 16px 0',
-    color: '#1f2937',
+    fontSize: "16px",
+    color: "#1A1A2E",
+    margin: "0 0 12px",
+    padding: "0 20px",
   },
   text: {
-    fontSize: '16px',
-    lineHeight: '24px',
-    color: '#374151',
-    margin: '0 0 16px 0',
+    fontSize: "15px",
+    color: "#4A5568",
+    lineHeight: "1.6",
+    margin: "0 0 24px",
+    padding: "0 20px",
   },
   detailsBox: {
-    backgroundColor: '#fef2f2', // Light red background
-    borderLeft: '4px solid #dc2626',
-    padding: '20px',
-    margin: '24px 0',
-    borderRadius: '4px',
+    backgroundColor: "#F9FAFB",
+    border: "1px solid #D1D5DB",
+    borderRadius: "12px",
+    padding: "24px",
+    margin: "0 20px 24px",
+    width: "92%",
   },
   detailsHeading: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#dc2626',
-    margin: '0 0 16px 0',
+    fontSize: "11px",
+    fontWeight: "700",
+    color: "#9CA3AF",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.5px",
+    margin: "0 0 16px",
   },
-  detail: {
-    fontSize: '15px',
-    margin: '8px 0',
-    color: '#1f2937',
+  detailRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    padding: "12px 0",
   },
-  hr: {
-    borderColor: '#e5e7eb',
-    margin: '24px 0',
+  detailIcon: {
+    marginRight: "12px",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
   },
-  sectionHeading: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#059669', // Green for action items
-    margin: '0 0 12px 0',
+  detailContent: {
+    flex: 1,
   },
-  button: {
-    backgroundColor: '#059669',
-    color: '#ffffff',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    textDecoration: 'none',
-    textAlign: 'center' as const,
-    display: 'inline-block',
-    padding: '14px 28px',
-    borderRadius: '6px',
-    margin: '16px 0',
+  detailLabel: {
+    fontSize: "11px",
+    color: "#6B7280",
+    fontWeight: "600",
+    textTransform: "uppercase" as const,
+    margin: "0 0 4px",
+    letterSpacing: "0.5px",
   },
-  link: {
-    color: '#2563eb',
-    textDecoration: 'underline',
+  detailValue: {
+    fontSize: "14px",
+    color: "#4B5563",
+    fontWeight: "400",
+    margin: "0",
+    textDecoration: "line-through",
+  },
+  rebookText: {
+    fontSize: "15px",
+    color: "#4A5568",
+    lineHeight: "1.6",
+    textAlign: "center" as const,
+    margin: "0 0 24px",
+    padding: "0 20px",
+  },
+  buttonContainer: {
+    textAlign: "center" as const,
+    margin: "0 20px 32px",
+  },
+  primaryButton: {
+    display: "inline-block",
+    backgroundColor: "#00A36C",
+    color: "#FFFFFF",
+    fontSize: "14px",
+    fontWeight: "600",
+    textDecoration: "none",
+    padding: "14px 28px",
+    borderRadius: "8px",
+  },
+  contactSection: {
+    backgroundColor: "#F0F4F0",
+    borderRadius: "8px",
+    padding: "16px",
+    margin: "0 20px 24px",
+    width: "92%"
+  },
+  contactItem: {
+    display: "flex",
+    alignItems: "flex-start",
+  },
+  contactIcon: {
+    fontSize: "18px",
+    marginRight: "12px",
+    color: "#00A36C",
+  },
+  contactText: {
+    fontSize: "13px",
+    color: "#1A1A2E",
+    margin: 0,
+    lineHeight: "1.5",
   },
   footer: {
-    fontSize: '14px',
-    color: '#6b7280',
-    textAlign: 'center' as const,
-    margin: '24px 0 8px 0',
-    fontStyle: 'italic',
+    textAlign: "center" as const,
+    padding: "32px 20px",
+    borderTop: "1px solid #E5E7EB",
+    margin: "0",
   },
-  subfooter: {
-    fontSize: '12px',
-    color: '#9ca3af',
-    textAlign: 'center' as const,
-    margin: '8px 0 0 0',
+  brandName: {
+    fontSize: "16px",
+    fontWeight: "700",
+    color: "#8B4513",
+    margin: "0 0 16px",
+  },
+  footerLink: {
+    fontSize: "13px",
+    color: "#4A5568",
+    textDecoration: "none",
+  },
+  copyright: {
+    fontSize: "12px",
+    color: "#6B7280",
+    margin: "16px 0 0",
   },
 };
