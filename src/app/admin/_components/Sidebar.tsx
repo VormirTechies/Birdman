@@ -14,16 +14,19 @@ import {
   LogOut,
   X,
   Bird,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
   { label: 'Calendar', icon: Calendar, href: '/admin/calendar' },
   { label: 'Checklist', icon: ClipboardList, href: '/admin/checklist' },
   { label: 'History', icon: History, href: '/admin/history' },
+  { label: 'Visitors', icon: Users, href: '/admin/visitors' },
   { label: 'Gallery', icon: Images, href: '/admin/gallery' },
   { label: 'Settings', icon: Settings, href: '/admin/settings' },
   { label: 'Profile', icon: UserCircle, href: '/admin/profile' },
@@ -36,6 +39,10 @@ interface SidebarProps {
 
 function SidebarContent({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
+  // Defer active-state to client to avoid SSR/hydration mismatch.
+  // Server always renders all links inactive; client updates after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -60,8 +67,9 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isActive =
-            pathname === item.href ||
-            (item.href !== '/admin' && pathname?.startsWith(item.href));
+            mounted &&
+            (pathname === item.href ||
+              (item.href !== '/admin' && pathname?.startsWith(item.href)));
           return (
             <Link
               key={item.href}
@@ -74,7 +82,6 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
                   : 'text-[#616161] hover:bg-[#F5F5F5] hover:text-[#212121]'
               )}
               style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-              suppressHydrationWarning
             >
               <item.icon
                 className={cn(

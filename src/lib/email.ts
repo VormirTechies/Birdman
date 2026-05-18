@@ -4,6 +4,7 @@ import BookingConfirmation from '../../emails/booking-confirmation';
 import BookingReminder from '../../emails/booking-reminder';
 import BookingReschedule from '../../emails/booking-reschedule';
 import BookingCancellation from '../../emails/booking-cancellation';
+import VipWelcome from '../../emails/vip-welcome';
 import type { Booking } from './db/schema';
 import React from 'react';
 
@@ -308,4 +309,49 @@ export async function sendCancellationEmails(
 
   console.log(`[Email Service] Cancellation emails complete: ${sent} sent, ${failed} failed`);
   return { sent, failed, errors };
+}
+
+// ─── Send VIP Welcome Email ───────────────────────────────────────────────────
+
+export async function sendVipWelcomeEmail(
+  booking: Booking,
+  totalVisits: number = 2
+): Promise<{
+  success: boolean;
+  error?: string;
+  messageId?: string;
+}> {
+  try {
+    if (!booking.email) {
+      return { success: false, error: 'No email address provided' };
+    }
+
+    const transporter = getTransporter();
+
+    const emailHtml = await render(
+      React.createElement(VipWelcome, {
+        visitorName: booking.visitorName,
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+        adults: booking.adults,
+        children: booking.children,
+        bookingId: booking.id,
+        totalVisits,
+      })
+    );
+
+    const info = await transporter.sendMail({
+      from: FROM_EMAIL,
+      to: booking.email,
+      subject: '⭐ Welcome Back, VIP! — Birdman of Chennai',
+      html: emailHtml,
+    });
+
+    console.log('[Email Service] VIP welcome email sent via Gmail:', info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Email Service] VIP welcome email exception:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
 }

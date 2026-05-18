@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Phone, Mail, Users } from 'lucide-react';
+import { Clock, Phone, Mail, Users, Crown, Star, StarOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatLocalDate } from '@/lib/utils';
 import type { HistoryBooking } from './HistoryTable';
@@ -45,9 +45,10 @@ function formatTime(time: string) {
 
 interface HistoryCardProps {
   booking: HistoryBooking;
+  onVipToggle?: (visitorId: string, isVip: boolean) => void;
 }
 
-export function HistoryCard({ booking: b }: HistoryCardProps) {
+export function HistoryCard({ booking: b, onVipToggle }: HistoryCardProps) {
   const vstatus = getVisitedStatus(b);
   const colors = avatarColor(b.visitorName);
   const initials = getInitials(b.visitorName);
@@ -73,9 +74,27 @@ export function HistoryCard({ booking: b }: HistoryCardProps) {
             {initials}
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#212121]" style={{ fontFamily: FONT }}>
-              {b.visitorName}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold text-[#212121]" style={{ fontFamily: FONT }}>
+                {b.visitorName}
+              </p>
+              {b.isVip && (
+                <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#FF8C00' }} />
+              )}
+              {onVipToggle && (
+                <button
+                  onClick={() => b.visitorId && onVipToggle(b.visitorId, !b.isVip)}
+                  disabled={!b.visitorId}
+                  title={b.isVip ? 'Remove VIP' : 'Mark as VIP'}
+                  className="p-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-30"
+                >
+                  {b.isVip
+                    ? <Star className="w-3.5 h-3.5 fill-[#FF8C00] text-[#FF8C00]" />
+                    : <StarOff className="w-3.5 h-3.5 text-gray-300" />
+                  }
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-1 mt-0.5 text-[#9E9E9E]">
               <Clock className="w-3 h-3" />
               <span className="text-xs" style={{ fontFamily: FONT }}>

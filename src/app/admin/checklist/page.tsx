@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format, addDays, subDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, Search, X, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Plus, Crown, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { DatePicker } from '@/app/admin/_components/DatePicker';
 import { InstantBookingModal } from '@/app/admin/_components/InstantBookingModal';
@@ -32,6 +32,11 @@ export default function ChecklistPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+
+  // VIP confirmation modal state
+  const [pendingVip, setPendingVip] = useState<{ bookingId: string; visitorName: string; newIsVip: boolean } | null>(null);
+  const [vipNotes, setVipNotes] = useState('');
+  const [isVipUpdating, setIsVipUpdating] = useState(false);
 
   // Refs for IntersectionObserver (avoid stale closures)
   const offsetRef = useRef(0);
@@ -74,6 +79,9 @@ export default function ChecklistPage() {
           adults: (b.adults ?? 1) as number,
           children: (b.children ?? 0) as number,
           numberOfGuests: (b.number_of_guests ?? b.numberOfGuests ?? 1) as number,
+          isVip: ((b.visitor as Record<string, unknown> | null)?.isVip ?? false) as boolean,
+          totalVisits: ((b.visitor as Record<string, unknown> | null)?.totalVisits ?? 1) as number,
+          visitorId: ((b.visitor as Record<string, unknown> | null)?.id) as string | undefined,
         }));
 
         const newOffset = currentOffset + mapped.length;
@@ -143,6 +151,44 @@ export default function ChecklistPage() {
   };
 
   const visitedCount = visitors.filter(v => v.visited).length;
+
+  // Open modal instead of immediately updating
+  const handleVipToggle = useCallback((bookingId: string, newIsVip: boolean) => {
+    const visitor = visitors.find(v => v.id === bookingId);
+    if (!visitor) return;
+    setVipNotes('');
+    setPendingVip({ bookingId, visitorName: visitor.visitorName, newIsVip });
+  }, [visitors]);
+
+  // Called when the user confirms the modal
+  const confirmVipToggle = useCallback(async (notes?: string) => {
+    if (!pendingVip) return;
+    const { bookingId, newIsVip } = pendingVip;
+    setPendingVip(null);
+    setIsVipUpdating(true);
+    setVisitors(prev => prev.map(v => v.id === bookingId ? { ...v, isVip: newIsVip } : v));
+    try {
+      const body: Record<string, unknown> = { isVip: newIsVip };
+      if (newIsVip && notes?.trim()) body.vipNotes = notes.trim();
+      if (!newIsVip) body.vipNotes = '';
+      const res = await fetch(`/api/admin/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+      if (data.visitor?.id) {
+        setVisitors(prev => prev.map(v => v.id === bookingId ? { ...v, visitorId: data.visitor.id } : v));
+      }
+      toast.success(newIsVip ? '⭐ Marked as VIP' : 'VIP status removed');
+    } catch {
+      setVisitors(prev => prev.map(v => v.id === bookingId ? { ...v, isVip: !newIsVip } : v));
+      toast.error('Failed to update VIP status');
+    } finally {
+      setIsVipUpdating(false);
+    }
+  }, [pendingVip]);
 
   const dateLabel = (() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -266,6 +312,7 @@ export default function ChecklistPage() {
                 visitors={visitors}
                 updatingId={updatingId}
                 onToggle={handleToggle}
+                onVipToggle={handleVipToggle}
               />
 
               {/* Loading more spinner */}
@@ -309,6 +356,143 @@ export default function ChecklistPage() {
         onOpenChange={setIsBookingModalOpen}
         onSuccess={handleBookingSuccess}
       />
+
+      {/* ── VIP Add Modal ─────────────────────────────────────────────── */}
+      {pendingVip && pendingVip.newIsVip && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onClick={() => !isVipUpdating && setPendingVip(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+            style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#FFF3E0] flex items-center justify-center shrink-0">
+                <Star className="w-5 h-5 fill-[#FF8C00] text-[#FF8C00]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold text-[#212121] leading-tight">
+                  Mark as VIP?
+                </h2>
+                <p className="text-sm text-[#757575] mt-0.5">
+                  <span className="font-semibold text-[#212121]">{pendingVip.visitorName}</span> will be given VIP status.
+                </p>
+              </div>
+              <button
+                onClick={() => !isVipUpdating && setPendingVip(null)}
+                className="p-1 rounded-lg hover:bg-[#F5F5F5] transition-colors text-[#9E9E9E]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Notes input */}
+            <div className="px-6 pb-5">
+              <label className="block text-xs font-semibold text-[#616161] mb-1.5 uppercase tracking-wide">
+                VIP Private Note <span className="font-normal normal-case text-[#9E9E9E]">(optional)</span>
+              </label>
+              <textarea
+                autoFocus
+                rows={3}
+                value={vipNotes}
+                onChange={(e) => setVipNotes(e.target.value)}
+                placeholder="e.g. Allergic to noise, prefers morning slots…"
+                maxLength={500}
+                disabled={isVipUpdating}
+                className="w-full px-3 py-2.5 text-sm text-[#212121] placeholder:text-[#BDBDBD] bg-[#F5F5F5] rounded-xl border-2 border-transparent focus:border-[#FF8C00] outline-none transition-colors resize-none disabled:opacity-50"
+              />
+              <p className="text-right text-[10px] text-[#BDBDBD] mt-1">{vipNotes.length}/500</p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex gap-2">
+              <button
+                onClick={() => !isVipUpdating && setPendingVip(null)}
+                disabled={isVipUpdating}
+                className="flex-1 py-2.5 rounded-2xl border-2 border-[#E0E0E0] text-sm font-semibold text-[#424242] hover:bg-[#F5F5F5] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmVipToggle(vipNotes)}
+                disabled={isVipUpdating}
+                className="flex-1 py-2.5 rounded-2xl bg-[#FF8C00] hover:bg-[#E07B00] text-sm font-bold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isVipUpdating ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Crown className="w-4 h-4" />
+                    Make VIP
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIP Remove Modal ───────────────────────────────────────────── */}
+      {pendingVip && !pendingVip.newIsVip && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+          onClick={() => !isVipUpdating && setPendingVip(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+            style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 pt-6 pb-5 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#FFF3E0] flex items-center justify-center shrink-0">
+                <Star className="w-5 h-5 text-[#FF8C00]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold text-[#212121] leading-tight">
+                  Remove VIP Status?
+                </h2>
+                <p className="text-sm text-[#757575] mt-1">
+                  <span className="font-semibold text-[#212121]">{pendingVip.visitorName}</span> will no longer have VIP privileges.
+                </p>
+              </div>
+              <button
+                onClick={() => !isVipUpdating && setPendingVip(null)}
+                className="p-1 rounded-lg hover:bg-[#F5F5F5] transition-colors text-[#9E9E9E]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex gap-2">
+              <button
+                onClick={() => !isVipUpdating && setPendingVip(null)}
+                disabled={isVipUpdating}
+                className="flex-1 py-2.5 rounded-2xl border-2 border-[#E0E0E0] text-sm font-semibold text-[#424242] hover:bg-[#F5F5F5] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmVipToggle()}
+                disabled={isVipUpdating}
+                className="flex-1 py-2.5 rounded-2xl bg-[#EF5350] hover:bg-[#C62828] text-sm font-bold text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {isVipUpdating ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Remove VIP'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

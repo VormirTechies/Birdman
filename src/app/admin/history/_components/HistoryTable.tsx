@@ -2,7 +2,7 @@
 
 import { cn, formatLocalDate } from '@/lib/utils';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, User, Baby } from 'lucide-react';
+import { ChevronLeft, ChevronRight, User, Baby, Crown, Star, StarOff } from 'lucide-react';
 import { Select } from '@/app/admin/_components/Select';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
@@ -19,6 +19,8 @@ export interface HistoryBooking {
   bookingTime: string;
   visited: boolean;
   status: string;
+  isVip?: boolean;
+  visitorId?: string;
 }
 
 function getVisitedStatus(booking: HistoryBooking): 'visited' | 'no-show' | 'upcoming' {
@@ -91,6 +93,7 @@ interface HistoryTableProps {
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: number) => void;
   loading?: boolean;
+  onVipToggle?: (visitorId: string, isVip: boolean) => void;
 }
 
 export function HistoryTable({
@@ -101,6 +104,7 @@ export function HistoryTable({
   onPageChange,
   onPageSizeChange,
   loading,
+  onVipToggle,
 }: HistoryTableProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -179,9 +183,27 @@ export function HistoryTable({
                           {initials}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-[#212121]" style={{ fontFamily: FONT }}>
-                            {b.visitorName}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium text-[#212121]" style={{ fontFamily: FONT }}>
+                              {b.visitorName}
+                            </p>
+                            {b.isVip && (
+                              <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#FF8C00' }} />
+                            )}
+                            {onVipToggle && (
+                              <button
+                                onClick={() => b.visitorId && onVipToggle(b.visitorId, !b.isVip)}
+                                disabled={!b.visitorId}
+                                title={b.isVip ? 'Remove VIP' : 'Mark as VIP'}
+                                className="p-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-30"
+                              >
+                                {b.isVip
+                                  ? <Star className="w-3.5 h-3.5 fill-[#FF8C00] text-[#FF8C00]" />
+                                  : <StarOff className="w-3.5 h-3.5 text-gray-300" />
+                                }
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs text-[#9E9E9E]" style={{ fontFamily: FONT }}>
                             {format(new Date(`${b.bookingDate}T00:00:00`), 'MMM dd, yyyy')}
                           </p>
