@@ -1,6 +1,6 @@
 'use client';
 
-import { Users } from 'lucide-react';
+import { Users, Crown, Star, StarOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export interface ChecklistVisitor {
@@ -11,12 +11,16 @@ export interface ChecklistVisitor {
   adults: number;
   children: number;
   numberOfGuests: number; // Deprecated, kept for backward compatibility
+  isVip?: boolean;
+  totalVisits?: number;
+  visitorId?: string;
 }
 
 interface VisitorChecklistItemProps {
   visitor: ChecklistVisitor;
   onToggle: (id: string, visited: boolean) => void;
   isUpdating: boolean;
+  onVipToggle?: (bookingId: string, isVip: boolean) => void;
 }
 
 const AVATAR_COLORS = [
@@ -50,6 +54,7 @@ export function VisitorChecklistItem({
   visitor,
   onToggle,
   isUpdating,
+  onVipToggle,
 }: VisitorChecklistItemProps) {
   const colors = getAvatarColor(visitor.visitorName);
   const initials = getInitials(visitor.visitorName);
@@ -78,12 +83,20 @@ export function VisitorChecklistItem({
 
       {/* Name & Phone */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-sm font-semibold text-[#212121] truncate"
-          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-        >
-          {visitor.visitorName}
-        </p>
+        <div className="flex items-center gap-1 min-w-0">
+          <p
+            className="text-sm font-semibold text-[#212121] truncate"
+            style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+          >
+            {visitor.visitorName}
+          </p>
+          {visitor.isVip && (
+            <Crown
+              className="w-3.5 h-3.5 shrink-0"
+              style={{ color: '#FF8C00' }}
+            />
+          )}
+        </div>
         <p
           className="text-xs text-[#757575] mt-0.5"
           style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
@@ -104,7 +117,7 @@ export function VisitorChecklistItem({
         </div>
       </div>
 
-      {/* Visited toggle */}
+      {/* Visited + VIP toggles */}
       <div className="flex items-center gap-2 shrink-0">
         <span
           className="text-xs font-medium text-[#757575] hidden lg:inline"
@@ -125,6 +138,17 @@ export function VisitorChecklistItem({
             className="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200"
             style={{ transform: visitor.visited ? 'translateX(22px)' : 'translateX(4px)' }}
           />
+        </button>
+        {/* VIP star toggle */}
+        <button
+          onClick={() => onVipToggle?.(visitor.id, !visitor.isVip)}
+          title={visitor.isVip ? 'Remove VIP' : 'Mark as VIP'}
+          className="p-1 rounded hover:bg-gray-100 transition-colors"
+        >
+          {visitor.isVip
+            ? <Star className="w-3.5 h-3.5 fill-[#FF8C00] text-[#FF8C00]" />
+            : <StarOff className="w-3.5 h-3.5 text-gray-300" />
+          }
         </button>
       </div>
     </motion.div>

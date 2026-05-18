@@ -3,7 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getBookings, createBooking, markConfirmationSent } from '@/lib/db/queries';
 import { createAdminBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
+import { sendVipWelcomeEmail } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
+import { findOrCreateVisitor, linkBookingToVisitor } from '@/lib/visitors';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -74,6 +76,27 @@ export async function POST(request: NextRequest) {
       bookingTime: validatedData.bookingTime,
     });
 
+    // Match or create visitor profile
+    let isVip = false;
+    let isReturning = false;
+    let visitorId: string | null = null;
+    let totalVisits = 1;
+    try {
+      const visitorResult = await findOrCreateVisitor(
+        validatedData.phone,
+        validatedData.email,
+        validatedData.visitorName,
+        validatedData.bookingDate
+      );
+      isVip = visitorResult.isVip;
+      isReturning = visitorResult.isReturning;
+      visitorId = visitorResult.visitor.id;
+      totalVisits = visitorResult.visitor.totalVisits ?? 1;
+      await linkBookingToVisitor(booking.id, visitorId);
+    } catch (visitorError) {
+      console.error('[Admin API] Visitor matching failed (non-fatal):', visitorError);
+    }
+
     // Format guest count for display
     const guestCount = booking.children > 0 
       ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
@@ -81,8 +104,10 @@ export async function POST(request: NextRequest) {
 
     // Notify All Admins
     await sendPushToAllAdmins({
-      title: 'Walk-in Visitor Registered',
-      body: `${booking.visitorName} (${guestCount}) checked in for ${booking.bookingDate}.`,
+      title: isVip ? '⭐ VIP Walk-in Registered!' : 'Walk-in Visitor Registered',
+      body: `${booking.visitorName} (${guestCount}) checked in for ${booking.bookingDate}.${
+        isVip ? ' VIP visitor!' : isReturning ? ' (Returning visitor)' : ''
+      }`,
       url: '/admin',
       visitorName: booking.visitorName,
       bookingDate: booking.bookingDate,
@@ -92,7 +117,9 @@ export async function POST(request: NextRequest) {
     let emailSent = false;
     if (validatedData.email && validatedData.email.trim() !== '') {
       try {
-        const emailResult = await sendBookingConfirmation(booking);
+        const emailResult = isVip
+          ? await sendVipWelcomeEmail(booking, totalVisits)
+          : await sendBookingConfirmation(booking);
         emailSent = emailResult.success;
 
         if (emailResult.success) {
@@ -119,7 +146,10 @@ export async function POST(request: NextRequest) {
           children: booking.children,
           numberOfGuests: booking.numberOfGuests,
           status: booking.status,
+          visitorId,
         },
+        isVip,
+        isReturning,
         emailSent,
       },
       { status: 201 }
