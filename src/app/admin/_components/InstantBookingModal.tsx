@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { User, Baby, Calendar as CalendarIcon, Clock, Mail, Phone as PhoneIcon, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { User, Baby, Calendar as CalendarIcon, Clock, Mail, Phone as PhoneIcon, AlertCircle, CheckCircle2, Loader2, Crown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,14 @@ interface FormErrors {
   general?: string;
 }
 
+interface VisitorLookupResult {
+  id: string;
+  name: string;
+  isVip: boolean;
+  totalVisits: number;
+  lastVisitDate: string | null;
+}
+
 export function InstantBookingModal({
   open,
   onOpenChange,
@@ -63,6 +71,8 @@ export function InstantBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string>('');
+  const [visitorMatch, setVisitorMatch] = useState<VisitorLookupResult | null>(null);
+  const lookupTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -81,9 +91,42 @@ export function InstantBookingModal({
         setErrors({});
         setShowSuccess(false);
         setBookingId('');
+        setVisitorMatch(null);
       }, 200);
     }
   }, [open]);
+
+  // Debounced visitor lookup on phone/email change
+  const triggerLookup = (phone: string, email: string) => {
+    if (lookupTimeout.current) clearTimeout(lookupTimeout.current);
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length < 10 && !email.includes('@')) {
+      setVisitorMatch(null);
+      return;
+    }
+    lookupTimeout.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (cleaned.length >= 10) params.set('phone', phone.trim());
+        if (email.includes('@')) params.set('email', email.trim());
+        const res = await fetch(`/api/admin/visitors/lookup?${params.toString()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.visitor) {
+          setVisitorMatch(data.visitor);
+          // Auto-populate name if empty
+          setFormData(prev => ({
+            ...prev,
+            visitorName: prev.visitorName.trim() === '' ? data.visitor.name : prev.visitorName,
+          }));
+        } else {
+          setVisitorMatch(null);
+        }
+      } catch {
+        // silently ignore lookup errors
+      }
+    }, 300);
+  };
 
   const totalGuests = formData.adults + formData.children;
 
@@ -267,6 +310,28 @@ export function InstantBookingModal({
             </div>
           )}
 
+          {/* Returning visitor alert */}
+          {visitorMatch && (
+            <div
+              className="flex items-start gap-3 p-3 rounded-lg border"
+              style={visitorMatch.isVip
+                ? { backgroundColor: '#FFF8EC', borderColor: '#FF8C00' }
+                : { backgroundColor: '#EFF6FF', borderColor: '#93C5FD' }
+              }
+            >
+              {visitorMatch.isVip
+                ? <Crown className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#FF8C00' }} />
+                : <User className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
+              }
+              <p className="text-sm font-medium" style={{ color: visitorMatch.isVip ? '#B45309' : '#1D4ED8' }}>
+                {visitorMatch.isVip
+                  ? `⭐ Returning VIP — ${visitorMatch.name} — ${visitorMatch.totalVisits} visit${visitorMatch.totalVisits !== 1 ? 's' : ''}`
+                  : `↩ Returning visitor — ${visitorMatch.name} — ${visitorMatch.totalVisits} visit${visitorMatch.totalVisits !== 1 ? 's' : ''}`
+                }
+              </p>
+            </div>
+          )}
+
           {/* Visitor Information */}
           <div className="space-y-4">
 
@@ -309,10 +374,10 @@ export function InstantBookingModal({
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => {
-                    setFormData({ ...formData, phone: e.target.value });
-                    if (errors.phone) {
-                      setErrors({ ...errors, phone: undefined });
-                    }
+                    const phone = e.target.value;
+                    setFormData(prev => ({ ...prev, phone }));
+                    if (errors.phone) setErrors({ ...errors, phone: undefined });
+                    triggerLookup(phone, formData.email);
                   }}
                   placeholder="Enter phone number"
                   className={cn(
@@ -339,10 +404,10 @@ export function InstantBookingModal({
                   type="email"
                   value={formData.email}
                   onChange={(e) => {
-                    setFormData({ ...formData, email: e.target.value });
-                    if (errors.email) {
-                      setErrors({ ...errors, email: undefined });
-                    }
+                    const email = e.target.value;
+                    setFormData(prev => ({ ...prev, email }));
+                    if (errors.email) setErrors({ ...errors, email: undefined });
+                    triggerLookup(formData.phone, email);
                   }}
                   placeholder="Enter email address (optional)"
                   className={cn(

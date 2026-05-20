@@ -5,6 +5,7 @@ import { HistoryToolbar, type VisitedFilter, type SortBy, type SortDir } from '.
 import { HistoryTable, type HistoryBooking } from './_components/HistoryTable';
 import { HistoryCard } from './_components/HistoryCard';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 // ─── Debounce Hook ────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay: number): T {
@@ -33,6 +34,7 @@ interface ApiBooking {
   bookingTime?: string;
   visited: boolean;
   status: string;
+  visitor?: { id?: string; isVip?: boolean } | null;
 }
 
 function normalise(b: ApiBooking): HistoryBooking {
@@ -48,6 +50,8 @@ function normalise(b: ApiBooking): HistoryBooking {
     bookingTime: b.booking_time ?? b.bookingTime ?? '00:00',
     visited: b.visited,
     status: b.status,
+    isVip: b.visitor?.isVip ?? false,
+    visitorId: b.visitor?.id ?? undefined,
   };
 }
 
@@ -238,6 +242,28 @@ export default function HistoryPage() {
     setSortDir(dir);
   };
 
+  const handleVipToggle = useCallback(async (visitorId: string, newIsVip: boolean) => {
+    const update = (prev: HistoryBooking[]) =>
+      prev.map(b => b.visitorId === visitorId ? { ...b, isVip: newIsVip } : b);
+    setDesktopData(update);
+    setMobileData(update);
+    try {
+      const res = await fetch(`/api/admin/visitors/${visitorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isVip: newIsVip }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(newIsVip ? 'Marked as VIP' : 'VIP removed');
+    } catch {
+      const revert = (prev: HistoryBooking[]) =>
+        prev.map(b => b.visitorId === visitorId ? { ...b, isVip: !newIsVip } : b);
+      setDesktopData(revert);
+      setMobileData(revert);
+      toast.error('Failed to update VIP status');
+    }
+  }, []);
+
   return (
     <div className="min-h-full bg-[#F8F8F8]" style={{ fontFamily: FONT }}>
       {/* Desktop Title — scrolls with page, sits above toolbar */}
@@ -288,6 +314,7 @@ export default function HistoryPage() {
           onPageChange={setPage}
           onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
           loading={desktopLoading}
+          onVipToggle={handleVipToggle}
         />
       </div>
 
@@ -314,7 +341,7 @@ export default function HistoryPage() {
               </p>
             </div>
           ) : (
-            mobileData.map((b) => <HistoryCard key={b.id} booking={b} />)
+            mobileData.map((b) => <HistoryCard key={b.id} booking={b} onVipToggle={handleVipToggle} />)
           )}
 
           {/* Load-more skeletons — inline in list, not pinned to bottom */}

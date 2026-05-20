@@ -59,6 +59,19 @@ export default function EmailTemplatesPage() {
               Sent when a booking is cancelled by admin or system
             </p>
           </Link>
+
+          <Link
+            href="/emails/vip-welcome"
+            className="block p-6 bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-amber-200"
+            style={{ borderColor: '#FF8C00' }}
+          >
+            <h2 className="text-xl font-semibold mb-2" style={{ color: '#FF8C00' }}>
+              ⭐ VIP Welcome
+            </h2>
+            <p className="text-gray-600 text-sm">
+              Sent to VIP visitors when they book — gold-accented welcome-back email
+            </p>
+          </Link>
         </div>
 
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">

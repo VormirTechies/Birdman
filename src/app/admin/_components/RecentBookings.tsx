@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal, X, User, Baby } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X, User, Baby, Star, StarOff, Crown } from 'lucide-react';
+import { toast } from 'sonner';
 import { SearchBar } from './SearchBar';
 import { DatePicker } from './DatePicker';
 import { BookingsTable } from './BookingsTable';
@@ -74,6 +75,8 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
             avatarColor: ['green', 'orange', 'pink', 'blue', 'purple'][
               Math.floor(Math.random() * 5)
             ] as 'green' | 'orange' | 'pink' | 'blue' | 'purple',
+            isVip: Boolean(b.visitor?.isVip),
+            visitorId: b.visitor?.id ?? undefined,
           }));
 
           setBookings(transformedBookings);
@@ -88,6 +91,22 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
 
     fetchBookings();
   }, [currentPage, selectedDate, refreshKey, searchQuery]);
+
+  const handleVipToggle = useCallback(async (visitorId: string, newIsVip: boolean) => {
+    setBookings(prev => prev.map(b => b.visitorId === visitorId ? { ...b, isVip: newIsVip } : b));
+    try {
+      const res = await fetch(`/api/admin/visitors/${visitorId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isVip: newIsVip }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(newIsVip ? 'Marked as VIP' : 'VIP removed');
+    } catch {
+      setBookings(prev => prev.map(b => b.visitorId === visitorId ? { ...b, isVip: !newIsVip } : b));
+      toast.error('Failed to update VIP status');
+    }
+  }, []);
 
   // All filtering is now server-side, no client-side filtering needed
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
@@ -215,12 +234,26 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
                                 >
                                   {booking.initials}
                                 </div>
-                                <div>
+                              <div className="flex items-center gap-2">
                                   <p className="font-medium text-[#212121]" style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}>
                                     {booking.guestName}
                                   </p>
-                                  <p className="text-sm text-[#616161]">{booking.email}</p>
+                                  {booking.isVip && (
+                                    <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#FF8C00' }} />
+                                  )}
+                                  <button
+                                    onClick={() => booking.visitorId && handleVipToggle(booking.visitorId, !booking.isVip)}
+                                    disabled={!booking.visitorId}
+                                    title={booking.isVip ? 'Remove VIP' : 'Mark as VIP'}
+                                    className="p-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-30"
+                                  >
+                                    {booking.isVip
+                                      ? <Star className="w-3.5 h-3.5 fill-[#FF8C00] text-[#FF8C00]" />
+                                      : <StarOff className="w-3.5 h-3.5 text-gray-300" />
+                                    }
+                                  </button>
                                 </div>
+                                  <p className="text-sm text-[#616161]">{booking.email}</p>
                               </div>
                             </td>
                             <td className="py-3 px-4">
@@ -273,7 +306,7 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
                   ))}
                 </div>
               ) : (
-                <BookingsList data={paginatedBookings} />
+                <BookingsList data={paginatedBookings} onVipToggle={handleVipToggle} />
               )}
             </div>
           </>

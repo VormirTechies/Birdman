@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { createBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
+import { sendVipWelcomeEmail } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
+import { findOrCreateVisitor, linkBookingToVisitor } from '@/lib/visitors';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -28,6 +30,25 @@ export async function POST(request: NextRequest) {
       bookingTime: validatedData.bookingTime,
     });
 
+    // Match or create visitor profile (non-blocking for booking creation)
+    let isVip = false;
+    let isReturning = false;
+    let totalVisits = 1;
+    try {
+      const visitorResult = await findOrCreateVisitor(
+        validatedData.phone,
+        validatedData.email,
+        validatedData.visitorName,
+        validatedData.bookingDate
+      );
+      isVip = visitorResult.isVip;
+      isReturning = visitorResult.isReturning;
+      totalVisits = visitorResult.visitor.totalVisits ?? 1;
+      await linkBookingToVisitor(booking.id, visitorResult.visitor.id);
+    } catch (visitorError) {
+      console.error('[API] Visitor matching failed (non-fatal):', visitorError);
+    }
+
     // Format guest count for display
     const guestCount = booking.children > 0 
       ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
@@ -35,8 +56,10 @@ export async function POST(request: NextRequest) {
 
     // Notify Admins Immediately
     await sendPushToAllAdmins({
-      title: 'New Parakeet Visit Booked!',
-      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
+      title: isVip ? '⭐ VIP Visitor Booked!' : 'New Parakeet Visit Booked!',
+      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.${
+        isVip ? ' VIP visitor!' : isReturning ? ' (Returning visitor)' : ''
+      }`,
       url: '/admin',
       visitorName: booking.visitorName,
       bookingDate: booking.bookingDate,
@@ -45,7 +68,10 @@ export async function POST(request: NextRequest) {
     // Send confirmation email (non-blocking - failure should not fail booking)
     let emailSent = false;
     try {
-      const emailResult = await sendBookingConfirmation(booking);
+      // VIPs get a special welcome-back email; new/returning visitors get the standard confirmation
+      const emailResult = isVip
+        ? await sendVipWelcomeEmail(booking, totalVisits)
+        : await sendBookingConfirmation(booking);
       emailSent = emailResult.success;
 
       if (emailResult.success) {

@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, ClipboardList, UserCircle, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, Calendar, ClipboardList, Users, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BOTTOM_NAV_ITEMS = [
   { label: 'DASHBOARD', icon: LayoutDashboard, href: '/admin' },
   { label: 'CALENDAR', icon: Calendar, href: '/admin/calendar' },
   { label: 'CHECKLIST', icon: ClipboardList, href: '/admin/checklist' },
-  { label: 'PROFILE', icon: UserCircle, href: '/admin/profile' },
+  { label: 'VISITORS', icon: Users, href: '/admin/visitors' },
 ];
 
 interface BottomNavProps {

@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Calendar, User, Baby } from 'lucide-react';
+import { Calendar, User, Baby, Crown } from 'lucide-react';
 
 export interface Booking {
   id: string;
@@ -13,6 +13,8 @@ export interface Booking {
   avatarColor: string;
   adults: number;
   children: number;
+  isVip?: boolean;
+  visitorId?: string;
 }
 
 interface BookingsTableProps {
@@ -88,6 +90,9 @@ export function BookingsTable({ data }: BookingsTableProps) {
                     >
                       {booking.guestName}
                     </span>
+                    {booking.isVip && (
+                      <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#FF8C00' }} />
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4">

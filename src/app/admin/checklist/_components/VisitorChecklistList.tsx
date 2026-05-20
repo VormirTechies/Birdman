@@ -7,12 +7,14 @@ interface VisitorChecklistListProps {
   visitors: ChecklistVisitor[];
   updatingId: string | null;
   onToggle: (id: string, visited: boolean) => void;
+  onVipToggle?: (bookingId: string, isVip: boolean) => void;
 }
 
 export function VisitorChecklistList({
   visitors,
   updatingId,
   onToggle,
+  onVipToggle,
 }: VisitorChecklistListProps) {
   if (visitors.length === 0) {
     return (
@@ -36,6 +38,7 @@ export function VisitorChecklistList({
             visitor={visitor}
             onToggle={onToggle}
             isUpdating={updatingId === visitor.id}
+            onVipToggle={onVipToggle}
           />
         ))}
       </AnimatePresence>

@@ -1,11 +1,12 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Phone, Calendar, User, Baby } from 'lucide-react';
+import { Phone, Calendar, User, Baby, Star, StarOff, Crown } from 'lucide-react';
 import type { Booking } from './BookingsTable';
 
 interface BookingsListProps {
   data: Booking[];
+  onVipToggle?: (visitorId: string, isVip: boolean) => void;
 }
 
 const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
@@ -16,7 +17,7 @@ const AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   purple: { bg: '#E1BEE7', text: '#7B1FA2' },
 };
 
-export function BookingsList({ data }: BookingsListProps) {
+export function BookingsList({ data, onVipToggle }: BookingsListProps) {
   return (
     <div className="space-y-3">
       {data.map((booking) => {
@@ -26,7 +27,7 @@ export function BookingsList({ data }: BookingsListProps) {
             key={booking.id}
             className="bg-white rounded-2xl p-4 shadow-sm"
           >
-            {/* Top row: Avatar + Name + Email */}
+            {/* Top row: Avatar + Name + Email + VIP toggle */}
             <div className="flex items-start gap-3 mb-3">
               <div
                 className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
@@ -39,12 +40,30 @@ export function BookingsList({ data }: BookingsListProps) {
                 {booking.initials}
               </div>
               <div className="flex-1 min-w-0">
-                <p
-                  className="text-sm font-semibold text-[#212121] truncate"
-                  style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                >
-                  {booking.guestName}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p
+                    className="text-sm font-semibold text-[#212121] truncate"
+                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+                  >
+                    {booking.guestName}
+                  </p>
+                  {booking.isVip && (
+                    <Crown className="w-3.5 h-3.5 shrink-0" style={{ color: '#FF8C00' }} />
+                  )}
+                  {onVipToggle && (
+                    <button
+                      onClick={() => booking.visitorId && onVipToggle(booking.visitorId, !booking.isVip)}
+                      disabled={!booking.visitorId}
+                      title={booking.isVip ? 'Remove VIP' : 'Mark as VIP'}
+                      className="p-0.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-30 shrink-0"
+                    >
+                      {booking.isVip
+                        ? <Star className="w-3.5 h-3.5 fill-[#FF8C00] text-[#FF8C00]" />
+                        : <StarOff className="w-3.5 h-3.5 text-gray-300" />
+                      }
+                    </button>
+                  )}
+                </div>
                 <p
                   className="text-xs text-[#616161] truncate"
                   style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}

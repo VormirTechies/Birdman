@@ -1,4 +1,5 @@
 import { pgTable, uuid, varchar, text, timestamp, integer, boolean, date, time, index } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BIRDMAN OF CHENNAI - MVP DATABASE SCHEMA
@@ -12,6 +13,7 @@ export const bookings = pgTable(
   'bookings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    visitorId: uuid('visitor_id').references(() => visitors.id, { onDelete: 'set null' }), // Links to persistent visitor profile
     visitorName: varchar('visitor_name', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }).notNull(), // Indian format: +91-XXXXXXXXXX
     email: varchar('email', { length: 255 }),
@@ -33,6 +35,31 @@ export const bookings = pgTable(
     bookingDateIdx: index('bookings_booking_date_idx').on(table.bookingDate),
     statusIdx: index('bookings_status_idx').on(table.status),
     visitedIdx: index('bookings_visited_idx').on(table.visited),
+  })
+);
+
+// ─── Visitors Table ─────────────────────────────────────────────────────────
+// Persistent visitor profiles for returning-visitor detection and VIP tracking
+
+export const visitors = pgTable(
+  'visitors',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: varchar('name', { length: 255 }).notNull(), // Latest name used (updated on each booking)
+    phone: varchar('phone', { length: 20 }).unique(), // Nullable unique — some walk-ins have no phone
+    email: varchar('email', { length: 255 }).unique(), // Nullable unique — email is optional
+    isVip: boolean('is_vip').notNull().default(false), // Admin-flagged VIP status
+    vipNotes: text('vip_notes'), // Private admin notes (e.g., "journalist", "frequent donor")
+    totalVisits: integer('total_visits').notNull().default(1), // Lifetime visit count
+    firstVisitDate: date('first_visit_date'), // Date of first recorded booking
+    lastVisitDate: date('last_visit_date'), // Date of most recent booking
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    phoneIdx: index('visitors_phone_idx').on(table.phone),
+    emailIdx: index('visitors_email_idx').on(table.email),
+    isVipIdx: index('visitors_is_vip_idx').on(table.isVip),
   })
 );
 
@@ -148,8 +175,24 @@ export const calendarSettings = pgTable(
 // TYPE EXPORTS - TypeScript inference from Drizzle schema
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Drizzle Relations ───────────────────────────────────────────────────────
+export const visitorsRelations = relations(visitors, ({ many }) => ({
+  bookings: many(bookings),
+}));
+
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  visitor: one(visitors, { fields: [bookings.visitorId], references: [visitors.id] }),
+}));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TYPE EXPORTS - TypeScript inference from Drizzle schema
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+
+export type Visitor = typeof visitors.$inferSelect;
+export type NewVisitor = typeof visitors.$inferInsert;
 
 export type GalleryImage = typeof galleryImages.$inferSelect;
 export type NewGalleryImage = typeof galleryImages.$inferInsert;

@@ -1,5 +1,5 @@
 import { db } from './index';
-import { bookings, verificationCodes, feedback, galleryImages, calendarSettings, type NewBooking, type Booking, type NewFeedback, type Feedback, type CalendarSettings, type NewCalendarSettings } from './schema';
+import { bookings, verificationCodes, feedback, galleryImages, calendarSettings, type NewBooking, type Booking, type Visitor, type NewFeedback, type Feedback, type CalendarSettings, type NewCalendarSettings } from './schema';
 import { eq, and, asc, desc, gt, gte, sql } from 'drizzle-orm';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,7 +45,7 @@ export async function getBookings(params: {
   visitedFilter?: 'visited' | 'not-visited' | 'yet-to-visit'; // omit = All
   sortBy?: 'name' | 'email' | 'date' | 'guestCount';
   sortDir?: 'asc' | 'desc';
-}): Promise<{ bookings: Booking[]; total: number }> {
+}): Promise<{ bookings: (Booking & { visitor: Visitor | null })[]; total: number }> {
   const { status, date, minDate, search, limit = 50, offset = 0, sort, visitedFilter, sortBy, sortDir = 'desc' } = params;
   const today = new Date().toISOString().split('T')[0];
 
@@ -113,6 +113,7 @@ export async function getBookings(params: {
       limit,
       offset,
       orderBy,
+      with: { visitor: true },
     }),
     db.select({ count: sql<number>`count(*)` }).from(bookings).where(whereClause)
   ]);
