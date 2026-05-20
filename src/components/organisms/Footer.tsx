@@ -8,6 +8,9 @@ import Image from 'next/image';
 const quickLinks = [
   { href: '/story', label: 'His Story' },
   { href: '/gallery', label: 'Photo Gallery' },
+  { href: '/visit', label: 'Visitor Guide' },
+  { href: '/meiyazhagan', label: 'Meiyazhagan Connection' },
+  { href: '/blog', label: 'Blog' },
   { href: '/book', label: 'Book a Visit' },
   { href: '/feedback', label: 'Visitor Reviews' },
 ];

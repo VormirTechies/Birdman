@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Menu, Calendar, Home, BookOpen, ImageIcon, Heart } from 'lucide-react';
+import { Menu, Calendar, Home, Library, ImageIcon, Heart, MapPin, Newspaper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -18,8 +18,10 @@ import Image from 'next/image';
 
 const navLinks = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/story', label: 'His Story', icon: BookOpen },
+  { href: '/story', label: 'His Story', icon: Library },
   { href: '/gallery', label: 'Gallery', icon: ImageIcon },
+  { href: '/visit', label: 'Visit', icon: MapPin },
+  { href: '/blog', label: 'Blog', icon: Newspaper },
   // { href: '/feedback', label: 'Feedback', icon: MessageSquare },
 ];
 
