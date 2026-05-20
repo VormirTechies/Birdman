@@ -12,6 +12,6 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: 'Applebot-Extended', allow: '/' },
       { userAgent: 'Bytespider', allow: '/' },
     ],
-    sitemap: 'https://birdmanofchennai.com/sitemap.xml',
+    sitemap: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app'}/sitemap.xml`,
   };
 }
