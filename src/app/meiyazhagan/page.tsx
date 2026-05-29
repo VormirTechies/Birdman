@@ -12,9 +12,7 @@ import {
 } from '@/components/ui/animated-section';
 import { Button } from '@/components/ui/button';
 import { absoluteUrl, siteConfig } from '@/lib/site';
-
-const MEIYAZHAGAN_VIDEO_URL =
-  'https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan_wide.mp4';
+import { MeiyazhaganHeroVideo } from './MeiyazhaganHeroVideo';
 
 export const metadata: Metadata = {
   title: 'Meiyazhagan & the Birdman of Chennai — The Real Story Behind the Film',
@@ -117,18 +115,9 @@ export default function MeiyazhaganPage() {
       <Header />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[60vh] flex items-end pb-16 pt-32 overflow-hidden bg-canopy-dark">
+      <section className="relative min-h-[82vh] md:min-h-[85vh] flex items-end pb-16 pt-32 overflow-hidden bg-canopy-dark">
         <div className="absolute inset-0">
-          <video
-            src={MEIYAZHAGAN_VIDEO_URL}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 h-full w-full object-cover opacity-45"
-            aria-label="Meiyazhagan-inspired Birdman of Chennai parakeet gathering video"
-          />
+          <MeiyazhaganHeroVideo />
           <div className="absolute inset-0 bg-gradient-to-b from-canopy-dark/70 via-canopy-dark/40 to-canopy-dark/85" />
         </div>
         <div className="container-wide relative z-10">
