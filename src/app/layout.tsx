@@ -190,6 +190,21 @@ export default function RootLayout({
                   "scheduleTimezone": "Asia/Kolkata"
                 },
                 "isAccessibleForFree": true,
+                "offers": {
+                  "@type": "Offer",
+                  "name": "Free visitor entry",
+                  "url": absoluteUrl("/book"),
+                  "price": "0",
+                  "priceCurrency": "INR",
+                  "availability": "https://schema.org/InStock",
+                  "validFrom": "2026-01-01T00:00:00+05:30"
+                },
+                "performer": {
+                  "@type": "Person",
+                  "@id": `${siteConfig.url}/#sudarson-sah`,
+                  "name": "Sudarson Sah",
+                  "alternateName": ["Kili Sudarson", "Birdman of Chennai", "Parrot Sudarson"]
+                },
                 "organizer": { "@id": `${siteConfig.url}/#sudarson-sah` },
                 "location": {
                   "@type": "Place",
