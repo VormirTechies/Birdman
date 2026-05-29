@@ -34,6 +34,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'birdmanofchennai.vercel.app' }],
+        destination: 'https://www.parrotsudarson.org/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'birdmanofchennai.com' }],
+        destination: 'https://www.parrotsudarson.org/:path*',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
@@ -48,6 +64,18 @@ const nextConfig: NextConfig = {
           { key: 'Service-Worker-Allowed', value: '/' },
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
         ],
+      },
+      {
+        source: '/admin/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
+        source: '/emails/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
+        source: '/api/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       },
     ];
   },

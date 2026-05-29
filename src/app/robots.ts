@@ -1,9 +1,14 @@
 import { MetadataRoute } from 'next';
+import { absoluteUrl } from '@/lib/site';
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      { userAgent: '*', allow: '/', disallow: '/admin/' },
+      {
+        userAgent: '*',
+        allow: '/',
+        disallow: ['/admin/', '/api/', '/emails/'],
+      },
       { userAgent: 'GPTBot', allow: '/' },
       { userAgent: 'ChatGPT-User', allow: '/' },
       { userAgent: 'ClaudeBot', allow: '/' },
@@ -12,6 +17,6 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: 'Applebot-Extended', allow: '/' },
       { userAgent: 'Bytespider', allow: '/' },
     ],
-    sitemap: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app'}/sitemap.xml`,
+    sitemap: absoluteUrl('/sitemap.xml'),
   };
 }

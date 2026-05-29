@@ -139,11 +139,11 @@ export function Footer() {
                   <span>2/3, Iyya Mudali St, Adikesavarpuram, Chintadripet, Chennai, Tamil Nadu 600002</span>
                 </a>
                 <a
-                  href="mailto:info@birdmanofchennai.com"
+                  href="mailto:info@parrotsudarson.org"
                   className="flex items-center gap-2.5 text-white/60 hover:text-sanctuary-green-light transition-colors text-sm"
                 >
                   <Mail className="w-4 h-4 shrink-0" />
-                  <span>info@birdmanofchennai.com</span>
+                  <span>info@parrotsudarson.org</span>
                 </a>
               </div>
             </div>

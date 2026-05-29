@@ -11,8 +11,7 @@ import {
   StaggerItem,
 } from '@/components/ui/animated-section';
 import { blogPosts } from '@/lib/blog';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app';
+import { absoluteUrl, siteConfig } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Blog — Birdman of Chennai | Parakeet Stories, Nature & Wildlife',
@@ -28,14 +27,13 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: '/blog',
-    languages: { 'en-IN': '/blog', 'ta-IN': '/ta/blog' },
   },
   openGraph: {
     title: 'Blog — Birdman of Chennai',
     description:
       'Stories, photography guides, and wildlife insights from the Birdman of Chennai sanctuary.',
-    url: `${BASE_URL}/blog`,
-    images: [{ url: '/images/og-image.png', width: 1200, height: 1200 }],
+    url: absoluteUrl('/blog'),
+    images: [{ url: absoluteUrl('/images/og-image.png'), width: 1200, height: 1200 }],
   },
 };
 
@@ -46,21 +44,21 @@ export default function BlogPage() {
     '@context': 'https://schema.org',
     '@type': 'Blog',
     name: 'Birdman of Chennai — Blog',
-    url: `${BASE_URL}/blog`,
+    url: absoluteUrl('/blog'),
     description:
       'Stories, guides, and wildlife insights from the Birdman of Chennai sanctuary in Chintadripet, Chennai.',
     publisher: {
       '@type': 'Organization',
       name: 'Birdman of Chennai',
-      url: BASE_URL,
+      url: siteConfig.url,
     },
     blogPost: blogPosts.map((post) => ({
       '@type': 'BlogPosting',
       headline: post.title,
       description: post.description,
-      url: `${BASE_URL}/blog/${post.slug}`,
+      url: absoluteUrl(`/blog/${post.slug}`),
       datePublished: post.publishedAt,
-      image: `${BASE_URL}${post.coverImage}`,
+      image: absoluteUrl(post.coverImage),
     })),
   };
 

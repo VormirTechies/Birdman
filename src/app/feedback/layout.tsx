@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { absoluteUrl } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Visitor Feedback — Birdman of Chennai',
@@ -35,13 +36,13 @@ const breadcrumbSchema = {
       '@type': 'ListItem',
       position: 1,
       name: 'Home',
-      item: 'https://birdmanofchennai.com',
+      item: absoluteUrl('/'),
     },
     {
       '@type': 'ListItem',
       position: 2,
       name: 'Visitor Feedback',
-      item: 'https://birdmanofchennai.com/feedback',
+      item: absoluteUrl('/feedback'),
     },
   ],
 };

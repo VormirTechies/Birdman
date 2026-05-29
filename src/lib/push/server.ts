@@ -9,7 +9,7 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY?.replace(/['"]/g, '').tr
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    'mailto:admin@birdmanofchennai.com',
+    'mailto:admin@parrotsudarson.org',
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
   );

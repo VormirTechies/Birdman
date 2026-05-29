@@ -5,7 +5,7 @@ import { pushSubscriptions } from '@/lib/db/schema';
 // Configure VAPID
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    'mailto:admin@birdmanofchennai.com',
+    'mailto:admin@parrotsudarson.org',
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );

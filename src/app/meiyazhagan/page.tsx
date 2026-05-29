@@ -11,8 +11,7 @@ import {
   StaggerItem,
 } from '@/components/ui/animated-section';
 import { Button } from '@/components/ui/button';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app';
+import { absoluteUrl, siteConfig } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Meiyazhagan & the Birdman of Chennai — The Real Story Behind the Film',
@@ -31,14 +30,13 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: '/meiyazhagan',
-    languages: { 'en-IN': '/meiyazhagan', 'ta-IN': '/ta/meiyazhagan' },
   },
   openGraph: {
     title: 'Meiyazhagan & the Birdman of Chennai — The Real Story',
     description:
       "Before Meiyazhagan captured hearts on screen, Sudarson Sah was living that story every day on a rooftop in Chintadripet. Meet the real Birdman of Chennai.",
-    url: `${BASE_URL}/meiyazhagan`,
-    images: [{ url: '/images/og-image.png', width: 1200, height: 1200 }],
+    url: absoluteUrl('/meiyazhagan'),
+    images: [{ url: absoluteUrl('/images/og-image.png'), width: 1200, height: 1200 }],
   },
 };
 
@@ -87,17 +85,17 @@ export default function MeiyazhaganPage() {
     headline: 'Meiyazhagan and the Real Birdman of Chennai: Sudarson Sah',
     description:
       "The Tamil film Meiyazhagan brought wider attention to the story of Sudarson Sah, the Birdman of Chennai, whose real-life devotion to feeding ~6,000 wild parakeets daily echoes the film's themes of human-nature connection.",
-    url: `${BASE_URL}/meiyazhagan`,
-    image: `${BASE_URL}/images/og-image.png`,
+    url: absoluteUrl('/meiyazhagan'),
+    image: absoluteUrl('/images/og-image.png'),
     author: {
       '@type': 'Person',
       name: 'Sudarson Sah',
-      url: BASE_URL,
+      url: siteConfig.url,
     },
     publisher: {
       '@type': 'Organization',
       name: 'Birdman of Chennai',
-      url: BASE_URL,
+      url: siteConfig.url,
     },
     about: {
       '@type': 'Movie',
