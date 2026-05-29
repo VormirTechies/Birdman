@@ -9,8 +9,7 @@ import { Footer } from '@/components/organisms/Footer';
 import { AnimatedSection } from '@/components/ui/animated-section';
 import { Button } from '@/components/ui/button';
 import { blogPosts, getBlogPost } from '@/lib/blog';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app';
+import { absoluteUrl, siteConfig } from '@/lib/site';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -31,18 +30,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: post.keywords,
     alternates: {
       canonical: `/blog/${post.slug}`,
-      languages: {
-        'en-IN': `/blog/${post.slug}`,
-        'ta-IN': `/ta/blog/${post.slug}`,
-      },
     },
     openGraph: {
       title: post.title,
       description: post.description,
-      url: `${BASE_URL}/blog/${post.slug}`,
+      url: absoluteUrl(`/blog/${post.slug}`),
       type: 'article',
       publishedTime: post.publishedAt,
-      images: [{ url: `${BASE_URL}${post.coverImage}`, width: 1200, height: 630 }],
+      images: [{ url: absoluteUrl(post.coverImage), width: 1200, height: 630 }],
     },
   };
 }
@@ -59,24 +54,24 @@ export default async function BlogArticlePage({ params }: Props) {
     '@type': 'BlogPosting',
     headline: post.title,
     description: post.description,
-    image: `${BASE_URL}${post.coverImage}`,
+    image: absoluteUrl(post.coverImage),
     datePublished: post.publishedAt,
-    url: `${BASE_URL}/blog/${post.slug}`,
+    url: absoluteUrl(`/blog/${post.slug}`),
     keywords: post.keywords.join(', '),
     articleSection: post.category,
     author: {
       '@type': 'Organization',
       name: 'Birdman of Chennai',
-      url: BASE_URL,
+      url: siteConfig.url,
     },
     publisher: {
       '@type': 'Organization',
       name: 'Birdman of Chennai',
-      url: BASE_URL,
+      url: siteConfig.url,
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `${BASE_URL}/blog/${post.slug}`,
+      '@id': absoluteUrl(`/blog/${post.slug}`),
     },
   };
 

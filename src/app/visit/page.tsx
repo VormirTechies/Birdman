@@ -14,8 +14,7 @@ import {
   StaggerItem,
 } from '@/components/ui/animated-section';
 import { Button } from '@/components/ui/button';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app';
+import { absoluteUrl } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Visit the Birdman of Chennai — Timings, Address & How to Get There',
@@ -35,14 +34,13 @@ export const metadata: Metadata = {
   ],
   alternates: {
     canonical: '/visit',
-    languages: { 'en-IN': '/visit', 'ta-IN': '/ta/visit' },
   },
   openGraph: {
     title: 'Visit the Birdman of Chennai — Timings, Address & Directions',
     description:
       "Every evening at 4:30 PM, ~6,000 wild rose-ringed parakeets descend on a rooftop in Chintadripet, Chennai. Free entry. Here's everything you need to plan a perfect visit.",
-    url: `${BASE_URL}/visit`,
-    images: [{ url: '/images/og-image.png', width: 1200, height: 1200 }],
+    url: absoluteUrl('/visit'),
+    images: [{ url: absoluteUrl('/images/og-image.png'), width: 1200, height: 1200 }],
   },
 };
 
@@ -187,8 +185,8 @@ export default function VisitPage() {
     name: 'Birdman of Chennai — Parakeet Sanctuary',
     description:
       "Daily gathering of ~6,000 wild rose-ringed parakeets at Sudarson Sah's rooftop sanctuary in Chintadripet, Chennai.",
-    url: `${BASE_URL}/visit`,
-    image: `${BASE_URL}/images/og-image.png`,
+    url: absoluteUrl('/visit'),
+    image: absoluteUrl('/images/og-image.png'),
     address: {
       '@type': 'PostalAddress',
       streetAddress: 'Iyya Mudali Street',

@@ -8,7 +8,7 @@ const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(
-    'mailto:admin@birdmanofchennai.com',
+    'mailto:admin@parrotsudarson.org',
     vapidPublicKey,
     vapidPrivateKey
   );

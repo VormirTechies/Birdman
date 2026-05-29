@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter, Noto_Sans_Tamil } from "next/font/google";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import Script from "next/script";
+import { absoluteUrl, siteConfig } from "@/lib/site";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -24,11 +25,13 @@ const notoSansTamil = Noto_Sans_Tamil({
   display: "swap",
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://birdmanofchennai.vercel.app';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(BASE_URL),
-  title: "The Birdman of Chennai — Sudarson Sah's Parakeet Sanctuary",
+  metadataBase: new URL(siteConfig.url),
+  applicationName: siteConfig.name,
+  title: {
+    default: siteConfig.title,
+    template: "%s | Birdman of Chennai",
+  },
   description:
     "Witness the daily miracle of ~6,000 wild rose-ringed parakeets gathering at Mr. Sudarson Sah's rooftop sanctuary in Chintadripet, Chennai. Book your free visit and experience 16 years of extraordinary urban bird conservation.",
   keywords: [
@@ -44,11 +47,21 @@ export const metadata: Metadata = {
     "Iyya Mudali Street",
   ],
   authors: [{ name: "Sudarson Sah" }],
+  creator: "Birdman of Chennai",
+  publisher: "Birdman of Chennai",
+  category: "Travel",
   alternates: {
     canonical: '/',
-    languages: {
-      'en-IN': '/',
-      'ta-IN': '/ta',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
     },
   },
   openGraph: {
@@ -56,12 +69,12 @@ export const metadata: Metadata = {
     description:
       "Every evening at 4:30 PM, ~6,000 wild rose-ringed parakeets descend on Sudarson Sah's rooftop in Chintadripet, Chennai. Witness this daily miracle — free entry, book your visit.",
     type: "website",
-    url: BASE_URL,
+    url: siteConfig.url,
     siteName: "Birdman of Chennai",
     locale: "en_IN",
     images: [
       {
-        url: "/images/og-image.png",
+        url: absoluteUrl("/images/og-image.png"),
         width: 1200,
         height: 1200,
         alt: "Artistic depiction of Sudarson Sah (The Birdman of Chennai) feeding thousands of rose-ringed parakeets on his rooftop sanctuary",
@@ -75,6 +88,11 @@ export const metadata: Metadata = {
       "Every evening, ~6,000 wild parakeets land on one man's rooftop in Chennai. Sudarson Sah has fed them daily for 16 years. Book a free visit.",
     images: ["/images/og-image.png"],
   },
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -99,12 +117,12 @@ export default function RootLayout({
               {
                 "@context": "https://schema.org",
                 "@type": "LocalBusiness",
-                "@id": `${BASE_URL}/#business`,
+                "@id": `${siteConfig.url}/#business`,
                 "name": "Birdman of Chennai Parakeet Sanctuary",
                 "alternateName": "Kili Sudarson's Sanctuary",
-                "image": `${BASE_URL}/images/banner_hd.png`,
+                "image": absoluteUrl("/images/banner_hd.png"),
                 "description": "A unique urban bird sanctuary in Chintadripet, Chennai, where ~6,000 wild rose-ringed parakeets are fed daily by Mr. Sudarson Sah. Inspired the Tamil film Meiyazhagan (2024). Free entry — book your visit.",
-                "url": BASE_URL,
+                "url": siteConfig.url,
                 "priceRange": "Free",
                 "address": {
                   "@type": "PostalAddress",
@@ -134,7 +152,7 @@ export default function RootLayout({
               {
                 "@context": "https://schema.org",
                 "@type": "Person",
-                "@id": `${BASE_URL}/#sudarson-sah`,
+                "@id": `${siteConfig.url}/#sudarson-sah`,
                 "name": "Sudarson Sah",
                 "alternateName": ["Kili Sudarson", "Parrot Sudarson", "Birdman of Chennai"],
                 "jobTitle": "Urban Bird Conservationist",
@@ -148,7 +166,7 @@ export default function RootLayout({
                 },
                 "spouse": { "@type": "Person", "name": "Vithya Sah" },
                 "knowsAbout": ["Rose-ringed Parakeets", "Urban Wildlife Conservation", "Bird Feeding"],
-                "url": `${BASE_URL}/story`,
+                "url": absoluteUrl("/story"),
                 "sameAs": [
                   "https://thefederal.com/category/features/meiyazhagan-chennai-birdman-parrots-167626",
                   "https://www.newindianexpress.com/magazine/2025/Aug/10/the-wind-beneath-their-wings",
@@ -158,10 +176,10 @@ export default function RootLayout({
               {
                 "@context": "https://schema.org",
                 "@type": "Event",
-                "@id": `${BASE_URL}/#daily-feeding`,
+                "@id": `${siteConfig.url}/#daily-feeding`,
                 "name": "Daily Parakeet Feeding at Birdman of Chennai Sanctuary",
                 "description": "Every evening, ~6,000 wild rose-ringed parakeets descend on Sudarson Sah's rooftop terrace in Chintadripet, Chennai, for their daily feeding. Free entry — visitors must book in advance and maintain silence during the feeding.",
-                "image": `${BASE_URL}/images/banner_hd.png`,
+                "image": absoluteUrl("/images/banner_hd.png"),
                 "startDate": "2026-01-01T16:30:00+05:30",
                 "endDate": "2026-12-31T18:30:00+05:30",
                 "eventSchedule": {
@@ -172,7 +190,7 @@ export default function RootLayout({
                   "scheduleTimezone": "Asia/Kolkata"
                 },
                 "isAccessibleForFree": true,
-                "organizer": { "@id": `${BASE_URL}/#sudarson-sah` },
+                "organizer": { "@id": `${siteConfig.url}/#sudarson-sah` },
                 "location": {
                   "@type": "Place",
                   "name": "Birdman of Chennai Parakeet Sanctuary",
@@ -187,44 +205,7 @@ export default function RootLayout({
                 },
                 "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
                 "eventStatus": "https://schema.org/EventScheduled",
-                "url": `${BASE_URL}/book`
-              },
-              {
-                "@context": "https://schema.org",
-                "@type": "LocalBusiness",
-                "@id": `${BASE_URL}/#business`,
-                "name": "Birdman of Chennai Parakeet Sanctuary",
-                "aggregateRating": {
-                  "@type": "AggregateRating",
-                  "ratingValue": "5",
-                  "bestRating": "5",
-                  "worstRating": "1",
-                  "ratingCount": "14000",
-                  "reviewCount": "3"
-                },
-                "review": [
-                  {
-                    "@type": "Review",
-                    "author": { "@type": "Person", "name": "Priya Sundaram" },
-                    "datePublished": "2026-03-01",
-                    "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
-                    "reviewBody": "An absolutely magical experience! Watching thousands of parakeets arrive at feeding time is something I will never forget. Mr. Sah is truly an inspiration."
-                  },
-                  {
-                    "@type": "Review",
-                    "author": { "@type": "Person", "name": "Raj Krishnamurthy" },
-                    "datePublished": "2026-02-01",
-                    "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
-                    "reviewBody": "We visited during the evening session and it was breathtaking. The birds know him by heart. A must-visit for anyone in Chennai."
-                  },
-                  {
-                    "@type": "Review",
-                    "author": { "@type": "Person", "name": "Sarah Mitchell" },
-                    "datePublished": "2026-01-01",
-                    "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
-                    "reviewBody": "I traveled from London specifically to see this. It exceeded all expectations. The connection between Mr. Sah and these birds is truly extraordinary."
-                  }
-                ]
+                "url": absoluteUrl("/book")
               }
             ]),
           }}

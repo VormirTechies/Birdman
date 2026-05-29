@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
+import { absoluteUrl, siteConfig } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Sudarson Sah — The Birdman of Chennai | 16 Years of Wild Parakeets',
@@ -34,11 +35,11 @@ const videoObjectSchema = {
   name: 'The Birdman of Chennai — Sudarson Sah Story',
   description:
     'Watch ~6,000 wild rose-ringed parakeets descend on Sudarson Sah\'s rooftop in Chintadripet, Chennai, for their daily evening feeding.',
-  thumbnailUrl: 'https://birdmanofchennai.com/images/banner_hd.png',
+  thumbnailUrl: absoluteUrl('/images/banner_hd.png'),
   uploadDate: '2024-01-01',
   contentUrl:
     'https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Birdman_story_wide.mp4',
-  author: { '@id': 'https://birdmanofchennai.com/#sudarson-sah' },
+  author: { '@id': `${siteConfig.url}/#sudarson-sah` },
 };
 
 const breadcrumbSchema = {
@@ -49,13 +50,13 @@ const breadcrumbSchema = {
       '@type': 'ListItem',
       position: 1,
       name: 'Home',
-      item: 'https://birdmanofchennai.com',
+      item: absoluteUrl('/'),
     },
     {
       '@type': 'ListItem',
       position: 2,
       name: 'The Story',
-      item: 'https://birdmanofchennai.com/story',
+      item: absoluteUrl('/story'),
     },
   ],
 };
