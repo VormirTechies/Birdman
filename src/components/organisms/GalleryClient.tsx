@@ -54,30 +54,6 @@ function SkeletonCard({ index }: { index: number }) {
 const PAGE_SIZE = 15;
 const VIDEO_URL =
   "https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan_wide.mp4";
-
-// ── Module-level blob-URL cache ────────────────────────────────────────────────
-// Module variables survive re-renders, Strict-Mode double-mounts, and in-tab
-// navigations — the video is fetched at most ONCE per tab session.
-let _galleryBlobUrl: string | null = null;
-let _galleryFetch: Promise<string> | null = null;
-
-function loadGalleryVideo(): Promise<string> {
-  if (_galleryBlobUrl) return Promise.resolve(_galleryBlobUrl);
-  if (!_galleryFetch) {
-    _galleryFetch = fetch(VIDEO_URL)
-      .then((r) => r.blob())
-      .then((blob) => {
-        _galleryBlobUrl = URL.createObjectURL(blob);
-        _galleryFetch = null;
-        return _galleryBlobUrl;
-      })
-      .catch(() => {
-        _galleryFetch = null;
-        return VIDEO_URL; // fallback to direct URL on error
-      });
-  }
-  return _galleryFetch;
-}
 // ──────────────────────────────────────────────────────────────────────────────
 
 export function GalleryClient({
@@ -87,8 +63,7 @@ export function GalleryClient({
   const [images, setImages] = useState<GalleryImage[]>(initialImages);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialImages.length < totalCount);
-  const [muted, setMuted] = useState(false);
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [muted, setMuted] = useState(true);
   const [videoReady, setVideoReady] = useState(false);
   const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({
     open: false,
@@ -98,11 +73,6 @@ export function GalleryClient({
   const videoRef = useRef<HTMLVideoElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(initialImages.length);
-  // ── Load video blob once per session ─────────────────────────────────────────
-
-  useEffect(() => {
-    loadGalleryVideo().then(setVideoSrc);
-  }, []);
   // ── Mute toggle ──────────────────────────────────────────────────────────────
 
   const toggleMute = () => {
@@ -192,19 +162,19 @@ export function GalleryClient({
         {/* Fallback gradient visible while video loads */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,176,140,0.08),transparent_70%)]" />
 
-        {videoSrc && (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            autoPlay
-            loop
-            playsInline
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
-              videoReady ? "opacity-100" : "opacity-0"
-            }`}
-            onCanPlay={() => setVideoReady(true)}
-          />
-        )}
+        <video
+          ref={videoRef}
+          src={VIDEO_URL}
+          autoPlay
+          muted={muted}
+          loop
+          playsInline
+          preload="metadata"
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+            videoReady ? "opacity-100" : "opacity-0"
+          }`}
+          onCanPlay={() => setVideoReady(true)}
+        />
 
         {/* Overlay gradient */}
         <div className="absolute inset-0 bg-linear-to-t from-canopy-dark/85 via-canopy-dark/20 to-transparent" />
