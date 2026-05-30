@@ -18,6 +18,7 @@ import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatBookingNumber } from '@/lib/booking-number';
 
 interface InstantBookingModalProps {
   open: boolean;
@@ -71,6 +72,7 @@ export function InstantBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [bookingId, setBookingId] = useState<string>('');
+  const [bookingNumber, setBookingNumber] = useState<number | null>(null);
   const [visitorMatch, setVisitorMatch] = useState<VisitorLookupResult | null>(null);
   const lookupTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -91,6 +93,7 @@ export function InstantBookingModal({
         setErrors({});
         setShowSuccess(false);
         setBookingId('');
+        setBookingNumber(null);
         setVisitorMatch(null);
       }, 200);
     }
@@ -210,6 +213,7 @@ export function InstantBookingModal({
 
       // Show success state
       setBookingId(data.booking.id);
+      setBookingNumber(data.booking.bookingNumber ?? null);
       setShowSuccess(true);
 
       // Call success callback
@@ -219,7 +223,7 @@ export function InstantBookingModal({
 
       // Show success toast
       toast.success('Booking created successfully!', {
-        description: `Booking ID: ${data.booking.id.slice(0, 8)}... for ${formData.visitorName}`,
+        description: `Booking ID: ${data.booking.bookingNumber ? formatBookingNumber(data.booking.bookingNumber) : data.booking.id.slice(0, 8)} for ${formData.visitorName}`,
       });
 
       // Auto-close modal after 2 seconds
@@ -249,6 +253,7 @@ export function InstantBookingModal({
     setErrors({});
     setShowSuccess(false);
     setBookingId('');
+    setBookingNumber(null);
   };
 
   if (showSuccess) {
@@ -267,7 +272,9 @@ export function InstantBookingModal({
             </p>
             <div className="bg-[#F5F5F5] rounded-xl p-4 w-full mb-6">
               <div className="text-xs text-[#616161] mb-1">Booking ID</div>
-              <div className="text-sm font-mono text-[#212121] break-all">{bookingId}</div>
+              <div className="text-sm font-mono text-[#212121] break-all">
+                {bookingNumber ? formatBookingNumber(bookingNumber) : bookingId}
+              </div>
             </div>
             <div className="flex gap-3 w-full">
               <Button

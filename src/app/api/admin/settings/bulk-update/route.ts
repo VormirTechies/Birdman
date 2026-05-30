@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
     let cancelledBookingsCount = 0;
     let cancelledBookings: Array<{ 
       id: string; 
+      bookingNumber: number;
       email: string | null; 
       visitorName: string; 
       bookingDate: string; 

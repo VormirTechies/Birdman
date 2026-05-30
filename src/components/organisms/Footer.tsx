@@ -12,6 +12,7 @@ const quickLinks = [
   { href: '/meiyazhagan', label: 'Meiyazhagan Connection' },
   { href: '/blog', label: 'Blog' },
   { href: '/book', label: 'Book a Visit' },
+  { href: '/booking-status', label: 'Manage Booking' },
   { href: '/feedback', label: 'Visitor Reviews' },
 ];
 

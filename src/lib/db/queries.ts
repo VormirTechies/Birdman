@@ -9,7 +9,52 @@ import { eq, and, asc, desc, gt, gte, sql } from 'drizzle-orm';
 
 // ─── Create Booking ──────────────────────────────────────────────────────────
 
+let bookingNumberColumnReady = false;
+
+export async function ensureBookingNumberColumn(): Promise<void> {
+  if (bookingNumberColumnReady) return;
+
+  await db.execute(sql`
+    CREATE SEQUENCE IF NOT EXISTS bookings_booking_number_seq;
+
+    ALTER TABLE bookings
+      ADD COLUMN IF NOT EXISTS booking_number integer;
+
+    WITH base AS (
+      SELECT COALESCE(MAX(booking_number), 0) AS max_number
+      FROM bookings
+      WHERE booking_number IS NOT NULL
+    ),
+    numbered AS (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY created_at, id) AS row_number
+      FROM bookings
+      WHERE booking_number IS NULL
+    )
+    UPDATE bookings
+    SET booking_number = base.max_number + numbered.row_number
+    FROM base, numbered
+    WHERE bookings.id = numbered.id;
+
+    SELECT setval(
+      'bookings_booking_number_seq',
+      GREATEST((SELECT COALESCE(MAX(booking_number), 0) FROM bookings), 1),
+      true
+    );
+
+    ALTER TABLE bookings
+      ALTER COLUMN booking_number SET DEFAULT nextval('bookings_booking_number_seq'),
+      ALTER COLUMN booking_number SET NOT NULL;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS bookings_booking_number_unique_idx
+      ON bookings (booking_number);
+  `);
+
+  bookingNumberColumnReady = true;
+}
+
 export async function createBooking(data: NewBooking): Promise<Booking> {
+  await ensureBookingNumberColumn();
+
   const [booking] = await db
     .insert(bookings)
     .values({
@@ -26,6 +71,8 @@ export async function createBooking(data: NewBooking): Promise<Booking> {
 // ─── Get Booking by ID ───────────────────────────────────────────────────────
 
 export async function getBookingById(id: string): Promise<Booking | undefined> {
+  await ensureBookingNumberColumn();
+
   return db.query.bookings.findFirst({
     where: eq(bookings.id, id),
   });
@@ -47,6 +94,8 @@ export async function getBookings(params: {
   sortDir?: 'asc' | 'desc';
 }): Promise<{ bookings: (Booking & { visitor: Visitor | null })[]; total: number }> {
   const { status, date, minDate, search, limit = 50, offset = 0, sort, visitedFilter, sortBy, sortDir = 'desc' } = params;
+  await ensureBookingNumberColumn();
+
   const today = new Date().toISOString().split('T')[0];
 
   // 1. BASE CONDITIONS
@@ -127,6 +176,8 @@ export async function getBookings(params: {
 // ─── Get Bookings by Date ────────────────────────────────────────────────────
 
 export async function getBookingsByDate(date: string): Promise<Booking[]> {
+  await ensureBookingNumberColumn();
+
   return db.query.bookings.findMany({
     where: eq(bookings.bookingDate, date),
     orderBy: [desc(bookings.bookingTime)],
@@ -136,6 +187,8 @@ export async function getBookingsByDate(date: string): Promise<Booking[]> {
 // ─── Get Bookings Needing Reminders ──────────────────────────────────────────
 
 export async function getBookingsNeedingReminders(date: string): Promise<Booking[]> {
+  await ensureBookingNumberColumn();
+
   return db.query.bookings.findMany({
     where: and(
       eq(bookings.bookingDate, date),
@@ -151,6 +204,8 @@ export async function updateBooking(
   id: string,
   data: Partial<NewBooking>
 ): Promise<Booking | undefined> {
+  await ensureBookingNumberColumn();
+
   const [updated] = await db
     .update(bookings)
     .set({
@@ -191,6 +246,8 @@ export async function markConfirmationSent(id: string): Promise<void> {
 // ─── Cancel Booking ──────────────────────────────────────────────────────────
 
 export async function cancelBooking(id: string): Promise<Booking | undefined> {
+  await ensureBookingNumberColumn();
+
   const [cancelled] = await db
     .update(bookings)
     .set({
@@ -239,6 +296,8 @@ export async function deleteVerificationCode(id: string) {
 // ─── Admin Dashboard Queries ──────────────────────────────────────────────────
 
 export async function getTodayBookings() {
+  await ensureBookingNumberColumn();
+
   const today = new Date().toISOString().split('T')[0];
   return db.query.bookings.findMany({
     where: eq(bookings.bookingDate, today),
@@ -247,6 +306,8 @@ export async function getTodayBookings() {
 }
 
 export async function getAllBookings(limit = 100) {
+  await ensureBookingNumberColumn();
+
   return db.query.bookings.findMany({
     orderBy: [desc(bookings.createdAt)],
     limit,
@@ -254,6 +315,8 @@ export async function getAllBookings(limit = 100) {
 }
 
 export async function getDashboardStats() {
+  await ensureBookingNumberColumn();
+
   const today = new Date().toISOString().split('T')[0];
   
   const all = await db.query.bookings.findMany();
@@ -279,6 +342,8 @@ export async function getDashboardStats() {
 // ─── Get Booking Stats (Optimized with SQL Aggregation) ──────────────────────
 
 export async function getBookingStats() {
+  await ensureBookingNumberColumn();
+
   const today = new Date().toISOString().split('T')[0];
   const next30 = new Date();
   next30.setDate(next30.getDate() + 30);
@@ -523,6 +588,8 @@ export async function getDayDetails(date: string): Promise<{
     percentage: number;
   };
 }> {
+  await ensureBookingNumberColumn();
+
   // Get settings for this date (or use defaults)
   const settings = await db.query.calendarSettings.findFirst({
     where: eq(calendarSettings.date, date),
@@ -623,6 +690,8 @@ export async function upsertCalendarSettings(data: {
 // Daily visitor checklist: fetch visitors for a date and toggle visited status
 
 export async function getChecklistForDate(date: string): Promise<Booking[]> {
+  await ensureBookingNumberColumn();
+
   return db.query.bookings.findMany({
     where: and(
       eq(bookings.bookingDate, date),
@@ -637,6 +706,8 @@ export async function getChecklistForDate(date: string): Promise<Booking[]> {
 }
 
 export async function toggleVisited(id: string, visited: boolean): Promise<Booking | undefined> {
+  await ensureBookingNumberColumn();
+
   const [updated] = await db
     .update(bookings)
     .set({
@@ -658,6 +729,7 @@ export async function cancelBookingsForDates(
   endDate: string
 ): Promise<Array<{ 
   id: string; 
+  bookingNumber: number;
   email: string | null; 
   visitorName: string; 
   bookingDate: string; 
@@ -665,6 +737,8 @@ export async function cancelBookingsForDates(
   children: number;
   numberOfGuests: number;
 }>> {
+  await ensureBookingNumberColumn();
+
   const cancelled = await db
     .update(bookings)
     .set({
@@ -682,6 +756,7 @@ export async function cancelBookingsForDates(
 
   return cancelled.map(booking => ({
     id: booking.id,
+    bookingNumber: booking.bookingNumber,
     email: booking.email,
     visitorName: booking.visitorName,
     bookingDate: booking.bookingDate,

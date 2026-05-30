@@ -18,6 +18,7 @@ interface BookingConfirmationProps {
   children: number;
   numberOfGuests?: number; // Deprecated, kept for backward compatibility
   bookingId: string;
+  manageUrl?: string;
 }
 
 export default function BookingConfirmation({
@@ -27,6 +28,7 @@ export default function BookingConfirmation({
   adults,
   children,
   bookingId,
+  manageUrl,
 }: BookingConfirmationProps) {
 
   return (
@@ -253,9 +255,11 @@ export default function BookingConfirmation({
 
           {/* CTA Buttons */}
           <Section style={styles.buttonContainer}>
-            {/* <Link href={`${baseUrl}/admin`} style={styles.primaryButton}>
-              View Details / Reschedule
-            </Link> */}
+            {manageUrl && (
+              <Link href={manageUrl} style={styles.primaryButton}>
+                Manage Booking
+              </Link>
+            )}
             <Link
               href="https://maps.app.goo.gl/G76qA7qZAJ3g44Pu9"
               style={styles.secondaryButton}

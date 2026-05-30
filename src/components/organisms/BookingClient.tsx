@@ -43,6 +43,7 @@ import {
   Baby,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatBookingNumber } from '@/lib/booking-number';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,7 @@ export function BookingClient() {
   const [submitError, setSubmitError] = useState('');
   const [bookingResult, setBookingResult] = useState<{
     id: string;
+    bookingNumber?: number;
     date: string;
     adults: number;
     children: number;
@@ -302,6 +304,7 @@ export function BookingClient() {
       }
       setBookingResult({
         id: result.booking?.id ?? result.id ?? '',
+        bookingNumber: result.booking?.bookingNumber,
         date: formData.date ? format(formData.date, 'PPP') : '',
         adults: formData.adults,
         children: formData.children,
@@ -401,10 +404,17 @@ export function BookingClient() {
                   <h2 className="font-display font-bold text-2xl md:text-3xl text-canopy-dark">
                     Plan Your Visit
                   </h2>
-                  <p className="text-canopy-dark/50 mt-1 text-sm">
-                    Select a date and fill in your details
-                  </p>
-                </div>
+            <p className="text-canopy-dark/50 mt-1 text-sm">
+              Select a date and fill in your details
+            </p>
+            <Link
+              href="/booking-status"
+              className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sanctuary-green hover:text-canopy-dark transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Already booked? Check or manage your booking
+            </Link>
+          </div>
 
                 <div className="bg-white rounded-3xl shadow-card overflow-hidden">
                   <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-canopy-dark/5">
@@ -945,7 +955,9 @@ export function BookingClient() {
                       Booking ID
                     </div>
                     <div className="font-mono font-bold text-lg text-sanctuary-green tracking-wider">
-                      #{bookingResult.id.slice(-8).toUpperCase()}
+                      {bookingResult.bookingNumber
+                        ? formatBookingNumber(bookingResult.bookingNumber)
+                        : `#${bookingResult.id.slice(-8).toUpperCase()}`}
                     </div>
                   </div>
                   <div className="bg-morning-mist rounded-xl p-5 text-center">
@@ -1004,10 +1016,10 @@ export function BookingClient() {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex gap-3">
+                <div className="grid sm:grid-cols-3 gap-3">
                   <Button
                     asChild
-                    className="flex-1 bg-canopy-dark hover:bg-sanctuary-green text-white rounded-xl h-12 gap-2 transition-all"
+                    className="bg-canopy-dark hover:bg-sanctuary-green text-white rounded-xl h-12 gap-2 transition-all"
                   >
                     <Link href="/">
                       <Home className="w-4 h-4" />
@@ -1017,7 +1029,17 @@ export function BookingClient() {
                   <Button
                     asChild
                     variant="outline"
-                    className="flex-1 rounded-xl h-12 gap-2 border-canopy-dark/15"
+                    className="rounded-xl h-12 gap-2 border-sanctuary-green/30 text-sanctuary-green hover:bg-sanctuary-green/5"
+                  >
+                    <Link href="/booking-status">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Manage
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="rounded-xl h-12 gap-2 border-canopy-dark/15"
                   >
                     <a
                       href={process.env.NEXT_PUBLIC_MAP_LINK}

@@ -20,6 +20,7 @@ interface BookingRescheduleProps {
   children: number;
   numberOfGuests?: number; // Deprecated
   bookingId: string;
+  manageUrl?: string;
 }
 
 export default function BookingReschedule({
@@ -31,9 +32,10 @@ export default function BookingReschedule({
   adults,
   children,
   bookingId,
+  manageUrl,
 }: BookingRescheduleProps) {
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "https://birdmanofchennai.com";
+    process.env.NEXT_PUBLIC_BASE_URL || "https://www.parrotsudarson.org";
 
   return (
     <Html>
@@ -210,10 +212,10 @@ export default function BookingReschedule({
           {/* CTA Button */}
           <Section style={styles.buttonContainer}>
             <Link
-              href={`${baseUrl}/admin`}
+              href={manageUrl ?? `${baseUrl}/booking-status`}
               style={styles.primaryButton}
             >
-              View Updated Booking
+              Manage Booking
             </Link>
           </Section>
 
