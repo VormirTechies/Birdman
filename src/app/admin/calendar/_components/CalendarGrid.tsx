@@ -49,8 +49,11 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
       setLoading(true);
       try {
         const visibleMonths = [-1, 0, 1].map((offset) => {
-          const date = new Date(currentMonth);
-          date.setMonth(date.getMonth() + offset);
+          const date = new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() + offset,
+            1
+          );
           return {
             year: date.getFullYear(),
             month: date.getMonth() + 1,
