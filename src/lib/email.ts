@@ -31,7 +31,19 @@ function getTransporter() {
 }
 
 // Email sender configuration
-const FROM_EMAIL = process.env.EMAIL_FROM || '"Birdman of Chennai" <vigneshwaran7797@gmail.com>';
+const FROM_EMAIL = process.env.EMAIL_FROM || 'Birdman of Chennai <parrotsudarson@gmail.com>';
+
+function getMailDefaults() {
+  const cc = (process.env.EMAIL_CC || '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  return {
+    from: FROM_EMAIL,
+    ...(cc.length > 0 ? { cc } : {}),
+  };
+}
 
 // ─── Send Booking Confirmation ───────────────────────────────────────────────
 
@@ -63,7 +75,7 @@ export async function sendBookingConfirmation(booking: Booking): Promise<{
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '🦜 Booking Confirmed — Birdman of Chennai',
       html: emailHtml,
@@ -104,7 +116,7 @@ export async function sendBookingReminder(booking: Booking): Promise<{
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '⏰ Reminder: Your Visit is Today! — Birdman of Chennai',
       html: emailHtml,
@@ -152,7 +164,7 @@ export async function sendRescheduleNotification(
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '📅 Booking Rescheduled — Birdman of Chennai',
       html: emailHtml,
@@ -204,7 +216,7 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
     `;
 
     await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: email,
       subject: '🔐 Verification Code: Admin Profile Update — Birdman of Chennai',
       html: htmlBody,
@@ -247,7 +259,7 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '🦜 Booking Cancellation Notice — Birdman of Chennai',
       html: emailHtml,
@@ -348,7 +360,7 @@ export async function sendVipWelcomeEmail(
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '⭐ Welcome Back, VIP! — Birdman of Chennai',
       html: emailHtml,
