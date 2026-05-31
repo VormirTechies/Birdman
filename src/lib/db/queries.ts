@@ -354,18 +354,18 @@ export async function getBookingStats() {
 
   // Execute all stats queries in parallel for performance
   const [todayResult, next30Result, last30Result, totalResult] = await Promise.all([
-    // Today's visitors (confirmed bookings only)
+    // Today's guests (confirmed bookings only)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
       .where(and(
         eq(bookings.bookingDate, today),
         eq(bookings.status, 'confirmed')
       )),
     
-    // Next 30 days (confirmed bookings only)
+    // Next 30 days guests (confirmed bookings only)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
       .where(and(
         sql`${bookings.bookingDate} >= ${today}`,
@@ -373,9 +373,9 @@ export async function getBookingStats() {
         eq(bookings.status, 'confirmed')
       )),
     
-    // Last 30 days (completed + confirmed)
+    // Last 30 days guests (completed + confirmed)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
       .where(and(
         sql`${bookings.bookingDate} >= ${last30Str}`,
@@ -383,9 +383,9 @@ export async function getBookingStats() {
         sql`${bookings.status} IN ('completed', 'confirmed')`
       )),
     
-    // Total visitors (completed bookings only)
+    // Total guests (completed bookings only)
     db
-      .select({ total: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)` })
+      .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
       .where(eq(bookings.status, 'completed'))
   ]);
