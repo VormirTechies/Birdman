@@ -524,7 +524,7 @@ export async function getMonthlyBookingStats(year: number, month: number): Promi
     .select({
       date: bookings.bookingDate,
       count: sql<number>`COUNT(*)::int`,
-      guestSum: sql<number>`COALESCE(SUM(${bookings.numberOfGuests}), 0)::int`,
+      guestSum: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)::int`,
     })
     .from(bookings)
     .where(and(
