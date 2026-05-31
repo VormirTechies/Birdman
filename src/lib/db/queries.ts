@@ -373,21 +373,21 @@ export async function getBookingStats() {
         eq(bookings.status, 'confirmed')
       )),
     
-    // Last 30 days guests (completed + confirmed)
+    // Last 30 days guests who were checked in
     db
       .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
       .where(and(
         sql`${bookings.bookingDate} >= ${last30Str}`,
         sql`${bookings.bookingDate} < ${today}`,
-        sql`${bookings.status} IN ('completed', 'confirmed')`
+        eq(bookings.visited, true)
       )),
     
-    // Total guests (completed bookings only)
+    // Total guests who were checked in
     db
       .select({ total: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)` })
       .from(bookings)
-      .where(eq(bookings.status, 'completed'))
+      .where(eq(bookings.visited, true))
   ]);
 
   return {
