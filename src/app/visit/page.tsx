@@ -271,7 +271,7 @@ export default function VisitPage() {
             className="object-cover opacity-40"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-canopy-dark/60 via-canopy-dark/30 to-canopy-dark/80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-canopy-dark/45 via-canopy-dark/20 to-canopy-dark/65" />
         </div>
         <div className="container-wide relative z-10">
           <AnimatedSection>
@@ -289,6 +289,29 @@ export default function VisitPage() {
                 Every evening at 4:30 PM, ~6,000 wild rose-ringed parakeets descend on one
                 rooftop in Chintadripet. Here&apos;s everything you need to plan a perfect visit.
               </p>
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-fit bg-sanctuary-green hover:bg-sanctuary-green-light text-white rounded-full px-8 gap-2 shadow-glow-green"
+                >
+                  <Link href="/book">
+                    <Calendar className="w-5 h-5" />
+                    Book a Free Visit
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="w-fit border-white/30 text-white hover:bg-white/10 rounded-full px-8 gap-2"
+                >
+                  <Link href="/booking-status">
+                    Manage Booking
+                    <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
           </AnimatedSection>
         </div>
