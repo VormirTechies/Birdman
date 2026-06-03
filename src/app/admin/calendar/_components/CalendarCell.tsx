@@ -63,7 +63,7 @@ export function CalendarCell({
         'flex flex-col items-start justify-between',
         'hover:shadow-md',
         getCellBackground(),
-        isCurrentMonth ? 'cursor-pointer' : 'cursor-default opacity-40',
+        isCurrentMonth ? 'cursor-pointer' : 'cursor-default opacity-50',
         // isToday && 'ring-2 ring-blue-500',
         !isCurrentMonth && 'pointer-events-none'
       )}
@@ -80,7 +80,7 @@ export function CalendarCell({
       </span>
 
       {/* Bottom Section: Booking Count */}
-      {isCurrentMonth && !isDisabled && (
+      {!isDisabled && (
         <div className="w-full flex items-center justify-between mt-auto">
           {/* Booking Count with Feather Icon */}
           {bookingCount > 0 && (

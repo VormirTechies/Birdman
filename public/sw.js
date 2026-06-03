@@ -5,8 +5,8 @@
 
 // ─── Cache Configuration ─────────────────────────────────────────────────────
 
-const CACHE_STATIC = 'birdman-static-v2';
-const CACHE_PAGES  = 'birdman-pages-v2';
+const CACHE_STATIC = 'birdman-static-v3';
+const CACHE_PAGES  = 'birdman-pages-v3';
 
 // Admin shell pages to pre-cache on install
 const PRECACHE_PAGES = [
@@ -59,9 +59,13 @@ self.addEventListener('fetch', function(event) {
   // API routes — network only, never cache sensitive data
   if (url.pathname.startsWith('/api/')) return;
 
-  // Static assets (Next.js chunks, fonts, images) — cache first
+  // Next.js chunks must always come from the browser/network cache path.
+  // Serving old chunks from Cache Storage can break after deploys because the
+  // HTML/RSC payload may reference modules that no longer exist in cached JS.
+  if (url.pathname.startsWith('/_next/')) return;
+
+  // Static assets (app images/icons only) — cache first
   if (
-    url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/images/') ||
     url.pathname.startsWith('/icons/')
   ) {

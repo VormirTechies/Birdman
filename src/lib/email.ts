@@ -7,6 +7,8 @@ import BookingCancellation from '../../emails/booking-cancellation';
 import VipWelcome from '../../emails/vip-welcome';
 import type { Booking } from './db/schema';
 import React from 'react';
+import { absoluteUrl } from './site';
+import { getPublicBookingCode } from './booking-number';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EMAIL SERVICE - Nodemailer (Gmail SMTP) Integration
@@ -29,7 +31,19 @@ function getTransporter() {
 }
 
 // Email sender configuration
-const FROM_EMAIL = process.env.EMAIL_FROM || '"Birdman of Chennai" <vigneshwaran7797@gmail.com>';
+const FROM_EMAIL = process.env.EMAIL_FROM || 'Birdman of Chennai <parrotsudarson@gmail.com>';
+
+function getMailDefaults() {
+  const cc = (process.env.EMAIL_CC || '')
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  return {
+    from: FROM_EMAIL,
+    ...(cc.length > 0 ? { cc } : {}),
+  };
+}
 
 // ─── Send Booking Confirmation ───────────────────────────────────────────────
 
@@ -55,12 +69,13 @@ export async function sendBookingConfirmation(booking: Booking): Promise<{
             adults: booking.adults,
             children: booking.children,
             numberOfGuests: booking.numberOfGuests, // Backward compatibility
-            bookingId: booking.id,
+            bookingId: getPublicBookingCode(booking),
+            manageUrl: absoluteUrl('/booking-status'),
         })
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '🦜 Booking Confirmed — Birdman of Chennai',
       html: emailHtml,
@@ -101,7 +116,7 @@ export async function sendBookingReminder(booking: Booking): Promise<{
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '⏰ Reminder: Your Visit is Today! — Birdman of Chennai',
       html: emailHtml,
@@ -143,12 +158,13 @@ export async function sendRescheduleNotification(
             adults: booking.adults,
             children: booking.children,
             numberOfGuests: booking.numberOfGuests, // Backward compatibility
-            bookingId: booking.id,
+            bookingId: getPublicBookingCode(booking),
+            manageUrl: absoluteUrl('/booking-status'),
         })
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '📅 Booking Rescheduled — Birdman of Chennai',
       html: emailHtml,
@@ -200,7 +216,7 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
     `;
 
     await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: email,
       subject: '🔐 Verification Code: Admin Profile Update — Birdman of Chennai',
       html: htmlBody,
@@ -237,12 +253,13 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
             adults: booking.adults,
             children: booking.children,
             numberOfGuests: booking.numberOfGuests, // Backward compatibility
-            bookingId: booking.id,
+            bookingId: getPublicBookingCode(booking),
+            manageUrl: absoluteUrl('/booking-status'),
         })
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '🦜 Booking Cancellation Notice — Birdman of Chennai',
       html: emailHtml,
@@ -261,7 +278,7 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
 // Used by admin settings page when blocking dates
 
 export async function sendCancellationEmails(
-  bookings: Array<{ id: string; email: string | null; visitorName: string; bookingDate: string; adults: number; children: number; numberOfGuests: number }>
+  bookings: Array<{ id: string; bookingNumber: number; email: string | null; visitorName: string; bookingDate: string; adults: number; children: number; numberOfGuests: number }>
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
   let sent = 0;
   let failed = 0;
@@ -279,6 +296,7 @@ export async function sendCancellationEmails(
     try {
       const result = await sendBookingCancellation({
         id: booking.id,
+        bookingNumber: booking.bookingNumber,
         email: booking.email,
         visitorName: booking.visitorName,
         bookingDate: booking.bookingDate,
@@ -335,13 +353,14 @@ export async function sendVipWelcomeEmail(
         bookingTime: booking.bookingTime,
         adults: booking.adults,
         children: booking.children,
-        bookingId: booking.id,
+        bookingId: getPublicBookingCode(booking),
+        manageUrl: absoluteUrl('/booking-status'),
         totalVisits,
       })
     );
 
     const info = await transporter.sendMail({
-      from: FROM_EMAIL,
+      ...getMailDefaults(),
       to: booking.email,
       subject: '⭐ Welcome Back, VIP! — Birdman of Chennai',
       html: emailHtml,

@@ -23,6 +23,7 @@ interface BookingCancellationProps {
   children: number;
   numberOfGuests?: number; // Deprecated
   bookingId: string;
+  manageUrl?: string;
 }
 
 export default function BookingCancellation({
@@ -30,9 +31,10 @@ export default function BookingCancellation({
   bookingDate,
   bookingTime,
   bookingId,
+  manageUrl,
 }: BookingCancellationProps) {
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL || "https://birdmanofchennai.com";
+    process.env.NEXT_PUBLIC_BASE_URL || "https://www.parrotsudarson.org";
 
   return (
     <Html>
@@ -219,6 +221,14 @@ export default function BookingCancellation({
 
           {/* CTA Button */}
           <Section style={styles.buttonContainer}>
+            {manageUrl && (
+              <Link
+                href={manageUrl}
+                style={styles.secondaryButton}
+              >
+                View Booking Status
+              </Link>
+            )}
             <Link
               href={`${baseUrl}/book`}
               style={styles.primaryButton}
@@ -475,6 +485,18 @@ const styles = {
     textDecoration: "none",
     padding: "14px 28px",
     borderRadius: "8px",
+  },
+  secondaryButton: {
+    display: "inline-block",
+    backgroundColor: "transparent",
+    color: "#00A36C",
+    fontSize: "14px",
+    fontWeight: "600",
+    textDecoration: "none",
+    padding: "12px 18px",
+    border: "1px solid #00A36C",
+    borderRadius: "8px",
+    margin: "8px",
   },
   contactSection: {
     backgroundColor: "#F0F4F0",

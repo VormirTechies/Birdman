@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
         success: true,
         booking: {
           id: booking.id,
+          bookingNumber: booking.bookingNumber,
           visitorName: booking.visitorName,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,

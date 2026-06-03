@@ -25,7 +25,10 @@ interface DayData {
  * - Manage capacity, operating hours, and open/close status
  */
 export default function CalendarPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -33,17 +36,13 @@ export default function CalendarPage() {
   // Handle month navigation
   const handlePreviousMonth = () => {
     setCurrentMonth((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() - 1);
-      return newDate;
+      return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
     });
   };
 
   const handleNextMonth = () => {
     setCurrentMonth((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(newDate.getMonth() + 1);
-      return newDate;
+      return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
     });
   };
 

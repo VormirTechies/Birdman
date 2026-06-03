@@ -18,6 +18,7 @@ interface VipWelcomeProps {
   children: number;
   bookingId: string;
   totalVisits: number; // Lifetime visit count (including this one)
+  manageUrl?: string;
 }
 
 export default function VipWelcome({
@@ -28,6 +29,7 @@ export default function VipWelcome({
   children,
   bookingId,
   totalVisits = 2,
+  manageUrl,
 }: VipWelcomeProps) {
   const ordinal = (n: number) => {
     const s = ['th', 'st', 'nd', 'rd'];
@@ -184,6 +186,11 @@ export default function VipWelcome({
 
           {/* CTA */}
           <Section style={styles.buttonContainer}>
+            {manageUrl && (
+              <Link href={manageUrl} style={styles.primaryButton}>
+                Manage Booking
+              </Link>
+            )}
             <Link href="https://maps.app.goo.gl/G76qA7qZAJ3g44Pu9" style={styles.secondaryButton}>
               View on Google Maps
             </Link>
@@ -385,6 +392,16 @@ const styles = {
   buttonContainer: {
     textAlign: 'center' as const,
     margin: '20px 24px',
+  } as React.CSSProperties,
+  primaryButton: {
+    display: 'inline-block',
+    backgroundColor: '#00A36C',
+    color: '#FFFFFF',
+    padding: '12px 20px',
+    textDecoration: 'none',
+    borderRadius: '8px',
+    fontWeight: '700',
+    margin: '8px',
   } as React.CSSProperties,
   secondaryButton: {
     display: 'inline-block',

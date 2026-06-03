@@ -48,23 +48,38 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
     const fetchMonthData = async () => {
       setLoading(true);
       try {
-        const year = currentMonth.getFullYear();
-        const month = currentMonth.getMonth() + 1; // JavaScript months are 0-indexed
+        const visibleMonths = [-1, 0, 1].map((offset) => {
+          const date = new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() + offset,
+            1
+          );
+          return {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+          };
+        });
 
-        const response = await fetch(
-          `/api/calendar/month?year=${year}&month=${month}`
+        const responses = await Promise.all(
+          visibleMonths.map(({ year, month }) =>
+            fetch(`/api/calendar/month?year=${year}&month=${month}`, {
+              cache: 'no-store',
+            })
+          )
         );
 
-        if (!response.ok) {
+        if (responses.some((response) => !response.ok)) {
           throw new Error('Failed to fetch calendar data');
         }
 
-        const data = await response.json();
+        const monthsData = await Promise.all(responses.map((response) => response.json()));
 
         // Convert array to map for quick lookup
         const dataMap: Record<string, DayData> = {};
-        data.days.forEach((day: DayData) => {
-          dataMap[day.date] = day;
+        monthsData.forEach((data) => {
+          data.days.forEach((day: DayData) => {
+            dataMap[day.date] = day;
+          });
         });
 
         setDaysData(dataMap);

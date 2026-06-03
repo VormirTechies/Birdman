@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Menu, Calendar, Home, Library, ImageIcon, Heart, MapPin, Newspaper } from 'lucide-react';
+import { Menu, Calendar, Home, Library, ImageIcon, Heart, MapPin, Newspaper, SearchCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -105,16 +105,34 @@ export function Header() {
           })}
 
           <div className="ml-3">
-            <Button
-              asChild
-              size="sm"
-              className="bg-sanctuary-green hover:bg-canopy-dark text-white rounded-full px-5 py-4 gap-2 shadow-glow-green transition-all duration-300 hover:shadow-lg"
-            >
-              <Link href="/book">
-                <Calendar className="w-4 h-4" />
-                Book Visit
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className={cn(
+                  'rounded-full px-4 py-4 gap-2 transition-all duration-300',
+                  isScrolled || !isTransparentTop
+                    ? 'border-sanctuary-green/25 text-sanctuary-green hover:bg-morning-mist'
+                    : 'border-white/35 text-white hover:bg-white/10'
+                )}
+              >
+                <Link href="/booking-status">
+                  <SearchCheck className="w-4 h-4" />
+                  Manage
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                className="bg-sanctuary-green hover:bg-canopy-dark text-white rounded-full px-5 py-4 gap-2 shadow-glow-green transition-all duration-300 hover:shadow-lg"
+              >
+                <Link href="/book">
+                  <Calendar className="w-4 h-4" />
+                  Book Visit
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -221,6 +239,23 @@ export function Header() {
                       <Link href="/book" onClick={() => setIsOpen(false)}>
                         <Calendar className="w-5 h-5 shrink-0" />
                         <span>Book Your Visit</span>
+                      </Link>
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.42 }}
+                    className="mt-3"
+                  >
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full border-sanctuary-green/25 text-sanctuary-green hover:bg-morning-mist rounded-2xl h-12 text-sm font-semibold gap-2.5"
+                    >
+                      <Link href="/booking-status" onClick={() => setIsOpen(false)}>
+                        <SearchCheck className="w-5 h-5 shrink-0" />
+                        <span>Check Booking Status</span>
                       </Link>
                     </Button>
                   </motion.div>

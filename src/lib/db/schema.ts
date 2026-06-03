@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { pgTable, uuid, varchar, text, timestamp, integer, boolean, date, time, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -13,6 +14,10 @@ export const bookings = pgTable(
   'bookings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    bookingNumber: integer('booking_number')
+      .notNull()
+      .unique()
+      .default(sql`nextval('bookings_booking_number_seq')`),
     visitorId: uuid('visitor_id').references(() => visitors.id, { onDelete: 'set null' }), // Links to persistent visitor profile
     visitorName: varchar('visitor_name', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 20 }).notNull(), // Indian format: +91-XXXXXXXXXX
