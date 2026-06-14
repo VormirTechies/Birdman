@@ -7,6 +7,7 @@ import { RangeSlider } from '../../_components/RangeSlider';
 import { TimePicker } from '../../_components/TimePicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 interface DayDetailsModalProps {
   isOpen: boolean;
@@ -77,7 +78,7 @@ export function DayDetailsModal({
     const fetchDayDetails = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/calendar/day/${date}`);
+        const response = await authenticatedFetch(`/api/calendar/day/${date}`);
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -127,7 +128,7 @@ export function DayDetailsModal({
 
     setSaving(true);
     try {
-      const response = await fetch('/api/calendar/settings', {
+      const response = await authenticatedFetch('/api/calendar/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,8 +150,6 @@ export function DayDetailsModal({
     }
   };
 
-  // Calculate updated available spots
-  const updatedAvailable = Math.max(0, settings.maxCapacity - stats.totalBooked);
   const updatedPercentage = settings.maxCapacity > 0
     ? Math.round((stats.totalBooked / settings.maxCapacity) * 100)
     : 0;

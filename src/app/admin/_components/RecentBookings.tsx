@@ -9,6 +9,7 @@ import { BookingsTable } from './BookingsTable';
 import { BookingsList } from './BookingsList';
 import type { Booking } from './BookingsTable';
 import { formatLocalDate } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 interface RecentBookingsProps {
   refreshKey?: number;
@@ -50,7 +51,7 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
           params.append('search', searchQuery);
         }
 
-        const response = await fetch(`/api/bookings?${params.toString()}`, {
+        const response = await authenticatedFetch(`/api/bookings?${params.toString()}`, {
           cache: 'no-cache',
         });
 
@@ -58,26 +59,37 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
 
         if (data.success && Array.isArray(data.bookings)) {
           // Transform API data to match Booking interface
-          const transformedBookings: Booking[] = data.bookings.map((b: any) => ({
-            id: b.id,
-            guestName: b.visitor_name || b.visitorName,
-            mobile: b.phone,
-            email: b.email || '',
-            checkInDate: new Date(b.booking_date || b.bookingDate),
-            adults: b.adults ?? 1,
-            children: b.children ?? 0,
-            initials: (b.visitor_name || b.visitorName || 'XX')
-              .split(' ')
-              .map((n: string) => n[0])
-              .join('')
-              .toUpperCase()
-              .slice(0, 2),
-            avatarColor: ['green', 'orange', 'pink', 'blue', 'purple'][
-              Math.floor(Math.random() * 5)
-            ] as 'green' | 'orange' | 'pink' | 'blue' | 'purple',
-            isVip: Boolean(b.visitor?.isVip),
-            visitorId: b.visitor?.id ?? undefined,
-          }));
+          const transformedBookings: Booking[] = data.bookings.map(
+            (booking: Record<string, unknown>) => {
+              const visitor = booking.visitor as Record<string, unknown> | undefined;
+              const guestName = String(
+                booking.visitor_name ?? booking.visitorName ?? ''
+              );
+
+              return {
+                id: String(booking.id),
+                guestName,
+                mobile: String(booking.phone ?? ''),
+                email: String(booking.email ?? ''),
+                checkInDate: new Date(
+                  String(booking.booking_date ?? booking.bookingDate ?? '')
+                ),
+                adults: Number(booking.adults ?? 1),
+                children: Number(booking.children ?? 0),
+                initials: (guestName || 'XX')
+                  .split(' ')
+                  .map((name) => name[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2),
+                avatarColor: ['green', 'orange', 'pink', 'blue', 'purple'][
+                  Math.floor(Math.random() * 5)
+                ] as 'green' | 'orange' | 'pink' | 'blue' | 'purple',
+                isVip: Boolean(visitor?.isVip),
+                visitorId: typeof visitor?.id === 'string' ? visitor.id : undefined,
+              };
+            }
+          );
 
           setBookings(transformedBookings);
           setTotalCount(data.total || transformedBookings.length);
@@ -95,7 +107,7 @@ export function RecentBookings({ refreshKey }: RecentBookingsProps = {}) {
   const handleVipToggle = useCallback(async (visitorId: string, newIsVip: boolean) => {
     setBookings(prev => prev.map(b => b.visitorId === visitorId ? { ...b, isVip: newIsVip } : b));
     try {
-      const res = await fetch(`/api/admin/visitors/${visitorId}`, {
+      const res = await authenticatedFetch(`/api/admin/visitors/${visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVip: newIsVip }),

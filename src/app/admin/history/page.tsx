@@ -6,6 +6,7 @@ import { HistoryTable, type HistoryBooking } from './_components/HistoryTable';
 import { HistoryCard } from './_components/HistoryCard';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 // ─── Debounce Hook ────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay: number): T {
@@ -123,7 +124,7 @@ export default function HistoryPage() {
 
     let cancelled = false;
     setDesktopLoading(true);
-    fetch(`/api/bookings?${params.toString()}`)
+    authenticatedFetch(`/api/bookings?${params.toString()}`)
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -160,7 +161,7 @@ export default function HistoryPage() {
     });
 
     try {
-      const res = await fetch(`/api/bookings?${params.toString()}`);
+      const res = await authenticatedFetch(`/api/bookings?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         const items = (data.bookings as ApiBooking[]).map(normalise);
@@ -193,7 +194,7 @@ export default function HistoryPage() {
     });
 
     try {
-      const res = await fetch(`/api/bookings?${params.toString()}`);
+      const res = await authenticatedFetch(`/api/bookings?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         const items = (data.bookings as ApiBooking[]).map(normalise);
@@ -248,7 +249,7 @@ export default function HistoryPage() {
     setDesktopData(update);
     setMobileData(update);
     try {
-      const res = await fetch(`/api/admin/visitors/${visitorId}`, {
+      const res = await authenticatedFetch(`/api/admin/visitors/${visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVip: newIsVip }),

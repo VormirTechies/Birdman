@@ -1,65 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db } from '@/lib/db';
-import { visitors, bookings } from '@/lib/db/schema';
-import { eq, desc, ilike, or, and, count, sql } from 'drizzle-orm';
+import { getAdminDb } from '@/lib/firebase/admin';
+import {
+  normalizeVisitor,
+  type NormalizedVisitor,
+} from '@/lib/firebase/visitors';
+import { requireAdmin } from '@/lib/require-admin';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GET /api/admin/visitors — List Visitors (Admin)
-//   ?vip=true         — only VIP visitors
-//   ?search=           — name/phone/email search
-//   ?page=&limit=      — pagination
-// ═══════════════════════════════════════════════════════════════════════════
+type SortField =
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'isVip'
+  | 'totalVisits'
+  | 'firstVisitDate'
+  | 'lastVisitDate'
+  | 'createdAt'
+  | 'updatedAt';
+
+const sortFields = new Set<SortField>([
+  'name',
+  'phone',
+  'email',
+  'isVip',
+  'totalVisits',
+  'firstVisitDate',
+  'lastVisitDate',
+  'createdAt',
+  'updatedAt',
+]);
+
+function parsePositiveInteger(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function comparableValue(visitor: NormalizedVisitor, field: SortField) {
+  const value = visitor[field];
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (typeof value === 'number') return value;
+  return String(value ?? '').toLowerCase();
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { searchParams } = new URL(request.url);
-    const vipOnly = searchParams.get('vip') === 'true';
-    const search = searchParams.get('search')?.trim() || '';
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-    const limit = Math.min(100, parseInt(searchParams.get('limit') || '20'));
-    const offset = (page - 1) * limit;
+    const search = searchParams.get('search')?.trim().toLowerCase() ?? '';
+    const vip = searchParams.get('vip');
+    const page = parsePositiveInteger(searchParams.get('page'), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get('limit'), 20));
+    const requestedSort = searchParams.get('sort') as SortField | null;
+    const sort = requestedSort && sortFields.has(requestedSort)
+      ? requestedSort
+      : 'lastVisitDate';
+    const order = searchParams.get('order')?.toLowerCase() === 'asc' ? 1 : -1;
 
-    // Build where conditions
-    const conditions = [];
-    if (vipOnly) conditions.push(eq(visitors.isVip, true));
+    const snapshot = await getAdminDb().collection('visitors').get();
+    let visitorRows = snapshot.docs.map((document) =>
+      normalizeVisitor(document.id, document.data())
+    );
+
+    if (vip === 'true' || vip === 'false') {
+      const expectedVip = vip === 'true';
+      visitorRows = visitorRows.filter((visitor) => visitor.isVip === expectedVip);
+    }
+
     if (search) {
-      conditions.push(
-        or(
-          ilike(visitors.name, `%${search}%`),
-          ilike(visitors.phone, `%${search}%`),
-          ilike(visitors.email, `%${search}%`)
-        )!
+      visitorRows = visitorRows.filter((visitor) =>
+        [visitor.name, visitor.phone, visitor.email].some((value) =>
+          String(value ?? '').toLowerCase().includes(search)
+        )
       );
     }
 
-    const where = conditions.length > 1
-      ? and(...conditions)
-      : conditions.length === 1
-        ? conditions[0]
-        : undefined;
+    visitorRows.sort((left, right) => {
+      const leftValue = comparableValue(left, sort);
+      const rightValue = comparableValue(right, sort);
 
-    const [rows, [{ total }]] = await Promise.all([
-      db
-        .select()
-        .from(visitors)
-        .where(where)
-        .orderBy(desc(visitors.lastVisitDate))
-        .limit(limit)
-        .offset(offset),
-      db.select({ total: count() }).from(visitors).where(where),
-    ]);
+      if (leftValue < rightValue) return -1 * order;
+      if (leftValue > rightValue) return 1 * order;
+      return 0;
+    });
+
+    const total = visitorRows.length;
+    const offset = (page - 1) * limit;
+    const visitors = visitorRows.slice(offset, offset + limit);
 
     return NextResponse.json({
-      visitors: rows,
-      total: Number(total),
+      visitors,
+      total,
       page,
       limit,
-      totalPages: Math.ceil(Number(total) / limit),
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('[API] GET /admin/visitors failed:', error);

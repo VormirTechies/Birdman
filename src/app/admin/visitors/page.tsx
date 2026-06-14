@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Crown, Search, Star, StarOff, Pencil, Trash2, ChevronLeft, ChevronRight, Users, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ function VisitorDrawer({
 
   useEffect(() => {
     setLoadingBookings(true);
-    fetch(`/api/admin/visitors/${visitor.id}`)
+    authenticatedFetch(`/api/admin/visitors/${visitor.id}`)
       .then(r => r.json())
       .then(data => {
         if (data.bookings) setBookings(data.bookings);
@@ -86,7 +87,7 @@ function VisitorDrawer({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/visitors/${visitor.id}`, {
+      const res = await authenticatedFetch(`/api/admin/visitors/${visitor.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVip, vipNotes: notes, name }),
@@ -288,7 +289,7 @@ export default function VisitorsPage() {
       if (search.length >= 2) params.set('search', search);
       if (vipOnly) params.set('vip', 'true');
 
-      const res = await fetch(`/api/admin/visitors?${params.toString()}`);
+      const res = await authenticatedFetch(`/api/admin/visitors?${params.toString()}`);
       if (!res.ok) throw new Error('Fetch failed');
       const data: ApiResponse = await res.json();
       setVisitors(data.visitors);
@@ -310,7 +311,7 @@ export default function VisitorsPage() {
     if (!confirm(`Remove ${name} from visitor records? Their booking history will be preserved.`)) return;
     setDeleting(id);
     try {
-      const res = await fetch(`/api/admin/visitors/${id}`, { method: 'DELETE' });
+      const res = await authenticatedFetch(`/api/admin/visitors/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       setVisitors(vs => vs.filter(v => v.id !== id));
       setTotal(t => t - 1);
@@ -332,7 +333,7 @@ export default function VisitorsPage() {
     // Optimistic update
     setVisitors(vs => vs.map(v => v.id === visitor.id ? { ...v, isVip: newIsVip } : v));
     try {
-      const res = await fetch(`/api/admin/visitors/${visitor.id}`, {
+      const res = await authenticatedFetch(`/api/admin/visitors/${visitor.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVip: newIsVip }),

@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Bird, Mail, Lock, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import {
+  confirmPasswordReset,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  verifyPasswordResetCode,
+} from 'firebase/auth';
+import { auth } from '@/firebase';
 import Carousel from '../_components/Carousel';
 import OTPInput from '../_components/OTPInput';
 
@@ -24,9 +30,14 @@ const GALLERY_IMAGES = [
   '/images/gallery/010.jpeg',
 ];
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<CardView>('login');
+  const [resetCode, setResetCode] = useState<string | null>(null);
   
   // Login state
   const [email, setEmail] = useState('');
@@ -75,24 +86,18 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
-      
       // Validate inputs
       if (!email || !password) {
         throw new Error('Please fill in all fields');
       }
 
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
+      await signInWithEmailAndPassword(auth, email, password);
 
       // Successful login - redirect to dashboard
-      router.push('/admin');
-    } catch (err: any) {
-      setError(err.message || 'Invalid login credentials');
+      router.replace('/admin');
+      router.refresh();
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Invalid login credentials'));
     } finally {
       setIsLoading(false);
     }
@@ -104,28 +109,21 @@ export default function AdminLoginPage() {
     setForgotLoading(true);
 
     try {
-      const supabase = createClient();
-
       // Validate email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(forgotEmail)) {
         throw new Error('Please enter a valid email address');
       }
 
-      // Send magic link for password reset
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        forgotEmail,
-        {
-          redirectTo: `${window.location.origin}/admin/reset-password`,
-        }
-      );
-
-      if (resetError) throw resetError;
+      // Send password reset email
+      await sendPasswordResetEmail(auth, forgotEmail, {
+        url: `${window.location.origin}/admin/login`,
+      });
 
       // Show success state
       setCurrentView('success');
-    } catch (err: any) {
-      setForgotError(err.message || 'Failed to send reset email. Please try again.');
+    } catch (err: unknown) {
+      setForgotError(getErrorMessage(err, 'Failed to send reset email. Please try again.'));
     } finally {
       setForgotLoading(false);
     }
@@ -142,11 +140,15 @@ export default function AdminLoginPage() {
       return;
     }
 
-    // TODO: Verify OTP
-    setTimeout(() => {
-      setOtpLoading(false);
+    try {
+      await verifyPasswordResetCode(auth, otp);
+      setResetCode(otp);
       setCurrentView('reset');
-    }, 1000);
+    } catch {
+      setOtpError('Invalid or expired code. Please try again.');
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -167,11 +169,19 @@ export default function AdminLoginPage() {
       return;
     }
 
-    // TODO: Reset password
-    setTimeout(() => {
-      setResetLoading(false);
+    try {
+      if (!resetCode) {
+        throw new Error('Invalid reset code');
+      }
+
+      await confirmPasswordReset(auth, resetCode, newPassword);
+
       setCurrentView('success');
-    }, 1000);
+    } catch {
+      setResetError('Failed to reset password. Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   const handleBackToLogin = () => {
@@ -185,6 +195,7 @@ export default function AdminLoginPage() {
     setForgotError('');
     setOtpError('');
     setResetError('');
+    setResetCode(null);
   };
 
   const handleResendOTP = () => {

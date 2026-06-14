@@ -6,7 +6,9 @@ import { Info } from 'lucide-react';
 import { ApplyModeSelector } from './_components/ApplyModeSelector';
 import { ConfigPanel } from './_components/ConfigPanel';
 import { PreviewModal } from './_components/PreviewModal';
-import { createClient } from '@/lib/supabase/client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/firebase';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 export type ApplyMode = 'all_days' | 'one_day' | 'date_range';
 
@@ -47,23 +49,10 @@ export default function SettingsPage() {
   const [isApplying, setIsApplying] = useState(false);
   const [adminId, setAdminId] = useState<string | null>(null);
 
-  // Get admin user ID on mount
   useEffect(() => {
-    const getAdminId = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          // Use Supabase user ID directly for tracking
-          setAdminId(user.id);
-        }
-      } catch (error) {
-        console.error('[Settings] Error getting admin ID:', error);
-      }
-    };
-
-    getAdminId();
+    return onAuthStateChanged(auth, (user) => {
+      setAdminId(user?.uid ?? null);
+    });
   }, []);
 
   // Fetch current settings for selected date (one_day mode)
@@ -76,7 +65,7 @@ export default function SettingsPage() {
       setIsLoadingSettings(true);
 
       try {
-        const response = await fetch(`/api/calendar/day/${selectedDate}`);
+        const response = await authenticatedFetch(`/api/calendar/day/${selectedDate}`);
         
         if (!response.ok) {
           console.error('[Settings] Failed to fetch date settings');
@@ -112,7 +101,7 @@ export default function SettingsPage() {
     setIsLoadingPreview(true);
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         applyMode,
         settings,
       };
@@ -124,7 +113,7 @@ export default function SettingsPage() {
         payload.endDate = endDate;
       }
 
-      const response = await fetch('/api/admin/settings/preview', {
+      const response = await authenticatedFetch('/api/admin/settings/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -156,7 +145,7 @@ export default function SettingsPage() {
     setIsApplying(true);
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         applyMode,
         settings,
         adminId,
@@ -169,7 +158,7 @@ export default function SettingsPage() {
         payload.endDate = endDate;
       }
 
-      const response = await fetch('/api/admin/settings/bulk-update', {
+      const response = await authenticatedFetch('/api/admin/settings/bulk-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

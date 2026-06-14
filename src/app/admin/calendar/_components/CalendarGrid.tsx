@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarCell } from './CalendarCell';
 import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 interface DayData {
   date: string;
@@ -62,7 +63,7 @@ export function CalendarGrid({ currentMonth, onDayClick }: CalendarGridProps) {
 
         const responses = await Promise.all(
           visibleMonths.map(({ year, month }) =>
-            fetch(`/api/calendar/month?year=${year}&month=${month}`, {
+            authenticatedFetch(`/api/calendar/month?year=${year}&month=${month}`, {
               cache: 'no-store',
             })
           )

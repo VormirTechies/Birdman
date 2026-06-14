@@ -1,9 +1,13 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db } from '@/lib/db';
-import { visitors, bookings } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
+import { getAdminDb } from '@/lib/firebase/admin';
+import {
+  checkinBelongsToVisitor,
+  normalizeCheckin,
+  normalizeVisitor,
+} from '@/lib/firebase/visitors';
+import { requireAdmin } from '@/lib/require-admin';
 
 const patchSchema = z.object({
   isVip: z.boolean().optional(),
@@ -11,63 +15,67 @@ const patchSchema = z.object({
   name: z.string().min(1).max(255).optional(),
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GET /api/admin/visitors/[id] — Single Visitor Details + Booking History
-// ═══════════════════════════════════════════════════════════════════════════
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+async function getVisitorReference(id: string) {
+  const reference = getAdminDb().collection('visitors').doc(id);
+  const snapshot = await reference.get();
+  return { reference, snapshot };
+}
+
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { id } = await params;
+    const { snapshot } = await getVisitorReference(id);
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
+    }
 
-    const [visitor] = await db.select().from(visitors).where(eq(visitors.id, id)).limit(1);
-    if (!visitor) return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
+    const checkinsSnapshot = await getAdminDb().collection('visitor_checkins').get();
+    const history = checkinsSnapshot.docs
+      .filter((document) => checkinBelongsToVisitor(document.data(), id))
+      .map(normalizeCheckin)
+      .sort((left, right) =>
+        String(right.bookingDate ?? '').localeCompare(String(left.bookingDate ?? ''))
+      )
+      .slice(0, 50);
 
-    const history = await db
-      .select({
-        id: bookings.id,
-        bookingDate: bookings.bookingDate,
-        bookingTime: bookings.bookingTime,
-        adults: bookings.adults,
-        children: bookings.children,
-        status: bookings.status,
-        visited: bookings.visited,
-        createdAt: bookings.createdAt,
-      })
-      .from(bookings)
-      .where(eq(bookings.visitorId, id))
-      .orderBy(desc(bookings.bookingDate))
-      .limit(50);
+    const visitor = normalizeVisitor(snapshot.id, snapshot.data() ?? {});
 
-    return NextResponse.json({ visitor, history });
+    return NextResponse.json({
+      visitor,
+      history,
+      bookings: history,
+    });
   } catch (error) {
     console.error('[API] GET /admin/visitors/[id] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH /api/admin/visitors/[id] — Update VIP Status / Notes
-// ═══════════════════════════════════════════════════════════════════════════
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { id } = await params;
+    const { reference, snapshot } = await getVisitorReference(id);
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
+    }
+
     const body = await request.json();
-    const parsed = patchSchema.safeParse(body);
+    const parsed = patchSchema.safeParse({
+      isVip: body.isVip ?? body.vip ?? body.is_vip,
+      vipNotes: body.vipNotes ?? body.vip_notes,
+      name: body.name ?? body.visitorName ?? body.visitor_name,
+    });
+
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.issues },
@@ -75,49 +83,40 @@ export async function PATCH(
       );
     }
 
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    const updates: Record<string, unknown> = {
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
     if (parsed.data.isVip !== undefined) updates.isVip = parsed.data.isVip;
     if (parsed.data.vipNotes !== undefined) updates.vipNotes = parsed.data.vipNotes;
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
 
-    const [updated] = await db
-      .update(visitors)
-      .set(updates)
-      .where(eq(visitors.id, id))
-      .returning();
+    await reference.update(updates);
+    const updatedSnapshot = await reference.get();
+    const visitor = normalizeVisitor(
+      updatedSnapshot.id,
+      updatedSnapshot.data() ?? {}
+    );
 
-    if (!updated) return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
-
-    return NextResponse.json({ success: true, visitor: updated });
+    return NextResponse.json({ success: true, visitor });
   } catch (error) {
     console.error('[API] PATCH /admin/visitors/[id] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DELETE /api/admin/visitors/[id] — Remove Visitor Record
-// (Bookings are kept; visitor_id is nulled via ON DELETE SET NULL)
-// ═══════════════════════════════════════════════════════════════════════════
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { id } = await params;
+    const { reference, snapshot } = await getVisitorReference(id);
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
+    }
 
-    const [deleted] = await db
-      .delete(visitors)
-      .where(eq(visitors.id, id))
-      .returning({ id: visitors.id });
-
-    if (!deleted) return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
-
+    await reference.delete();
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[API] DELETE /admin/visitors/[id] failed:', error);

@@ -7,6 +7,7 @@ import { StatCard } from './_components/StatCard';
 import { RecentBookings } from './_components/RecentBookings';
 import { InstantBookingModal } from './_components/InstantBookingModal';
 import type { StatCardProps } from './_components/StatCard';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 export default function AdminPage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -62,7 +63,7 @@ export default function AdminPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/bookings/stats', {
+        const response = await authenticatedFetch('/api/bookings/stats', {
           cache: 'no-cache',
         });
         const data = await response.json();

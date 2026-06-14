@@ -15,6 +15,7 @@ import {
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
 import { StoryHeroSection } from '@/components/organisms/StoryHeroSection';
+import VolunteerCarousel from '@/components/organisms/VolunteerCarousel';
 import { Counter } from '@/components/ui/counter';
 import {
   AnimatedSection,
@@ -173,15 +174,13 @@ export default function StoryPage() {
                   key={event.year}
                   delay={i * 0.1}
                   direction={i % 2 === 0 ? 'left' : 'right'}
-                  className={`relative flex flex-col md:flex-row items-start gap-6 ${
-                    i % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                  }`}
+                  className={`relative flex flex-col md:flex-row items-start gap-6 ${i % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
+                    }`}
                 >
                   {/* Content */}
                   <div
-                    className={`ml-20 md:ml-0 md:w-[calc(50%-2rem)] ${
-                      i % 2 === 0 ? 'md:text-right md:pr-8' : 'md:text-left md:pl-8'
-                    }`}
+                    className={`ml-20 md:ml-0 md:w-[calc(50%-2rem)] ${i % 2 === 0 ? 'md:text-right md:pr-8' : 'md:text-left md:pl-8'
+                      }`}
                   >
                     <span className="text-sanctuary-green font-display font-bold text-xl">
                       {event.year}
@@ -304,30 +303,9 @@ export default function StoryPage() {
             </p>
           </AnimatedSection>
 
-          <StaggerContainer className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
-            {[
-              { initials: 'VN', name: 'Volunteer Name', role: 'Daily Feeding Support', bg: '#C8E6C9', text: '#2E7D32' },
-              { initials: 'VN', name: 'Volunteer Name', role: 'Visitor Coordination', bg: '#FFE0B2', text: '#E65100' },
-              { initials: 'VN', name: 'Volunteer Name', role: 'Sanctuary Upkeep', bg: '#BBDEFB', text: '#1976D2' },
-              { initials: 'VN', name: 'Volunteer Name', role: 'Community Outreach', bg: '#E1BEE7', text: '#7B1FA2' },
-            ].map((v, i) => (
-              <StaggerItem key={i}>
-                <div className="bg-white rounded-2xl shadow-card p-6 text-center hover:shadow-card-hover transition-shadow duration-300">
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-display font-bold"
-                    style={{ backgroundColor: v.bg, color: v.text }}
-                  >
-                    {v.initials}
-                  </div>
-                  <h4 className="font-display font-bold text-canopy-dark text-base">{v.name}</h4>
-                  <p className="text-sanctuary-green text-xs font-semibold mt-1 mb-2">{v.role}</p>
-                  <p className="text-canopy-dark/50 text-xs leading-relaxed">
-                    Placeholder — real name coming soon
-                  </p>
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
+          <AnimatedSection className="mb-12">
+            <VolunteerCarousel />
+          </AnimatedSection>
 
           <AnimatedSection className="text-center">
             <p className="text-canopy-dark/50 text-sm">
@@ -444,7 +422,7 @@ export default function StoryPage() {
         <section className="py-20 md:py-24 bg-morning-mist text-center">
           <div className="container-wide max-w-2xl flex flex-col justify-center items-center gap-3">
             {/* <Bird className="w-10 h-10 text-sanctuary-green mx-auto mb-4" /> */}
-             <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={35} height={35} />
+            <Image src="/images/parrot_logo.png" alt="Parrot Logo" width={35} height={35} />
             <h2 className="font-display text-3xl md:text-4xl font-bold text-canopy-dark mb-4">
               Come See for Yourself
             </h2>

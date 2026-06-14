@@ -8,6 +8,7 @@ import { DatePicker } from '@/app/admin/_components/DatePicker';
 import { InstantBookingModal } from '@/app/admin/_components/InstantBookingModal';
 import { VisitorChecklistList } from './_components/VisitorChecklistList';
 import type { ChecklistVisitor } from './_components/VisitorChecklistItem';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const PAGE_SIZE = 20;
 
@@ -67,7 +68,7 @@ export default function ChecklistPage() {
       });
       if (search.trim()) params.set('search', search.trim());
 
-      const res = await fetch(`/api/bookings?${params}`, { cache: 'no-cache' });
+      const res = await authenticatedFetch(`/api/bookings?${params}`, { cache: 'no-cache' });
       const data = await res.json();
 
       if (data.success && Array.isArray(data.bookings)) {
@@ -135,7 +136,7 @@ export default function ChecklistPage() {
     setUpdatingId(id);
 
     try {
-      const res = await fetch(`/api/bookings/${id}`, {
+      const res = await authenticatedFetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visited }),
@@ -171,7 +172,7 @@ export default function ChecklistPage() {
       const body: Record<string, unknown> = { isVip: newIsVip };
       if (newIsVip && notes?.trim()) body.vipNotes = notes.trim();
       if (!newIsVip) body.vipNotes = '';
-      const res = await fetch(`/api/admin/bookings/${bookingId}`, {
+      const res = await authenticatedFetch(`/api/admin/bookings/${bookingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

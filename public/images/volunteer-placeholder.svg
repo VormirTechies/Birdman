@@ -1,0 +1,9 @@
+<svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="600" rx="48" fill="#E5F6EC"/>
+  <circle cx="400" cy="220" r="120" fill="#C8E6C9"/>
+  <rect x="220" y="380" width="360" height="150" rx="30" fill="#C8E6C9"/>
+  <path d="M400 140C371.49 140 347.5 164.688 347.5 196.5C347.5 228.313 371.49 253 400 253C428.51 253 452.5 228.313 452.5 196.5C452.5 164.688 428.51 140 400 140Z" fill="#8BC34A"/>
+  <path d="M283 403C283 363.91 315.91 331 355 331H445C484.09 331 517 363.91 517 403V417C517 444.72 494.72 467 467 467H333C305.28 467 283 444.72 283 417V403Z" fill="#8BC34A"/>
+  <text x="400" y="540" text-anchor="middle" fill="#2F855A" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700">Volunteer</text>
+  <text x="400" y="580" text-anchor="middle" fill="#2F855A" font-family="Inter, Arial, sans-serif" font-size="24">Image placeholder</text>
+</svg>

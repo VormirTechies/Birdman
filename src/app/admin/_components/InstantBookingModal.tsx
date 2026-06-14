@@ -19,6 +19,7 @@ import { TimePicker } from './TimePicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatBookingNumber } from '@/lib/booking-number';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 interface InstantBookingModalProps {
   open: boolean;
@@ -112,7 +113,9 @@ export function InstantBookingModal({
         const params = new URLSearchParams();
         if (cleaned.length >= 10) params.set('phone', phone.trim());
         if (email.includes('@')) params.set('email', email.trim());
-        const res = await fetch(`/api/admin/visitors/lookup?${params.toString()}`);
+        const res = await authenticatedFetch(
+          `/api/admin/visitors/lookup?${params.toString()}`
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (data.visitor) {
@@ -189,7 +192,7 @@ export function InstantBookingModal({
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/admin/bookings', {
+      const response = await authenticatedFetch('/api/admin/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

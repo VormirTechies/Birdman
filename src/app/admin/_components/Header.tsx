@@ -4,7 +4,8 @@ import { useRef, useState, useEffect } from 'react';
 import { Bell, Menu, UserCircle, LogOut, Bird, MessageSquare, CheckCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { createClient } from '@/lib/supabase/client';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from '@/firebase';
 import { ActionsMenu } from './ActionsMenu';
 import { useNotifications, AppNotification } from '@/components/providers/NotificationProvider';
 
@@ -84,14 +85,13 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   const { notifications, unreadCount, clearAll } = useNotifications();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user?.email) {
         setUserInitial(user.email.charAt(0).toUpperCase());
       }
-    };
-    fetchUser();
+    });
+
+    return unsubscribe;
   }, []);
 
   // Close on outside click / Escape
@@ -120,9 +120,8 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   };
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/admin/login');
+    await signOut(auth);
+    router.replace('/admin/login');
   };
 
   const profileMenuGroups = [

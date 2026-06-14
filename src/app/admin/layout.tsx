@@ -11,9 +11,10 @@ import { AdminBottomNav } from './_components/BottomNav';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { subscribeUser } from '@/lib/push/client';
 import { requestPushPermission } from '@/lib/push/send';
-import { createClient } from '@/lib/supabase/client';
+import { auth } from '@/firebase';
 import enMessages from '@/../messages/en.json';
 import { PWAInstallBanner } from '@/components/admin/PWAInstallBanner';
+import { AdminAuthGuard } from './AdminAuthGuard';
 
 const workSans = Work_Sans({
   subsets: ['latin'],
@@ -44,11 +45,7 @@ export default function AdminLayout({
       if (pathname?.includes('/login') || pathname?.includes('/reset-password')) return;
 
       try {
-        // Check if user is authenticated
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) return;
+        if (!auth.currentUser) return;
 
         console.log('[Admin Layout] Setting up push notifications...');
 
@@ -104,8 +101,9 @@ export default function AdminLayout({
 
   return (
     <NextIntlClientProvider locale="en" messages={enMessages}>
-      <NotificationProvider>
-      <div className={`${workSans.variable} min-h-screen bg-[#f8f8f8]`}>
+      <AdminAuthGuard>
+        <NotificationProvider>
+        <div className={`${workSans.variable} min-h-screen bg-[#f8f8f8]`}>
         {/* Fixed sidebar (desktop) + drawer (mobile) */}
         <AdminSidebar
           isOpen={isSidebarOpen}
@@ -128,8 +126,9 @@ export default function AdminLayout({
         <AdminBottomNav onMoreClick={() => setIsSidebarOpen(true)} />
 
         <Toaster position="top-right" richColors expand={true} theme="light" className="z-9999" />
-      </div>
-      </NotificationProvider>
+        </div>
+        </NotificationProvider>
+      </AdminAuthGuard>
     </NextIntlClientProvider>
   );
 }

@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import type { Booking } from '@/lib/db/schema';
+import { getAdminDb } from '@/lib/firebase/admin';
 import { createBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
-import { sendVipWelcomeEmail } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
-import { findOrCreateVisitor, linkBookingToVisitor } from '@/lib/visitors';
+import { requireAdmin } from '@/lib/require-admin';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -16,38 +17,74 @@ export async function POST(request: NextRequest) {
   try {
     // Parse and validate request body
     const body = await request.json();
-    const validatedData = createBookingSchema.parse(body);
+    const normalizedBody = {
+      ...body,
+      visitorName: body.visitorName ?? body.visitor_name,
+      numberOfGuests: body.numberOfGuests ?? body.number_of_guests,
+      bookingDate: body.bookingDate ?? body.booking_date,
+      bookingTime: body.bookingTime ?? body.booking_time,
+    };
+    const validatedData = createBookingSchema.parse(normalizedBody);
 
-    // Create booking in database
-    const booking = await createBooking({
-      visitorName: validatedData.visitorName,
-      phone: validatedData.phone,
-      email: validatedData.email,
-      adults: validatedData.adults,
-      children: validatedData.children,
-      numberOfGuests: validatedData.numberOfGuests || (validatedData.adults + validatedData.children), // Backward compatibility
-      bookingDate: validatedData.bookingDate,
-      bookingTime: validatedData.bookingTime,
+    const adminDb = getAdminDb();
+    const now = new Date();
+    const bookingRef = adminDb.collection('bookings').doc();
+    const counterRef = adminDb.collection('_counters').doc('bookings');
+    const numberOfGuests =
+      validatedData.numberOfGuests || (validatedData.adults + validatedData.children);
+
+    const bookingNumber = await adminDb.runTransaction(async (transaction) => {
+      const counterSnapshot = await transaction.get(counterRef);
+      const currentNumber = counterSnapshot.exists
+        ? Number(counterSnapshot.data()?.value ?? 0)
+        : 0;
+      const nextNumber = currentNumber + 1;
+
+      transaction.set(counterRef, { value: nextNumber }, { merge: true });
+      transaction.set(bookingRef, {
+        bookingNumber: nextNumber,
+        visitorName: validatedData.visitorName,
+        phone: validatedData.phone,
+        email: validatedData.email ?? null,
+        adults: validatedData.adults,
+        children: validatedData.children,
+        numberOfGuests,
+        bookingDate: validatedData.bookingDate,
+        bookingTime: validatedData.bookingTime,
+        status: 'confirmed',
+        visited: false,
+        confirmationSent: true,
+        reminderSent: false,
+        reminderSentAt: null,
+        visitorId: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return nextNumber;
     });
 
-    // Match or create visitor profile (non-blocking for booking creation)
-    let isVip = false;
-    let isReturning = false;
-    let totalVisits = 1;
-    try {
-      const visitorResult = await findOrCreateVisitor(
-        validatedData.phone,
-        validatedData.email,
-        validatedData.visitorName,
-        validatedData.bookingDate
-      );
-      isVip = visitorResult.isVip;
-      isReturning = visitorResult.isReturning;
-      totalVisits = visitorResult.visitor.totalVisits ?? 1;
-      await linkBookingToVisitor(booking.id, visitorResult.visitor.id);
-    } catch (visitorError) {
-      console.error('[API] Visitor matching failed (non-fatal):', visitorError);
-    }
+    // Preserve the existing email and API response contracts during the staged migration.
+    const booking: Booking = {
+      id: bookingRef.id,
+      bookingNumber,
+      visitorId: null,
+      visitorName: validatedData.visitorName,
+      phone: validatedData.phone,
+      email: validatedData.email ?? null,
+      adults: validatedData.adults,
+      children: validatedData.children,
+      numberOfGuests,
+      bookingDate: validatedData.bookingDate,
+      bookingTime: validatedData.bookingTime,
+      confirmationSent: true,
+      reminderSent: false,
+      reminderSentAt: null,
+      status: 'confirmed',
+      visited: false,
+      createdAt: now,
+      updatedAt: now,
+    };
 
     // Format guest count for display
     const guestCount = booking.children > 0 
@@ -56,10 +93,8 @@ export async function POST(request: NextRequest) {
 
     // Notify Admins Immediately
     await sendPushToAllAdmins({
-      title: isVip ? '⭐ VIP Visitor Booked!' : 'New Parakeet Visit Booked!',
-      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.${
-        isVip ? ' VIP visitor!' : isReturning ? ' (Returning visitor)' : ''
-      }`,
+      title: 'New Parakeet Visit Booked!',
+      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
       url: '/admin',
       visitorName: booking.visitorName,
       bookingDate: booking.bookingDate,
@@ -68,15 +103,14 @@ export async function POST(request: NextRequest) {
     // Send confirmation email (non-blocking - failure should not fail booking)
     let emailSent = false;
     try {
-      // VIPs get a special welcome-back email; new/returning visitors get the standard confirmation
-      const emailResult = isVip
-        ? await sendVipWelcomeEmail(booking, totalVisits)
-        : await sendBookingConfirmation(booking);
+      const emailResult = await sendBookingConfirmation(booking);
       emailSent = emailResult.success;
 
       if (emailResult.success) {
-        // Mark confirmation as sent in database
-        await markConfirmationSent(booking.id);
+        await bookingRef.update({
+          confirmationSent: true,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       }
     } catch (emailError) {
       console.error('[API] Email send failed, but booking created:', emailError);
@@ -138,12 +172,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // TODO: Add admin authentication check here
-    // For now, this endpoint is unprotected (Sprint 1)
-    // const session = await getServerSession();
-    // if (!session || !session.user.isAdmin) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // }
+    const authResult = await requireAdmin(request);
+    if (!authResult.user) return authResult.response;
 
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -152,14 +182,18 @@ export async function GET(request: NextRequest) {
     const minDate = searchParams.get('minDate');
     const search = searchParams.get('search');
     const sort = searchParams.get('sort') as 'checklist' | null;
+    const visitedParam = searchParams.get('visited');
     const visitedFilter = searchParams.get('visitedFilter') as 'visited' | 'not-visited' | 'yet-to-visit' | null;
     const sortBy = searchParams.get('sortBy') as 'name' | 'email' | 'date' | 'guestCount' | null;
     const sortDir = searchParams.get('sortDir') as 'asc' | 'desc' | null;
     const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const page = parseInt(searchParams.get('page') || '1');
+    const offset = searchParams.has('offset')
+      ? parseInt(searchParams.get('offset') || '0')
+      : (page - 1) * limit;
 
     // Validate limit and offset
-    if (limit < 1 || limit > 100) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       return NextResponse.json(
         {
           success: false,
@@ -169,7 +203,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (offset < 0) {
+    if (!Number.isInteger(page) || page < 1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Page must be a positive integer',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!Number.isInteger(offset) || offset < 0) {
       return NextResponse.json(
         {
           success: false,
@@ -201,29 +245,113 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch bookings from database
-    const { bookings, total } = await getBookings({
-      status: status || undefined,
-      date: date || undefined,
-      minDate: minDate || undefined,
-      search: search || undefined,
-      sort: sort || undefined,
-      visitedFilter: visitedFilter || undefined,
-      sortBy: sortBy || undefined,
-      sortDir: sortDir || undefined,
-      limit,
-      offset,
+    if (visitedParam && !['true', 'false'].includes(visitedParam)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Visited must be true or false',
+        },
+        { status: 400 }
+      );
+    }
+
+    const snapshot = await getAdminDb().collection('bookings').get();
+    const today = new Date().toISOString().split('T')[0];
+    const searchLower = search?.trim().toLowerCase();
+
+    let bookings: Array<Record<string, unknown> & { id: string }> = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    bookings = bookings.filter((booking) => {
+      const bookingStatus = String(booking.status ?? '');
+      const bookingDate = String(booking.bookingDate ?? '');
+      const visited = booking.visited === true;
+
+      if (status && bookingStatus !== status) return false;
+      if (date && bookingDate !== date) return false;
+      if (minDate && bookingDate < minDate) return false;
+      if (visitedParam && visited !== (visitedParam === 'true')) return false;
+
+      if (visitedFilter === 'visited' && !visited) return false;
+      if (visitedFilter === 'not-visited' && (visited || bookingDate >= today)) return false;
+      if (visitedFilter === 'yet-to-visit' && (visited || bookingDate < today)) return false;
+
+      if (searchLower) {
+        const searchable = [
+          booking.visitorName,
+          booking.email,
+          booking.phone,
+        ]
+          .map((value) => String(value ?? '').toLowerCase());
+
+        if (!searchable.some((value) => value.includes(searchLower))) return false;
+      }
+
+      return true;
+    });
+
+    const direction = sortDir === 'asc' ? 1 : -1;
+    const compareText = (left: unknown, right: unknown) =>
+      String(left ?? '').localeCompare(String(right ?? ''));
+    const toMillis = (value: unknown) => {
+      if (value instanceof Timestamp) return value.toMillis();
+      if (value instanceof Date) return value.getTime();
+      if (typeof value === 'string') return Date.parse(value) || 0;
+      return 0;
+    };
+
+    bookings.sort((left, right) => {
+      if (sort === 'checklist') {
+        const visitedDifference = Number(left.visited === true) - Number(right.visited === true);
+        return visitedDifference || compareText(left.visitorName, right.visitorName);
+      }
+
+      if (sortBy === 'name') {
+        return direction * compareText(left.visitorName, right.visitorName);
+      }
+      if (sortBy === 'email') {
+        return direction * compareText(left.email, right.email);
+      }
+      if (sortBy === 'guestCount') {
+        return direction * (Number(left.numberOfGuests ?? 0) - Number(right.numberOfGuests ?? 0));
+      }
+      if (sortBy === 'date') {
+        const dateDifference = compareText(left.bookingDate, right.bookingDate);
+        return direction * (dateDifference || compareText(left.bookingTime, right.bookingTime));
+      }
+
+      return toMillis(right.createdAt) - toMillis(left.createdAt);
+    });
+
+    const total = bookings.length;
+    const paginatedBookings = bookings.slice(offset, offset + limit).map((booking) => {
+      const serializeValue = (value: unknown): unknown => {
+        if (value instanceof Timestamp) return value.toDate().toISOString();
+        if (value instanceof Date) return value.toISOString();
+        if (Array.isArray(value)) return value.map(serializeValue);
+        if (value && typeof value === 'object') {
+          return Object.fromEntries(
+            Object.entries(value).map(([key, nestedValue]) => [key, serializeValue(nestedValue)])
+          );
+        }
+        return value;
+      };
+
+      return serializeValue(booking);
     });
 
     // Return bookings
     return NextResponse.json({
       success: true,
-      bookings,
+      bookings: paginatedBookings,
       total,
       pagination: {
         limit,
         offset,
-        count: bookings.length,
+        page,
+        count: paginatedBookings.length,
       },
     });
   } catch (error) {

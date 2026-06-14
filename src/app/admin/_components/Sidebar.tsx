@@ -13,14 +13,14 @@ import {
   Settings,
   LogOut,
   X,
-  Bird,
   Users,
   SearchCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createClient } from '@/lib/supabase/client';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/firebase';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/admin' },
@@ -42,12 +42,14 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
   // Defer active-state to client to avoid SSR/hydration mismatch.
   // Server always renders all links inactive; client updates after mount.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOut(auth);
     window.location.href = '/admin/login';
   };
 

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { getMonthlyBookingStats } from '@/lib/db/queries';
+import { getFirestoreMonthlyBookingStats } from '@/lib/firebase/calendar';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GET /api/calendar?month=YYYY-MM
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const stats = await getMonthlyBookingStats(year, month);
+    const stats = await getFirestoreMonthlyBookingStats(year, month);
 
     // Enrich each day with remaining capacity
     const enriched = stats.map((day) => ({

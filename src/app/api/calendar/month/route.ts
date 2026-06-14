@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMonthlyBookingStats } from '@/lib/db/queries';
+import { getFirestoreMonthlyBookingStats } from '@/lib/firebase/calendar';
+import { requireAdmin } from '@/lib/require-admin';
 
 // Force dynamic rendering (no caching)
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAdmin(request);
+    if (!authResult.user) return authResult.response;
+
     const searchParams = request.nextUrl.searchParams;
     const yearParam = searchParams.get('year');
     const monthParam = searchParams.get('month');
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch monthly statistics
-    const stats = await getMonthlyBookingStats(year, month);
+    const stats = await getFirestoreMonthlyBookingStats(year, month);
 
     return NextResponse.json({
       success: true,

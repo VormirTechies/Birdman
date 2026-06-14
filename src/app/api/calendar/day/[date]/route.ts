@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDayDetails } from '@/lib/db/queries';
+import { getFirestoreDayDetails } from '@/lib/firebase/calendar';
+import { requireAdmin } from '@/lib/require-admin';
 
 // Force dynamic rendering (no caching)
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ date: string }> }
 ) {
   try {
+    const authResult = await requireAdmin(request);
+    if (!authResult.user) return authResult.response;
+
     const { date } = await params;
 
     // Validate date format (YYYY-MM-DD)
@@ -38,7 +42,7 @@ export async function GET(
     }
 
     // Fetch day details
-    const details = await getDayDetails(date);
+    const details = await getFirestoreDayDetails(date);
 
     return NextResponse.json({
       success: true,

@@ -1,34 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { db } from '@/lib/db';
-import { bookings, visitors } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { findOrCreateVisitor } from '@/lib/visitors';
+import { getAdminDb } from '@/lib/firebase/admin';
+import { requireAdmin } from '@/lib/require-admin';
 
 const patchSchema = z.object({
-  isVip: z.boolean(),
+  status: z.enum(['confirmed', 'cancelled', 'completed']).optional(),
+  visited: z.boolean().optional(),
+  visitorName: z.string().min(2).max(255).optional(),
+  phone: z.string().min(5).max(20).optional(),
+  email: z.union([z.string().email(), z.literal(''), z.null()]).optional(),
+  adults: z.number().int().min(0).max(10).optional(),
+  children: z.number().int().min(0).max(10).optional(),
+  numberOfGuests: z.number().int().min(1).max(10).optional(),
+  bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  bookingTime: z.string().min(1).optional(),
+  isVip: z.boolean().optional(),
   vipNotes: z.string().max(500).optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided',
 });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PATCH /api/admin/bookings/[id] — Update booking's visitor VIP status
-// Finds or creates a visitor profile, links it to the booking if needed,
-// then updates the visitor's isVip flag.
-// ═══════════════════════════════════════════════════════════════════════════
+function serializeValue(value: unknown): unknown {
+  if (value instanceof Timestamp) return value.toDate().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(serializeValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, serializeValue(nestedValue)])
+    );
+  }
+  return value;
+}
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authResult = await requireAdmin(request);
+    if (!authResult.user) return authResult.response;
 
-    const { id: bookingId } = await params;
+    const { id } = await params;
+    const bookingRef = getAdminDb().collection('bookings').doc(id);
+    const snapshot = await bookingRef.get();
+
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
     const body = await request.json();
-    const parsed = patchSchema.safeParse(body);
+    const normalizedBody: Record<string, unknown> = { ...body };
+    if (normalizedBody.visitorName === undefined && body.visitor_name !== undefined) {
+      normalizedBody.visitorName = body.visitor_name;
+    }
+    if (normalizedBody.numberOfGuests === undefined && body.number_of_guests !== undefined) {
+      normalizedBody.numberOfGuests = body.number_of_guests;
+    }
+    if (normalizedBody.bookingDate === undefined && body.booking_date !== undefined) {
+      normalizedBody.bookingDate = body.booking_date;
+    }
+    if (normalizedBody.bookingTime === undefined && body.booking_time !== undefined) {
+      normalizedBody.bookingTime = body.booking_time;
+    }
+    const parsed = patchSchema.safeParse(normalizedBody);
+
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Validation failed', details: parsed.error.issues },
@@ -36,54 +72,69 @@ export async function PATCH(
       );
     }
 
-    const { isVip, vipNotes } = parsed.data;
+    const existing = snapshot.data() ?? {};
+    const updateData: Record<string, unknown> = {
+      ...parsed.data,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
 
-    // 1. Get the booking
-    const booking = await db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
-      with: { visitor: true },
+    if (
+      parsed.data.numberOfGuests === undefined &&
+      (parsed.data.adults !== undefined || parsed.data.children !== undefined)
+    ) {
+      const adults = parsed.data.adults ?? Number(existing.adults ?? 0);
+      const children = parsed.data.children ?? Number(existing.children ?? 0);
+      updateData.numberOfGuests = adults + children;
+    }
+
+    await bookingRef.update(updateData);
+    const updatedSnapshot = await bookingRef.get();
+    const booking = serializeValue({
+      id: updatedSnapshot.id,
+      ...updatedSnapshot.data(),
     });
+    const bookingData = updatedSnapshot.data() ?? {};
 
-    if (!booking) {
+    return NextResponse.json({
+      success: true,
+      booking,
+      visitor: {
+        id: bookingData.visitorId ?? updatedSnapshot.id,
+        isVip: bookingData.isVip === true,
+        vipNotes: bookingData.vipNotes ?? null,
+      },
+    });
+  } catch (error) {
+    console.error('[API] PATCH /admin/bookings/[id] failed:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authResult = await requireAdmin(request);
+    if (!authResult.user) return authResult.response;
+
+    const { id } = await params;
+    const bookingRef = getAdminDb().collection('bookings').doc(id);
+    const snapshot = await bookingRef.get();
+
+    if (!snapshot.exists) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    let visitorId = booking.visitorId;
+    await bookingRef.delete();
 
-    // 2. If no visitor profile linked, find or create one and link it
-    if (!visitorId) {
-      const result = await findOrCreateVisitor(
-        booking.phone,
-        booking.email,
-        booking.visitorName,
-        booking.bookingDate,
-      );
-      visitorId = result.visitor.id;
-
-      // Link booking to visitor
-      await db
-        .update(bookings)
-        .set({ visitorId })
-        .where(eq(bookings.id, bookingId));
-    }
-
-    // 3. Update visitor's VIP status
-    const updateData: Record<string, unknown> = { isVip, updatedAt: new Date() };
-    if (vipNotes !== undefined) updateData.vipNotes = vipNotes;
-
-    const [updated] = await db
-      .update(visitors)
-      .set(updateData)
-      .where(eq(visitors.id, visitorId))
-      .returning();
-
-    if (!updated) {
-      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ success: true, visitor: updated });
+    return NextResponse.json({
+      success: true,
+      message: 'Booking deleted successfully',
+      booking: { id },
+    });
   } catch (error) {
-    console.error('[API] PATCH /admin/bookings/[id] failed:', error);
+    console.error('[API] DELETE /admin/bookings/[id] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
