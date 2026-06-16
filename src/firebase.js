@@ -12,7 +12,37 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const requiredConfig = {
+  apiKey: firebaseConfig.apiKey,
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId,
+  appId: firebaseConfig.appId,
+};
 
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+const missingConfigKeys = Object.entries(requiredConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+export let firebaseConfigError =
+  missingConfigKeys.length > 0
+    ? `Missing Firebase client configuration: ${missingConfigKeys.join(", ")}`
+    : null;
+
+let dbInstance = null;
+let authInstance = { currentUser: null };
+
+if (!firebaseConfigError) {
+  try {
+    const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    dbInstance = getFirestore(app);
+    authInstance = getAuth(app);
+  } catch (error) {
+    firebaseConfigError =
+      error instanceof Error
+        ? `Firebase client initialization failed: ${error.message}`
+        : "Firebase client initialization failed";
+  }
+}
+
+export const db = dbInstance;
+export const auth = authInstance;

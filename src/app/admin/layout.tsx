@@ -11,7 +11,7 @@ import { AdminBottomNav } from './_components/BottomNav';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { subscribeUser } from '@/lib/push/client';
 import { requestPushPermission } from '@/lib/push/send';
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 import enMessages from '@/../messages/en.json';
 import { PWAInstallBanner } from '@/components/admin/PWAInstallBanner';
 import { AdminAuthGuard } from './AdminAuthGuard';
@@ -43,6 +43,7 @@ export default function AdminLayout({
       // Only run on client side and when not on excluded routes
       if (typeof window === 'undefined') return;
       if (pathname?.includes('/login') || pathname?.includes('/reset-password')) return;
+      if (firebaseConfigError) return;
 
       try {
         if (!auth.currentUser) return;

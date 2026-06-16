@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 import Image from 'next/image';
 import { useSyncExternalStore } from 'react';
 
@@ -49,7 +49,9 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
   );
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    if (!firebaseConfigError) {
+      await signOut(auth);
+    }
     window.location.href = '/admin/login';
   };
 

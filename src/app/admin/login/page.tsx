@@ -10,7 +10,7 @@ import {
   signInWithEmailAndPassword,
   verifyPasswordResetCode,
 } from 'firebase/auth';
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 import Carousel from '../_components/Carousel';
 import OTPInput from '../_components/OTPInput';
 
@@ -86,6 +86,10 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
+      if (firebaseConfigError) {
+        throw new Error(firebaseConfigError);
+      }
+
       // Validate inputs
       if (!email || !password) {
         throw new Error('Please fill in all fields');
@@ -109,6 +113,10 @@ export default function AdminLoginPage() {
     setForgotLoading(true);
 
     try {
+      if (firebaseConfigError) {
+        throw new Error(firebaseConfigError);
+      }
+
       // Validate email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(forgotEmail)) {
@@ -141,6 +149,10 @@ export default function AdminLoginPage() {
     }
 
     try {
+      if (firebaseConfigError) {
+        throw new Error(firebaseConfigError);
+      }
+
       await verifyPasswordResetCode(auth, otp);
       setResetCode(otp);
       setCurrentView('reset');
@@ -170,6 +182,10 @@ export default function AdminLoginPage() {
     }
 
     try {
+      if (firebaseConfigError) {
+        throw new Error(firebaseConfigError);
+      }
+
       if (!resetCode) {
         throw new Error('Invalid reset code');
       }

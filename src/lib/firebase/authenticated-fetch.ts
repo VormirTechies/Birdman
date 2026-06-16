@@ -1,11 +1,15 @@
 'use client';
 
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 
 export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ) {
+  if (firebaseConfigError) {
+    throw new Error(firebaseConfigError);
+  }
+
   const user = auth.currentUser;
   if (!user) {
     throw new Error('Admin authentication is required');

@@ -5,7 +5,7 @@ import { Bell, Menu, UserCircle, LogOut, Bird, MessageSquare, CheckCheck } from 
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 import { ActionsMenu } from './ActionsMenu';
 import { useNotifications, AppNotification } from '@/components/providers/NotificationProvider';
 
@@ -85,6 +85,11 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   const { notifications, unreadCount, clearAll } = useNotifications();
 
   useEffect(() => {
+    if (firebaseConfigError) {
+      console.error(firebaseConfigError);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user?.email) {
         setUserInitial(user.email.charAt(0).toUpperCase());
@@ -120,7 +125,9 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   };
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    if (!firebaseConfigError) {
+      await signOut(auth);
+    }
     router.replace('/admin/login');
   };
 

@@ -11,7 +11,7 @@
   "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/images/parrot_logo.PNG",
+      "src": "/images/parrot_logo.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any"
@@ -34,19 +34,19 @@
       "name": "Bookings",
       "short_name": "Bookings",
       "url": "/admin/bookings",
-      "icons": [{ "src": "/images/parrot_logo.PNG", "sizes": "any" }]
+      "icons": [{ "src": "/images/parrot_logo.png", "sizes": "any" }]
     },
     {
       "name": "Visitor Checklist",
       "short_name": "Checklist",
       "url": "/admin/checklist",
-      "icons": [{ "src": "/images/parrot_logo.PNG", "sizes": "any" }]
+      "icons": [{ "src": "/images/parrot_logo.png", "sizes": "any" }]
     },
     {
       "name": "Gallery",
       "short_name": "Gallery",
       "url": "/admin/gallery",
-      "icons": [{ "src": "/images/parrot_logo.PNG", "sizes": "any" }]
+      "icons": [{ "src": "/images/parrot_logo.png", "sizes": "any" }]
     }
   ]
 }

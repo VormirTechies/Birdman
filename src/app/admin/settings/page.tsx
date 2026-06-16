@@ -7,7 +7,7 @@ import { ApplyModeSelector } from './_components/ApplyModeSelector';
 import { ConfigPanel } from './_components/ConfigPanel';
 import { PreviewModal } from './_components/PreviewModal';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/firebase';
+import { auth, firebaseConfigError } from '@/firebase';
 import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 export type ApplyMode = 'all_days' | 'one_day' | 'date_range';
@@ -50,6 +50,11 @@ export default function SettingsPage() {
   const [adminId, setAdminId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (firebaseConfigError) {
+      console.error(firebaseConfigError);
+      return;
+    }
+
     return onAuthStateChanged(auth, (user) => {
       setAdminId(user?.uid ?? null);
     });
