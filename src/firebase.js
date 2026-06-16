@@ -29,7 +29,11 @@ export let firebaseConfigError =
     : null;
 
 let dbInstance = null;
-let authInstance = { currentUser: null };
+
+/** @type {import("firebase/auth").Auth} */
+let authInstance = /** @type {import("firebase/auth").Auth} */ ({
+  currentUser: null,
+});
 
 if (!firebaseConfigError) {
   try {
