@@ -44,3 +44,33 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Sensitive / secrets
+# Firebase service account and admin keys
+firebase-adminsdk*.json
+serviceAccount*.json
+google-credentials.json
+gcloud-service-account.json
+firebase-debug.log
+.firebase/
+# Google Android / iOS config (may contain identifiers)
+google-services.json
+GoogleService-Info.plist
+
+# Supabase exports / local config
+.supabase/
+supabase-export/
+
+# Private keys / keystores
+*.key
+*.jks
+*.p12
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Local credentials and secret files
+credentials.json
+secret*.json
+secrets.json
