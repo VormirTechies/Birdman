@@ -1,12 +1,11 @@
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import type { Booking } from '@/lib/db/schema';
-import { getAdminDb } from '@/lib/firebase/admin';
 import { createBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
 import { requireAdmin } from '@/lib/require-admin';
+import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,49 +25,10 @@ export async function POST(request: NextRequest) {
     };
     const validatedData = createBookingSchema.parse(normalizedBody);
 
-    const adminDb = getAdminDb();
-    const now = new Date();
-    const bookingRef = adminDb.collection('bookings').doc();
-    const counterRef = adminDb.collection('_counters').doc('bookings');
     const numberOfGuests =
       validatedData.numberOfGuests || (validatedData.adults + validatedData.children);
 
-    const bookingNumber = await adminDb.runTransaction(async (transaction) => {
-      const counterSnapshot = await transaction.get(counterRef);
-      const currentNumber = counterSnapshot.exists
-        ? Number(counterSnapshot.data()?.value ?? 0)
-        : 0;
-      const nextNumber = currentNumber + 1;
-
-      transaction.set(counterRef, { value: nextNumber }, { merge: true });
-      transaction.set(bookingRef, {
-        bookingNumber: nextNumber,
-        visitorName: validatedData.visitorName,
-        phone: validatedData.phone,
-        email: validatedData.email ?? null,
-        adults: validatedData.adults,
-        children: validatedData.children,
-        numberOfGuests,
-        bookingDate: validatedData.bookingDate,
-        bookingTime: validatedData.bookingTime,
-        status: 'confirmed',
-        visited: false,
-        confirmationSent: true,
-        reminderSent: false,
-        reminderSentAt: null,
-        visitorId: null,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      return nextNumber;
-    });
-
-    // Preserve the existing email and API response contracts during the staged migration.
-    const booking: Booking = {
-      id: bookingRef.id,
-      bookingNumber,
-      visitorId: null,
+    const booking = await createBooking({
       visitorName: validatedData.visitorName,
       phone: validatedData.phone,
       email: validatedData.email ?? null,
@@ -77,14 +37,12 @@ export async function POST(request: NextRequest) {
       numberOfGuests,
       bookingDate: validatedData.bookingDate,
       bookingTime: validatedData.bookingTime,
-      confirmationSent: true,
+      confirmationSent: false,
       reminderSent: false,
       reminderSentAt: null,
       status: 'confirmed',
       visited: false,
-      createdAt: now,
-      updatedAt: now,
-    };
+    });
 
     // Format guest count for display
     const guestCount = booking.children > 0 
@@ -107,10 +65,7 @@ export async function POST(request: NextRequest) {
       emailSent = emailResult.success;
 
       if (emailResult.success) {
-        await bookingRef.update({
-          confirmationSent: true,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        await markConfirmationSent(booking.id);
       }
     } catch (emailError) {
       console.error('[API] Email send failed, but booking created:', emailError);
@@ -255,103 +210,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const snapshot = await getAdminDb().collection('bookings').get();
-    const today = new Date().toISOString().split('T')[0];
-    const searchLower = search?.trim().toLowerCase();
-
-    let bookings: Array<Record<string, unknown> & { id: string }> = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    bookings = bookings.filter((booking) => {
-      const bookingStatus = String(booking.status ?? '');
-      const bookingDate = String(booking.bookingDate ?? '');
-      const visited = booking.visited === true;
-
-      if (status && bookingStatus !== status) return false;
-      if (date && bookingDate !== date) return false;
-      if (minDate && bookingDate < minDate) return false;
-      if (visitedParam && visited !== (visitedParam === 'true')) return false;
-
-      if (visitedFilter === 'visited' && !visited) return false;
-      if (visitedFilter === 'not-visited' && (visited || bookingDate >= today)) return false;
-      if (visitedFilter === 'yet-to-visit' && (visited || bookingDate < today)) return false;
-
-      if (searchLower) {
-        const searchable = [
-          booking.visitorName,
-          booking.email,
-          booking.phone,
-        ]
-          .map((value) => String(value ?? '').toLowerCase());
-
-        if (!searchable.some((value) => value.includes(searchLower))) return false;
-      }
-
-      return true;
-    });
-
-    const direction = sortDir === 'asc' ? 1 : -1;
-    const compareText = (left: unknown, right: unknown) =>
-      String(left ?? '').localeCompare(String(right ?? ''));
-    const toMillis = (value: unknown) => {
-      if (value instanceof Timestamp) return value.toMillis();
-      if (value instanceof Date) return value.getTime();
-      if (typeof value === 'string') return Date.parse(value) || 0;
-      return 0;
-    };
-
-    bookings.sort((left, right) => {
-      if (sort === 'checklist') {
-        const visitedDifference = Number(left.visited === true) - Number(right.visited === true);
-        return visitedDifference || compareText(left.visitorName, right.visitorName);
-      }
-
-      if (sortBy === 'name') {
-        return direction * compareText(left.visitorName, right.visitorName);
-      }
-      if (sortBy === 'email') {
-        return direction * compareText(left.email, right.email);
-      }
-      if (sortBy === 'guestCount') {
-        return direction * (Number(left.numberOfGuests ?? 0) - Number(right.numberOfGuests ?? 0));
-      }
-      if (sortBy === 'date') {
-        const dateDifference = compareText(left.bookingDate, right.bookingDate);
-        return direction * (dateDifference || compareText(left.bookingTime, right.bookingTime));
-      }
-
-      return toMillis(right.createdAt) - toMillis(left.createdAt);
-    });
-
-    const total = bookings.length;
-    const paginatedBookings = bookings.slice(offset, offset + limit).map((booking) => {
-      const serializeValue = (value: unknown): unknown => {
-        if (value instanceof Timestamp) return value.toDate().toISOString();
-        if (value instanceof Date) return value.toISOString();
-        if (Array.isArray(value)) return value.map(serializeValue);
-        if (value && typeof value === 'object') {
-          return Object.fromEntries(
-            Object.entries(value).map(([key, nestedValue]) => [key, serializeValue(nestedValue)])
-          );
-        }
-        return value;
-      };
-
-      return serializeValue(booking);
+    const result = await getBookings({
+      status: status ?? undefined,
+      date: date ?? undefined,
+      minDate: minDate ?? undefined,
+      search: search ?? undefined,
+      visited: visitedParam ? visitedParam === 'true' : undefined,
+      visitedFilter: visitedFilter ?? undefined,
+      sort: sort ?? undefined,
+      sortBy: sortBy ?? undefined,
+      sortDir: sortDir ?? undefined,
+      limit,
+      offset,
     });
 
     // Return bookings
     return NextResponse.json({
       success: true,
-      bookings: paginatedBookings,
-      total,
+      bookings: result.bookings,
+      total: result.total,
       pagination: {
         limit,
         offset,
         page,
-        count: paginatedBookings.length,
+        count: result.bookings.length,
       },
     });
   } catch (error) {

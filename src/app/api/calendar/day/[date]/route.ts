@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestoreDayDetails } from '@/lib/firebase/calendar';
+import { getDayDetails } from '@/lib/db/queries';
 import { requireAdmin } from '@/lib/require-admin';
 
 // Force dynamic rendering (no caching)
@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Fetch day details
-    const details = await getFirestoreDayDetails(date);
+    const details = await getDayDetails(date);
 
     return NextResponse.json({
       success: true,

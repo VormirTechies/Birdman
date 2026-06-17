@@ -58,10 +58,10 @@ export async function createBooking(data: NewBooking): Promise<Booking> {
   const [booking] = await db
     .insert(bookings)
     .values({
-      ...data,
       confirmationSent: false,
       reminderSent: false,
       status: 'confirmed',
+      ...data,
     })
     .returning();
   
@@ -88,12 +88,13 @@ export async function getBookings(params: {
   limit?: number;
   offset?: number;
   sort?: 'checklist'; // not-visited first, then alphabetical by name
+  visited?: boolean;
   // History page filters
   visitedFilter?: 'visited' | 'not-visited' | 'yet-to-visit'; // omit = All
   sortBy?: 'name' | 'email' | 'date' | 'guestCount';
   sortDir?: 'asc' | 'desc';
 }): Promise<{ bookings: (Booking & { visitor: Visitor | null })[]; total: number }> {
-  const { status, date, minDate, search, limit = 50, offset = 0, sort, visitedFilter, sortBy, sortDir = 'desc' } = params;
+  const { status, date, minDate, search, limit = 50, offset = 0, sort, visited, visitedFilter, sortBy, sortDir = 'desc' } = params;
   await ensureBookingNumberColumn();
 
   const today = new Date().toISOString().split('T')[0];
@@ -103,6 +104,7 @@ export async function getBookings(params: {
   if (status) conditions.push(eq(bookings.status, status));
   if (date) conditions.push(eq(bookings.bookingDate, date));
   if (minDate) conditions.push(gte(bookings.bookingDate, minDate)); // gte = today and onwards
+  if (visited !== undefined) conditions.push(eq(bookings.visited, visited));
 
   // 2. VISITED FILTER (History page)
   if (visitedFilter === 'visited') {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestoreMonthlyBookingStats } from '@/lib/firebase/calendar';
+import { getMonthlyBookingStats } from '@/lib/db/queries';
 import { requireAdmin } from '@/lib/require-admin';
 
 // Force dynamic rendering (no caching)
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch monthly statistics
-    const stats = await getFirestoreMonthlyBookingStats(year, month);
+    const stats = await getMonthlyBookingStats(year, month);
 
     return NextResponse.json({
       success: true,

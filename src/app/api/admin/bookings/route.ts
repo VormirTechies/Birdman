@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { Booking } from '@/lib/db/schema';
@@ -6,6 +8,7 @@ import { createAdminBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
 import { requireAdmin } from '@/lib/require-admin';
+import { createBooking } from '@/lib/db/queries';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -232,6 +235,27 @@ export async function POST(request: NextRequest) {
       createdAt: now,
       updatedAt: now,
     };
+
+    try {
+      await createBooking({
+        bookingNumber: booking.bookingNumber,
+        visitorName: booking.visitorName,
+        phone: booking.phone,
+        email: booking.email,
+        adults: booking.adults,
+        children: booking.children,
+        numberOfGuests: booking.numberOfGuests,
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+        confirmationSent: booking.confirmationSent,
+        reminderSent: booking.reminderSent,
+        reminderSentAt: booking.reminderSentAt,
+        status: booking.status,
+        visited: booking.visited,
+      });
+    } catch (sqlError) {
+      console.error('[Admin API] SQL booking insert failed; Firestore booking was created:', sqlError);
+    }
 
     // Format guest count for display
     const guestCount = booking.children > 0 
