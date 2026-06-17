@@ -131,7 +131,7 @@ export function Footer() {
               </h3>
               <div className="space-y-3">
                 <a
-                  href="https://maps.app.goo.gl/yTxPBBwY1X3A3bda6"
+                  href="https://maps.app.goo.gl/bMbnFM4a3qZRUMkM9"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-start gap-2.5 text-white/60 hover:text-sanctuary-green-light transition-all text-sm group"
