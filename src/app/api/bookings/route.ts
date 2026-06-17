@@ -2,9 +2,6 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { createBookingSchema } from '@/lib/validations';
-import { sendBookingConfirmation } from '@/lib/email';
-import { sendPushToAllAdmins } from '@/lib/push';
-import { requireAdmin } from '@/lib/require-admin';
 import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { ZodError } from 'zod';
 
@@ -49,18 +46,24 @@ export async function POST(request: NextRequest) {
       ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
       : `${booking.adults} guest(s)`;
 
-    // Notify Admins Immediately
-    await sendPushToAllAdmins({
-      title: 'New Parakeet Visit Booked!',
-      body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
-      url: '/admin',
-      visitorName: booking.visitorName,
-      bookingDate: booking.bookingDate,
-    });
+    // Notify admins without letting push infrastructure break the booking flow.
+    try {
+      const { sendPushToAllAdmins } = await import('@/lib/push');
+      await sendPushToAllAdmins({
+        title: 'New Parakeet Visit Booked!',
+        body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
+        url: '/admin',
+        visitorName: booking.visitorName,
+        bookingDate: booking.bookingDate,
+      });
+    } catch (pushError) {
+      console.error('[API] Push notification failed, but booking created:', pushError);
+    }
 
     // Send confirmation email (non-blocking - failure should not fail booking)
     let emailSent = false;
     try {
+      const { sendBookingConfirmation } = await import('@/lib/email');
       const emailResult = await sendBookingConfirmation(booking);
       emailSent = emailResult.success;
 
@@ -127,6 +130,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { requireAdmin } = await import('@/lib/require-admin');
     const authResult = await requireAdmin(request);
     if (!authResult.user) return authResult.response;
 
