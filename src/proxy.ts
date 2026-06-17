@@ -30,21 +30,25 @@ export async function proxy(request: NextRequest) {
         request.headers.get('x-real-ip') ??
         '127.0.0.1'
 
-      const { success, limit, remaining, reset } = await limiter.limit(ip)
+      try {
+        const { success, limit, remaining, reset } = await limiter.limit(ip)
 
-      if (!success) {
-        return NextResponse.json(
-          { success: false, error: 'Too many requests. Please try again in a minute.' },
-          {
-            status: 429,
-            headers: {
-              'X-RateLimit-Limit': limit.toString(),
-              'X-RateLimit-Remaining': remaining.toString(),
-              'X-RateLimit-Reset': reset.toString(),
-              'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
-            },
-          }
-        )
+        if (!success) {
+          return NextResponse.json(
+            { success: false, error: 'Too many requests. Please try again in a minute.' },
+            {
+              status: 429,
+              headers: {
+                'X-RateLimit-Limit': limit.toString(),
+                'X-RateLimit-Remaining': remaining.toString(),
+                'X-RateLimit-Reset': reset.toString(),
+                'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+              },
+            }
+          )
+        }
+      } catch (error) {
+        console.error('[Proxy] Booking rate limit check failed; allowing request:', error)
       }
     }
   }
