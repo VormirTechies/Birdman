@@ -151,9 +151,9 @@ export default function BookingConfirmation({
           <Section style={styles.sidebarSection}>
             <Text style={styles.sectionHeading}>Important Reminders</Text>
             <ul style={styles.list}>
-              <li style={styles.listItem}>Wear comfortable clothing</li>
+              <li style={styles.listItem}>Wear comfortable clothing with light colours</li>
               <li style={styles.listItem}>
-                Avoid bright colors that may startle the birds
+                Avoid dark colours & animal printed shirts that may startle the birds
               </li>
               <li style={styles.listItem}>
                 Keep a respectful distance from Mr. Sudarson Sah during feeding
