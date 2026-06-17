@@ -124,7 +124,7 @@ describe('CalendarCell', () => {
   });
 
   it('applies correct text color for dark green background', () => {
-    const { container } = render(
+    render(
       <CalendarCell {...baseProps} bookingCount={95} percentage={95} />
     );
     
@@ -133,7 +133,7 @@ describe('CalendarCell', () => {
   });
 
   it('applies correct text color for light backgrounds', () => {
-    const { container } = render(
+    render(
       <CalendarCell {...baseProps} bookingCount={30} percentage={30} />
     );
     

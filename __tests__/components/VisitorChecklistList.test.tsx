@@ -5,9 +5,12 @@ import type { ChecklistVisitor } from '@/app/admin/checklist/_components/Visitor
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, layout: _layout, layoutId: _layoutId, ...props }: React.HTMLAttributes<HTMLDivElement> & { layout?: unknown; layoutId?: unknown }) => (
-      <div {...props}>{children}</div>
-    ),
+    div: (componentProps: React.HTMLAttributes<HTMLDivElement> & { layout?: unknown; layoutId?: unknown }) => {
+      const props = { ...componentProps };
+      delete props.layout;
+      delete props.layoutId;
+      return <div {...props}>{componentProps.children}</div>;
+    },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -18,6 +21,8 @@ const makeVisitor = (overrides: Partial<ChecklistVisitor> = {}): ChecklistVisito
   phone: '+919000000000',
   visited: false,
   numberOfGuests: 1,
+  adults: 1,
+  children: 0,
   ...overrides,
 });
 

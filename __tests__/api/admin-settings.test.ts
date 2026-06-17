@@ -28,12 +28,18 @@ vi.mock('@/lib/email', () => ({
   sendCancellationEmails: vi.fn(),
 }));
 
+type MockDb = {
+  select: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+};
+
 describe('POST /api/admin/settings/preview', () => {
-  let mockDb: any;
+  let mockDb: MockDb;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb = dbModule.db as any;
+    mockDb = dbModule.db as unknown as MockDb;
   });
 
   afterEach(() => {
@@ -233,11 +239,11 @@ describe('POST /api/admin/settings/preview', () => {
 });
 
 describe('POST /api/admin/settings/bulk-update', () => {
-  let mockDb: any;
+  let mockDb: MockDb;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb = dbModule.db as any;
+    mockDb = dbModule.db as unknown as MockDb;
   });
 
   afterEach(() => {
@@ -288,8 +294,8 @@ describe('POST /api/admin/settings/bulk-update', () => {
     });
 
     const mockCancelledBookings = [
-      { id: 'b1', email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', numberOfGuests: 2 },
-      { id: 'b2', email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', numberOfGuests: 3 },
+      { id: 'b1', bookingNumber: 1, email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', adults: 2, children: 0, numberOfGuests: 2 },
+      { id: 'b2', bookingNumber: 2, email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', adults: 3, children: 0, numberOfGuests: 3 },
     ];
 
     vi.mocked(queriesModule.cancelBookingsForDates).mockResolvedValue(mockCancelledBookings);
@@ -402,8 +408,8 @@ describe('POST /api/admin/settings/bulk-update', () => {
     });
 
     const mockCancelledBookings = [
-      { id: 'b1', email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', numberOfGuests: 2 },
-      { id: 'b2', email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', numberOfGuests: 3 },
+      { id: 'b1', bookingNumber: 1, email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', adults: 2, children: 0, numberOfGuests: 2 },
+      { id: 'b2', bookingNumber: 2, email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', adults: 3, children: 0, numberOfGuests: 3 },
     ];
 
     vi.mocked(queriesModule.cancelBookingsForDates).mockResolvedValue(mockCancelledBookings);

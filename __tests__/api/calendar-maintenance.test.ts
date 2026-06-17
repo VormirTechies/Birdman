@@ -15,6 +15,11 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+type MockDb = {
+  delete: ReturnType<typeof vi.fn>;
+  execute: ReturnType<typeof vi.fn>;
+};
+
 describe('GET /api/cron/calendar-maintenance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -27,7 +32,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
   });
 
   it('deletes past dates and adds future date', async () => {
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     // Mock delete operation
     const mockDeletedRows = [
@@ -69,7 +74,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
   });
 
   it('maintains exactly 180 rows after maintenance', async () => {
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     mockDb.delete.mockReturnValue({
       where: vi.fn().mockReturnValue({
@@ -97,7 +102,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
   });
 
   it('handles case when no past dates to delete', async () => {
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     // No rows deleted
     mockDb.delete.mockReturnValue({
@@ -151,7 +156,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
     const originalEnv = process.env.CRON_SECRET;
     process.env.CRON_SECRET = 'test-secret-123';
 
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     mockDb.delete.mockReturnValue({
       where: vi.fn().mockReturnValue({
@@ -191,7 +196,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
     const originalEnv = process.env.CRON_SECRET;
     delete process.env.CRON_SECRET;
 
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     mockDb.delete.mockReturnValue({
       where: vi.fn().mockReturnValue({
@@ -217,7 +222,7 @@ describe('GET /api/cron/calendar-maintenance', () => {
     const originalEnv = process.env.CRON_SECRET;
     delete process.env.CRON_SECRET;
 
-    const mockDb = dbModule.db as any;
+    const mockDb = dbModule.db as unknown as MockDb;
 
     mockDb.delete.mockReturnValue({
       where: vi.fn().mockReturnValue({

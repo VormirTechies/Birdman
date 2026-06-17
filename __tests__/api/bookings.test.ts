@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 /**
  * API Route Tests - Booking Endpoints
@@ -10,9 +10,30 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  */
 
 // Mock database
+interface MockBooking {
+  id: string;
+  sessionId: string;
+  visitorName: string;
+  phone: string;
+  email: string;
+  locale: string;
+  numberOfVisitors: number;
+  rulesAccepted: boolean;
+  createdAt: Date;
+}
+
+interface MockSession {
+  id: string;
+  date: string;
+  time: string;
+  capacity: number;
+  bookedCount: number;
+  isActive: boolean;
+}
+
 const mockDb = {
-  bookings: [] as any[],
-  sessions: [] as any[],
+  bookings: [] as MockBooking[],
+  sessions: [] as MockSession[],
 };
 
 describe('POST /api/bookings', () => {
@@ -76,16 +97,6 @@ describe('POST /api/bookings', () => {
     // Set session to full
     mockDb.sessions[0].bookedCount = 10;
 
-    const bookingData = {
-      sessionId: 'session-1',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en',
-      numberOfVisitors: 1,
-      rulesAccepted: true,
-    };
-
     // Check capacity
     const session = mockDb.sessions[0];
     const hasCapacity = session.bookedCount < session.capacity;
@@ -97,16 +108,6 @@ describe('POST /api/bookings', () => {
     // Mark session as inactive
     mockDb.sessions[0].isActive = false;
 
-    const bookingData = {
-      sessionId: 'session-1',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en',
-      numberOfVisitors: 1,
-      rulesAccepted: true,
-    };
-
     const session = mockDb.sessions[0];
     expect(session.isActive).toBe(false);
   });
@@ -114,7 +115,6 @@ describe('POST /api/bookings', () => {
   it('handles concurrent booking requests', async () => {
     // Simulate race condition
     const session = mockDb.sessions[0];
-    const initialCount = session.bookedCount;
 
     // Two bookings for remaining 5 spots
     const booking1 = { numberOfVisitors: 3 };

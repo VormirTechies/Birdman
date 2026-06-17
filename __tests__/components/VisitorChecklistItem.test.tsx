@@ -6,9 +6,12 @@ import { VisitorChecklistItem, type ChecklistVisitor } from '@/app/admin/checkli
 // framer-motion needs to be mocked in jsdom – render children immediately
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, layout: _layout, layoutId: _layoutId, ...props }: React.HTMLAttributes<HTMLDivElement> & { layout?: unknown; layoutId?: unknown }) => (
-      <div {...props}>{children}</div>
-    ),
+    div: (componentProps: React.HTMLAttributes<HTMLDivElement> & { layout?: unknown; layoutId?: unknown }) => {
+      const props = { ...componentProps };
+      delete props.layout;
+      delete props.layoutId;
+      return <div {...props}>{componentProps.children}</div>;
+    },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -19,6 +22,8 @@ const baseVisitor: ChecklistVisitor = {
   phone: '+919876543210',
   visited: false,
   numberOfGuests: 2,
+  adults: 2,
+  children: 0,
 };
 
 describe('VisitorChecklistItem', () => {
