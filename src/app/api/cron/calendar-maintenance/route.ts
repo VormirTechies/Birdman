@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  deletePastCalendarSettings,
-  getFirestoreCalendarSettings,
-  upsertFirestoreCalendarSetting,
-} from '@/lib/firebase/calendar-settings';
+import { sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { calendarSettings } from '@/lib/db/schema';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -25,34 +23,39 @@ export async function GET(request: NextRequest) {
     futureDate.setUTCDate(futureDate.getUTCDate() + 180);
     const futureDateString = futureDate.toISOString().split('T')[0];
 
-    const deleted = await deletePastCalendarSettings(todayString);
-    const existingFutureSetting = (
-      await getFirestoreCalendarSettings(futureDateString, futureDateString)
-    )[0];
+    const deletedRows = await db
+      .delete(calendarSettings)
+      .where(sql`${calendarSettings.date} < ${todayString}`)
+      .returning();
 
-    if (!existingFutureSetting) {
-      await upsertFirestoreCalendarSetting(
-        futureDateString,
-        {
-          maxCapacity: 100,
-          startTime: '16:30:00',
-          isOpen: true,
-        },
-        null
-      );
-    }
+    await db.execute(sql`
+      INSERT INTO calendar_settings (date, max_capacity, start_time, is_open)
+      VALUES (${futureDateString}, 100, '16:30:00', true)
+      ON CONFLICT (date) DO NOTHING
+    `);
 
-    const settings = await getFirestoreCalendarSettings();
-    const dates = settings.map((setting) => setting.date).filter(Boolean);
+    const stats = await db.execute(sql`
+      SELECT
+        MIN(date)::text AS min_date,
+        MAX(date)::text AS max_date,
+        COUNT(*)::int AS total_rows
+      FROM calendar_settings
+    `);
+    const firstStatsRow = Array.isArray(stats)
+      ? stats[0]
+      : (stats as { rows?: unknown[] }).rows?.[0];
+    const window = firstStatsRow as
+      | { min_date: string | null; max_date: string | null; total_rows: number }
+      | undefined;
 
     return NextResponse.json({
       success: true,
-      deleted,
+      deleted: deletedRows.length,
       added: futureDateString,
       window: {
-        minDate: dates[0] ?? null,
-        maxDate: dates.at(-1) ?? null,
-        totalRows: settings.length,
+        minDate: window?.min_date ?? null,
+        maxDate: window?.max_date ?? null,
+        totalRows: window?.total_rows ?? 0,
       },
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConfirmedBookingCounts } from '@/lib/firebase/calendar-admin';
-import { getFirestoreCalendarSettings } from '@/lib/firebase/calendar-settings';
+import { and, asc, gte, inArray, lte, sql } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { bookings, calendarSettings } from '@/lib/db/schema';
 import { requireAdmin } from '@/lib/require-admin';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +76,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid applyMode' }, { status: 400 });
     }
 
-    const counts = await getConfirmedBookingCounts(new Set(affectedDates));
+    const counts = new Map<string, number>();
+    if (affectedDates.length > 0) {
+      const bookingCounts = await db
+        .select({
+          bookingDate: bookings.bookingDate,
+          count: sql<number>`COALESCE(SUM(${bookings.adults} + ${bookings.children}), 0)::int`,
+        })
+        .from(bookings)
+        .where(and(
+          inArray(bookings.bookingDate, affectedDates),
+          sql`${bookings.status} = 'confirmed'`
+        ))
+        .groupBy(bookings.bookingDate);
+
+      bookingCounts.forEach((row) => {
+        counts.set(row.bookingDate, row.count);
+      });
+    }
+
     const bookingsByDate = affectedDates
       .filter((affectedDate) => counts.has(affectedDate))
       .map((affectedDate) => ({
@@ -86,12 +105,18 @@ export async function POST(request: NextRequest) {
       (total, item) => total + item.count,
       0
     );
+    const sampleSettings = affectedDates.length > 0
+      ? await db
+        .select()
+        .from(calendarSettings)
+        .where(and(
+          gte(calendarSettings.date, affectedDates[0]),
+          lte(calendarSettings.date, affectedDates.at(-1) ?? affectedDates[0])
+        ))
+        .orderBy(asc(calendarSettings.date))
+      : [];
     const sampleDates = new Set(affectedDates.slice(0, 5));
-    const currentSettings = await getFirestoreCalendarSettings(
-      affectedDates[0],
-      affectedDates.at(-1)
-    );
-    const sampleSettings = currentSettings
+    const sampleCurrentSettings = sampleSettings
       .filter((setting) => sampleDates.has(setting.date))
       .map((setting) => ({
         date: setting.date,
@@ -107,7 +132,7 @@ export async function POST(request: NextRequest) {
       totalAffectedDates: affectedDates.length,
       existingBookingsCount: totalBookings,
       bookingsByDate,
-      sampleCurrentSettings: sampleSettings,
+      sampleCurrentSettings,
       willBlock: settings.isOpen === false,
     });
   } catch (error) {

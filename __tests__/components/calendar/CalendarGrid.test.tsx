@@ -84,7 +84,9 @@ describe('CalendarGrid', () => {
     render(<CalendarGrid currentMonth={currentMonth} onDayClick={mockOnDayClick} />);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=4');
+      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=4', {
+        cache: 'no-store',
+      });
     });
   });
 
@@ -140,14 +142,18 @@ describe('CalendarGrid', () => {
     );
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=4');
+      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=4', {
+        cache: 'no-store',
+      });
     });
 
     const newMonth = new Date(2026, 4, 1); // May 2026
     rerender(<CalendarGrid currentMonth={newMonth} onDayClick={mockOnDayClick} />);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=5');
+      expect(global.fetch).toHaveBeenCalledWith('/api/calendar/month?year=2026&month=5', {
+        cache: 'no-store',
+      });
     });
   });
 

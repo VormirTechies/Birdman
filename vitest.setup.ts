@@ -13,6 +13,7 @@ beforeAll(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test_anon_key';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'test_service_role_key';
+  Element.prototype.scrollIntoView = vi.fn();
 });
 
 // Mock Next.js router
@@ -33,4 +34,20 @@ vi.mock('next/navigation', () => ({
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
   useLocale: () => 'en',
+}));
+
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
+
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/require-admin', () => ({
+  requireAdmin: vi.fn().mockResolvedValue({
+    user: {
+      uid: '00000000-0000-0000-0000-000000000001',
+      email: 'admin@example.com',
+    },
+    response: null,
+  }),
 }));

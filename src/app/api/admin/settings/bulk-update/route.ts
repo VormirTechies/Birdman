@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { sendCancellationEmails } from '@/lib/email';
-import { cancelFirestoreBookingsForDates } from '@/lib/firebase/calendar-admin';
-import {
-  getFirestoreCalendarSettings,
-  getFutureCalendarSettingReferences,
-  updateFirestoreCalendarSettings,
-  upsertFirestoreCalendarSetting,
-  upsertFirestoreCalendarSettings,
-} from '@/lib/firebase/calendar-settings';
+import { db } from '@/lib/db';
+import { cancelBookingsForDates } from '@/lib/db/queries';
+import { calendarSettings } from '@/lib/db/schema';
 import { requireAdmin } from '@/lib/require-admin';
 
 export const dynamic = 'force-dynamic';
@@ -52,64 +48,77 @@ export async function POST(request: NextRequest) {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const updatedBy = authResult.user.uid;
+    const updatedBy = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(adminId)
+      ? adminId
+      : null;
     let affectedCount = 0;
     let cancellationStart: string | null = null;
     let cancellationEnd: string | null = null;
 
     switch (applyMode) {
       case 'all_days': {
-        const references = await getFutureCalendarSettingReferences(today);
-        affectedCount = await updateFirestoreCalendarSettings(
-          references,
-          settings,
-          updatedBy
-        );
+        const updatedRows = await db
+          .update(calendarSettings)
+          .set({ ...settings, updatedBy, updatedAt: new Date() })
+          .where(gte(calendarSettings.date, today))
+          .returning();
+        affectedCount = updatedRows.length;
 
         if (settings.isOpen === false) {
-          const futureSettings = await getFirestoreCalendarSettings(today);
           cancellationStart = today;
-          cancellationEnd = futureSettings.at(-1)?.date ?? today;
+          const end = new Date(`${today}T00:00:00Z`);
+          end.setUTCDate(end.getUTCDate() + 180);
+          cancellationEnd = end.toISOString().split('T')[0];
         }
         break;
       }
-      case 'one_day':
+      case 'one_day': {
         if (!date) {
           return NextResponse.json(
             { error: 'Date required for one_day mode' },
             { status: 400 }
           );
         }
-        await upsertFirestoreCalendarSetting(date, settings, updatedBy);
-        affectedCount = 1;
+        const updatedRows = await db
+          .update(calendarSettings)
+          .set({ ...settings, updatedBy, updatedAt: new Date() })
+          .where(eq(calendarSettings.date, date))
+          .returning();
+        affectedCount = updatedRows.length || 1;
         if (settings.isOpen === false) {
           cancellationStart = date;
           cancellationEnd = date;
         }
         break;
-      case 'date_range':
+      }
+      case 'date_range': {
         if (!startDate || !endDate) {
           return NextResponse.json(
             { error: 'startDate and endDate required for date_range mode' },
             { status: 400 }
           );
         }
-        affectedCount = await upsertFirestoreCalendarSettings(
-          dateRange(startDate, endDate),
-          settings,
-          updatedBy
-        );
+        const updatedRows = await db
+          .update(calendarSettings)
+          .set({ ...settings, updatedBy, updatedAt: new Date() })
+          .where(and(
+            gte(calendarSettings.date, startDate),
+            lte(calendarSettings.date, endDate)
+          ))
+          .returning();
+        affectedCount = updatedRows.length || dateRange(startDate, endDate).length;
         if (settings.isOpen === false) {
           cancellationStart = startDate;
           cancellationEnd = endDate;
         }
         break;
+      }
       default:
         return NextResponse.json({ error: 'Invalid applyMode' }, { status: 400 });
     }
 
     const cancelledBookings = cancellationStart && cancellationEnd
-      ? await cancelFirestoreBookingsForDates(cancellationStart, cancellationEnd)
+      ? await cancelBookingsForDates(cancellationStart, cancellationEnd)
       : [];
     const bookingsWithEmail = cancelledBookings.filter(
       (booking) => booking.email !== null

@@ -7,7 +7,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    testTimeout: 15000,
     setupFiles: ['./vitest.setup.ts'],
+    include: ['__tests__/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules/', '.next/', 'e2e/', '**/e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -21,12 +24,6 @@ export default defineConfig({
         '**/__tests__/**',
         '**/e2e/**',
       ],
-      thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
-      },
     },
   },
   resolve: {

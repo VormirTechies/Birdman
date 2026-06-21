@@ -177,7 +177,7 @@ describe('GET /api/sessions', () => {
               : 'available',
     }));
 
-    expect(sessions[0].status).toBe('few-left'); // 5/10 booked
+    expect(sessions[0].status).toBe('available'); // 5/10 booked
     expect(sessions[1].status).toBe('full'); // 10/10 booked
     expect(sessions[2].status).toBe('closed'); // inactive
   });

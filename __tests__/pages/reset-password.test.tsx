@@ -73,7 +73,7 @@ describe('Reset Password Page', () => {
 
       // Wait for the 500ms session check delay to complete
       await waitFor(() => {
-        expect(screen.getByText('Reset Password')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Reset Password' })).toBeInTheDocument();
         expect(screen.queryByText(/Verifying your session/i)).not.toBeInTheDocument();
       }, { timeout: 2000 });
 

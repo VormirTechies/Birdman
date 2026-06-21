@@ -37,9 +37,9 @@ describe('cn utility (classname merger)', () => {
     expect(result).toBe('class-1 class-3');
   });
 
-  it('removes duplicate classes', () => {
+  it('preserves duplicate non-tailwind classes', () => {
     const result = cn('class-1', 'class-2', 'class-1');
-    expect(result).toBe('class-1 class-2');
+    expect(result).toBe('class-1 class-2 class-1');
   });
 
   it('handles empty or null values', () => {

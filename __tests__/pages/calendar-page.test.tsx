@@ -199,8 +199,7 @@ describe('Calendar Page', () => {
     
     // Should have main container with proper styling
     expect(container.querySelector('.space-y-4')).toBeInTheDocument();
-    expect(container.querySelector('.bg-white')).toBeInTheDocument();
-    expect(container.querySelector('.rounded-2xl')).toBeInTheDocument();
+    expect(container.querySelector('.flex.flex-col.gap-2')).toBeInTheDocument();
   });
 
   it('increments refresh key on save', async () => {

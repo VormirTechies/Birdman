@@ -1,30 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import { createBookingSchema, createFeedbackSchema } from '@/lib/validations';
 
+const validBookingData = {
+  visitorName: 'John Doe',
+  phone: '+91-9876543210',
+  email: 'john@example.com',
+  adults: 2,
+  children: 0,
+  bookingDate: '2026-07-01',
+  bookingTime: '16:30',
+};
+
 describe('createBookingSchema', () => {
   it('should validate correct booking data', () => {
-    const validData = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
-    };
-
-    expect(() => createBookingSchema.parse(validData)).not.toThrow();
+    expect(() => createBookingSchema.parse(validBookingData)).not.toThrow();
   });
 
-  it('should accept Tamil locale', () => {
+  it('should accept Tamil names', () => {
     const tamilData = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'ஜான் டோ',
+      ...validBookingData,
+      visitorName: 'Tamil Visitor',
       phone: '9876543210',
-      email: 'john@example.com',
-      locale: 'ta' as const,
-      numberOfVisitors: 1,
-      rulesAccepted: true,
+      adults: 1,
     };
 
     expect(() => createBookingSchema.parse(tamilData)).not.toThrow();
@@ -32,78 +29,49 @@ describe('createBookingSchema', () => {
 
   it('should reject invalid phone format', () => {
     const invalidData = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: 'abc123xyz', // Invalid characters
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
+      ...validBookingData,
+      phone: 'abc123xyz',
     };
 
     expect(() => createBookingSchema.parse(invalidData)).toThrow();
   });
 
-  it('should reject invalid session ID', () => {
+  it('should reject invalid booking date format', () => {
     const invalidData = {
-      sessionId: 'not-a-uuid',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
+      ...validBookingData,
+      bookingDate: '07-01-2026',
     };
 
-    expect(() => createBookingSchema.parse(invalidData)).toThrow(/Invalid session ID/);
+    expect(() => createBookingSchema.parse(invalidData)).toThrow(/YYYY-MM-DD/);
   });
 
   it('should limit guests to 1-10', () => {
     const tooManyGuests = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 11, // Exceeds maximum
-      rulesAccepted: true,
+      ...validBookingData,
+      adults: 10,
+      children: 1,
     };
 
-    expect(() => createBookingSchema.parse(tooManyGuests)).toThrow(/Maximum 10 visitors/);
+    expect(() => createBookingSchema.parse(tooManyGuests)).toThrow(/Total number of guests/);
 
-    const zeroGuests = {
-      ...tooManyGuests,
-      numberOfVisitors: 0,
+    const zeroAdults = {
+      ...validBookingData,
+      adults: 0,
+      children: 0,
     };
 
-    expect(() => createBookingSchema.parse(zeroGuests)).toThrow(/At least 1 visitor/);
+    expect(() => createBookingSchema.parse(zeroAdults)).toThrow(/At least 1 adult/);
   });
 
-  it('should require rulesAccepted to be true', () => {
-    const rulesNotAccepted = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: false, // Critical: Silence Policy not accepted
-    };
-
-    expect(() => createBookingSchema.parse(rulesNotAccepted)).toThrow(
-      /You must accept the sanctuary rules/
-    );
+  it('should require booking time', () => {
+    const { bookingTime: _bookingTime, ...missingTime } = validBookingData;
+    expect(() => createBookingSchema.parse(missingTime)).toThrow();
   });
 
   it('should accept optional email as empty string', () => {
     const noEmail = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
+      ...validBookingData,
       email: '',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
     };
 
     expect(() => createBookingSchema.parse(noEmail)).not.toThrow();
@@ -111,13 +79,8 @@ describe('createBookingSchema', () => {
 
   it('should reject invalid email format', () => {
     const invalidEmail = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
-      visitorName: 'John Doe',
-      phone: '+91-9876543210',
+      ...validBookingData,
       email: 'not-an-email',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
     };
 
     expect(() => createBookingSchema.parse(invalidEmail)).toThrow(/Invalid email/);
@@ -125,13 +88,8 @@ describe('createBookingSchema', () => {
 
   it('should reject names that are too short', () => {
     const shortName = {
-      sessionId: '550e8400-e29b-41d4-a716-446655440000',
+      ...validBookingData,
       visitorName: 'J',
-      phone: '+91-9876543210',
-      email: 'john@example.com',
-      locale: 'en' as const,
-      numberOfVisitors: 2,
-      rulesAccepted: true,
     };
 
     expect(() => createBookingSchema.parse(shortName)).toThrow(/at least 2 characters/);

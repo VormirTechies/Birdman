@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { PATCH } from '@/app/api/bookings/[id]/route';
+import type { Booking } from '@/lib/db/schema';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -14,21 +15,38 @@ vi.mock('@/lib/email', () => ({
   sendRescheduleNotification: vi.fn(),
 }));
 
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/require-admin', () => ({
+  requireAdmin: vi.fn().mockResolvedValue({ user: { id: 'admin-1' }, response: null }),
+}));
+
+vi.mock('@/lib/firebase/admin', () => ({
+  getAdminDb: vi.fn(),
+}));
+
 import { getBookingById, toggleVisited } from '@/lib/db/queries';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const VALID_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
 
-function makeBooking(overrides = {}) {
+function makeBooking(overrides: Partial<Booking> = {}): Booking {
   return {
     id: VALID_UUID,
+    bookingNumber: 1,
+    visitorId: null,
     visitorName: 'Meiyazhagan Sudarson',
     phone: '+919876543210',
     email: 'meiya@example.com',
     numberOfGuests: 3,
+    adults: 2,
+    children: 1,
     bookingDate: '2026-04-28',
     bookingTime: '10:00',
+    confirmationSent: false,
+    reminderSent: false,
+    reminderSentAt: null,
     status: 'confirmed',
     visited: false,
     createdAt: new Date('2026-04-01'),
@@ -124,7 +142,7 @@ describe('PATCH /api/bookings/[id] – visited toggle', () => {
 
   describe('not found', () => {
     it('returns 404 when booking does not exist', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(null);
+      vi.mocked(getBookingById).mockResolvedValue(undefined);
 
       const res = await patch(VALID_UUID, { visited: true });
       expect(res.status).toBe(404);
@@ -134,7 +152,7 @@ describe('PATCH /api/bookings/[id] – visited toggle', () => {
     });
 
     it('does not call toggleVisited when booking is not found', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(null);
+      vi.mocked(getBookingById).mockResolvedValue(undefined);
       await patch(VALID_UUID, { visited: true });
       expect(toggleVisited).not.toHaveBeenCalled();
     });

@@ -151,7 +151,7 @@ describe('DayDetailsModal', () => {
     );
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(`/api/calendar/day/${testDate}`);
+      expect(global.fetch).toHaveBeenCalledWith(`/api/calendar/day/${testDate}`, undefined);
     });
   });
 
@@ -368,7 +368,7 @@ describe('DayDetailsModal', () => {
     );
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to load day details');
+      expect(toast.error).toHaveBeenCalledWith('Network error');
     });
   });
 

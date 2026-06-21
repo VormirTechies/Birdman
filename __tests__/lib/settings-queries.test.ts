@@ -9,6 +9,7 @@ import * as dbModule from '@/lib/db';
 
 vi.mock('@/lib/db', () => ({
   db: {
+    execute: vi.fn().mockResolvedValue(undefined),
     update: vi.fn(),
   },
 }));

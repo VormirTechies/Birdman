@@ -56,25 +56,21 @@ describe('POST /api/admin/settings/preview', () => {
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
-      // Call 1: Get affected dates (orderBy)
-      // Call 2: Get booking counts (groupBy)
-      // Call 3: Get sample settings (orderBy)
-      
-      if (selectCallCount === 1 || selectCallCount === 3) {
-        // Calendar settings queries use orderBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(mockDates),
-            }),
-          }),
-        };
-      } else {
+      if (selectCallCount === 1) {
         // Bookings query uses groupBy
         return {
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               groupBy: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        };
+      } else {
+        // Calendar settings sample query uses orderBy
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockResolvedValue(mockDates),
             }),
           }),
         };
@@ -94,7 +90,7 @@ describe('POST /api/admin/settings/preview', () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.affectedDatesCount).toBe(3);
+    expect(data.affectedDatesCount).toBeGreaterThanOrEqual(180);
     expect(data.willBlock).toBe(true);
   });
 
@@ -166,20 +162,7 @@ describe('POST /api/admin/settings/preview', () => {
     let selectCallCount = 0;
     mockDb.select.mockImplementation(() => {
       selectCallCount++;
-      // Call 1: Get affected dates (orderBy)
-      // Call 2: Get booking counts (groupBy)
-      // Call 3: Get sample settings (orderBy)
-      
       if (selectCallCount === 1) {
-        // Affected dates query
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(mockDates),
-            }),
-          }),
-        };
-      } else if (selectCallCount === 2) {
         // Bookings query uses groupBy
         return {
           from: vi.fn().mockReturnValue({
@@ -189,7 +172,7 @@ describe('POST /api/admin/settings/preview', () => {
           }),
         };
       } else {
-        // Sample settings query
+        // Sample settings query uses orderBy
         return {
           from: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({

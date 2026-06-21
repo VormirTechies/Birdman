@@ -13,6 +13,7 @@ vi.mock('@/lib/db', () => ({
         findMany: (...args: unknown[]) => mockFindMany(...args),
       },
     },
+    execute: vi.fn().mockResolvedValue(undefined),
     update: (...args: unknown[]) => mockUpdate(...args),
   },
 }));

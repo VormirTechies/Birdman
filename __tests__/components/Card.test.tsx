@@ -38,7 +38,7 @@ describe('Card Components', () => {
       </Card>
     );
 
-    const card = screen.getByText('Content').parentElement?.parentElement;
+    const card = screen.getByText('Content').parentElement;
     expect(card).toHaveClass('custom-card');
   });
 
@@ -65,7 +65,7 @@ describe('Card Components', () => {
     );
 
     const description = screen.getByText('Test Description');
-    expect(description).toHaveClass('text-muted-foreground');
+    expect(description).toHaveClass('text-chennai-earth');
   });
 
   it('supports nested components', () => {

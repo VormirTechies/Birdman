@@ -1,19 +1,20 @@
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  FieldValue,
-  Timestamp,
-  type DocumentSnapshot,
-} from 'firebase-admin/firestore';
 import { z } from 'zod';
-import type { Booking } from '@/lib/db/schema';
-import { getAdminDb } from '@/lib/firebase/admin';
-import { sendRescheduleNotification } from '@/lib/email';
-import { parsePublicBookingNumber } from '@/lib/booking-number';
+import {
+  cancelBooking,
+  getBookingById,
+  toggleVisited,
+  updateBooking,
+} from '@/lib/db/queries';
+import type { Booking, NewBooking } from '@/lib/db/schema';
 import { requireAdmin } from '@/lib/require-admin';
 
-const firestoreUpdateSchema = z.object({
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const updateSchema = z.object({
   status: z.enum(['confirmed', 'cancelled', 'completed']).optional(),
   visited: z.boolean().optional(),
   visitorName: z.string().min(2).max(255).optional(),
@@ -28,73 +29,57 @@ const firestoreUpdateSchema = z.object({
   message: 'At least one field must be provided',
 });
 
-function toDate(value: unknown): Date {
-  if (value instanceof Timestamp) return value.toDate();
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') return new Date(value);
-  return new Date();
-}
-
-function toBooking(id: string, data: Record<string, unknown>): Booking {
+function serializeBooking(booking: Booking) {
   return {
-    id,
-    bookingNumber: Number(data.bookingNumber ?? data.booking_number ?? 0),
-    visitorId: typeof data.visitorId === 'string' ? data.visitorId : null,
-    visitorName: String(data.visitorName ?? data.visitor_name ?? ''),
-    phone: String(data.phone ?? ''),
-    email: typeof data.email === 'string' ? data.email : null,
-    adults: Number(data.adults ?? 0),
-    children: Number(data.children ?? 0),
-    numberOfGuests: Number(data.numberOfGuests ?? data.number_of_guests ?? 0),
-    bookingDate: String(data.bookingDate ?? data.booking_date ?? ''),
-    bookingTime: String(data.bookingTime ?? data.booking_time ?? ''),
-    confirmationSent: data.confirmationSent === true,
-    reminderSent: data.reminderSent === true,
-    reminderSentAt: data.reminderSentAt ? toDate(data.reminderSentAt) : null,
-    status: String(data.status ?? 'confirmed'),
-    visited: data.visited === true,
-    createdAt: toDate(data.createdAt ?? data.created_at),
-    updatedAt: toDate(data.updatedAt ?? data.updated_at),
+    ...booking,
+    createdAt: booking.createdAt.toISOString(),
+    updatedAt: booking.updatedAt.toISOString(),
+    reminderSentAt: booking.reminderSentAt?.toISOString() ?? null,
   };
 }
 
-function serializeValue(value: unknown): unknown {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(serializeValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nestedValue]) => [key, serializeValue(nestedValue)])
-    );
-  }
-  return value;
+function normalizeBody(body: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...body,
+    visitorName: body.visitorName ?? body.visitor_name,
+    numberOfGuests: body.numberOfGuests ?? body.number_of_guests,
+    bookingDate: body.bookingDate ?? body.booking_date,
+    bookingTime: body.bookingTime ?? body.booking_time,
+  };
 }
 
-async function findBookingSnapshot(idOrBookingNumber: string): Promise<DocumentSnapshot | null> {
-  const bookings = getAdminDb().collection('bookings');
-  const directSnapshot = await bookings.doc(idOrBookingNumber).get();
+function toUpdateData(
+  parsed: z.infer<typeof updateSchema>,
+  existingBooking: Booking
+): Partial<NewBooking> {
+  const updateData: Partial<NewBooking> = {};
 
-  if (directSnapshot.exists) {
-    return directSnapshot;
+  if (parsed.status !== undefined) updateData.status = parsed.status;
+  if (parsed.visited !== undefined) updateData.visited = parsed.visited;
+  if (parsed.visitorName !== undefined) updateData.visitorName = parsed.visitorName;
+  if (parsed.phone !== undefined) updateData.phone = parsed.phone;
+  if (parsed.email !== undefined) updateData.email = parsed.email === '' ? null : parsed.email;
+  if (parsed.adults !== undefined) updateData.adults = parsed.adults;
+  if (parsed.children !== undefined) updateData.children = parsed.children;
+  if (parsed.numberOfGuests !== undefined) updateData.numberOfGuests = parsed.numberOfGuests;
+  if (parsed.bookingDate !== undefined) updateData.bookingDate = parsed.bookingDate;
+  if (parsed.bookingTime !== undefined) updateData.bookingTime = parsed.bookingTime;
+
+  if (
+    parsed.numberOfGuests === undefined &&
+    (parsed.adults !== undefined || parsed.children !== undefined)
+  ) {
+    const adults = parsed.adults ?? existingBooking.adults;
+    const children = parsed.children ?? existingBooking.children;
+    updateData.numberOfGuests = adults + children;
   }
 
-  const parsedBookingNumber = parsePublicBookingNumber(idOrBookingNumber);
-  const lookupValues: Array<string | number> = [idOrBookingNumber];
-
-  if (parsedBookingNumber !== null) {
-    lookupValues.unshift(parsedBookingNumber);
+  if (parsed.bookingDate !== undefined || parsed.bookingTime !== undefined) {
+    updateData.reminderSent = false;
+    updateData.reminderSentAt = null;
   }
 
-  for (const field of ['bookingNumber', 'booking_number']) {
-    for (const value of lookupValues) {
-      const querySnapshot = await bookings.where(field, '==', value).limit(1).get();
-      if (!querySnapshot.empty) {
-        return querySnapshot.docs[0];
-      }
-    }
-  }
-
-  return null;
+  return updateData;
 }
 
 export async function GET(
@@ -106,20 +91,24 @@ export async function GET(
     if (!authResult.user) return authResult.response;
 
     const { id } = await params;
-    const snapshot = await findBookingSnapshot(id);
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid booking id' },
+        { status: 400 }
+      );
+    }
 
-    if (!snapshot?.exists) {
+    const booking = await getBookingById(id);
+    if (!booking) {
       return NextResponse.json(
         { success: false, error: 'Booking not found' },
         { status: 404 }
       );
     }
 
-    const booking = toBooking(snapshot.id, snapshot.data() ?? {});
-
     return NextResponse.json({
       success: true,
-      booking: serializeValue(booking),
+      booking: serializeBooking(booking),
     });
   } catch (error) {
     console.error('[API] Failed to fetch booking:', error);
@@ -143,31 +132,16 @@ export async function PATCH(
     if (!authResult.user) return authResult.response;
 
     const { id } = await params;
-    const bookingRef = getAdminDb().collection('bookings').doc(id);
-    const snapshot = await bookingRef.get();
-
-    if (!snapshot.exists) {
+    if (!UUID_RE.test(id)) {
       return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
+        { success: false, error: 'Invalid booking id' },
+        { status: 400 }
       );
     }
 
     const body = await request.json();
-    const normalizedBody: Record<string, unknown> = { ...body };
-    if (normalizedBody.visitorName === undefined && body.visitor_name !== undefined) {
-      normalizedBody.visitorName = body.visitor_name;
-    }
-    if (normalizedBody.numberOfGuests === undefined && body.number_of_guests !== undefined) {
-      normalizedBody.numberOfGuests = body.number_of_guests;
-    }
-    if (normalizedBody.bookingDate === undefined && body.booking_date !== undefined) {
-      normalizedBody.bookingDate = body.booking_date;
-    }
-    if (normalizedBody.bookingTime === undefined && body.booking_time !== undefined) {
-      normalizedBody.bookingTime = body.booking_time;
-    }
-    const parsed = firestoreUpdateSchema.safeParse(normalizedBody);
+    const normalizedBody = normalizeBody(body);
+    const parsed = updateSchema.safeParse(normalizedBody);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -180,40 +154,50 @@ export async function PATCH(
       );
     }
 
-    const existingBooking = toBooking(id, snapshot.data() ?? {});
-    const updateData: Record<string, unknown> = {
-      ...parsed.data,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
+    const existingBooking = await getBookingById(id);
+    if (!existingBooking) {
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
 
-    if (
-      parsed.data.numberOfGuests === undefined &&
-      (parsed.data.adults !== undefined || parsed.data.children !== undefined)
-    ) {
-      const adults = parsed.data.adults ?? existingBooking.adults;
-      const children = parsed.data.children ?? existingBooking.children;
-      updateData.numberOfGuests = adults + children;
+    const keys = Object.keys(normalizedBody).filter((key) => normalizedBody[key] !== undefined);
+    if (keys.length === 1 && parsed.data.visited !== undefined) {
+      const updatedBooking = await toggleVisited(id, parsed.data.visited);
+      if (!updatedBooking) {
+        return NextResponse.json(
+          { success: false, error: 'Booking not found' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        booking: serializeBooking(updatedBooking),
+        emailSent: false,
+      });
     }
 
     const isReschedule =
       parsed.data.bookingDate !== undefined || parsed.data.bookingTime !== undefined;
-    if (isReschedule) {
-      updateData.reminderSent = false;
-      updateData.reminderSentAt = null;
-    }
-
     const oldBookingDetails = {
       bookingDate: existingBooking.bookingDate,
       bookingTime: existingBooking.bookingTime,
     };
 
-    await bookingRef.update(updateData);
-    const updatedSnapshot = await bookingRef.get();
-    const updatedBooking = toBooking(id, updatedSnapshot.data() ?? {});
+    const updatedBooking = await updateBooking(id, toUpdateData(parsed.data, existingBooking));
+    if (!updatedBooking) {
+      return NextResponse.json(
+        { success: false, error: 'Booking not found' },
+        { status: 404 }
+      );
+    }
 
     let emailSent = false;
     if (isReschedule) {
       try {
+        const { sendRescheduleNotification } = await import('@/lib/email');
         const emailResult = await sendRescheduleNotification(updatedBooking, oldBookingDetails);
         emailSent = emailResult.success;
       } catch (emailError) {
@@ -223,10 +207,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      booking: serializeValue({
-        id: updatedSnapshot.id,
-        ...updatedSnapshot.data(),
-      }),
+      booking: serializeBooking(updatedBooking),
       emailSent,
     });
   } catch (error) {
@@ -251,22 +232,25 @@ export async function DELETE(
     if (!authResult.user) return authResult.response;
 
     const { id } = await params;
-    const bookingRef = getAdminDb().collection('bookings').doc(id);
-    const snapshot = await bookingRef.get();
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid booking id' },
+        { status: 400 }
+      );
+    }
 
-    if (!snapshot.exists) {
+    const cancelled = await cancelBooking(id);
+    if (!cancelled) {
       return NextResponse.json(
         { success: false, error: 'Booking not found' },
         { status: 404 }
       );
     }
 
-    await bookingRef.delete();
-
     return NextResponse.json({
       success: true,
       message: 'Booking deleted successfully',
-      booking: { id },
+      booking: serializeBooking(cancelled),
     });
   } catch (error) {
     console.error('[API] Booking deletion failed:', error);

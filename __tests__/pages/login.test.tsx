@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 import AdminLoginPage from '@/app/admin/login/page';
@@ -22,17 +22,38 @@ vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
 }));
 
-// Mock Supabase client
-const mockSignInWithPassword = vi.fn();
-const mockResetPasswordForEmail = vi.fn();
+// Mock Firebase auth client
+const {
+  mockSignInWithEmailAndPassword,
+  mockSendPasswordResetEmail,
+  mockVerifyPasswordResetCode,
+  mockConfirmPasswordReset,
+} = vi.hoisted(() => ({
+  mockSignInWithEmailAndPassword: vi.fn(),
+  mockSendPasswordResetEmail: vi.fn(),
+  mockVerifyPasswordResetCode: vi.fn(),
+  mockConfirmPasswordReset: vi.fn(),
+}));
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: vi.fn(() => ({
-    auth: {
-      signInWithPassword: mockSignInWithPassword,
-      resetPasswordForEmail: mockResetPasswordForEmail,
-    },
-  })),
+vi.mock('firebase/auth', () => ({
+  confirmPasswordReset: mockConfirmPasswordReset,
+  sendPasswordResetEmail: mockSendPasswordResetEmail,
+  signInWithEmailAndPassword: mockSignInWithEmailAndPassword,
+  verifyPasswordResetCode: mockVerifyPasswordResetCode,
+}));
+
+vi.mock('@/firebase', () => ({
+  auth: {},
+  firebaseConfigError: null,
+}));
+
+vi.mock('framer-motion', () => ({
+  AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  motion: {
+    div: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+      <div {...props}>{children}</div>
+    ),
+  },
 }));
 
 // Mock Carousel component
@@ -56,13 +77,17 @@ vi.mock('@/app/admin/_components/OTPInput', () => ({
 
 describe('Login Page', () => {
   const mockPush = vi.fn();
-  const mockRouter = { push: mockPush };
+  const mockReplace = vi.fn();
+  const mockRefresh = vi.fn();
+  const mockRouter = { push: mockPush, replace: mockReplace, refresh: mockRefresh };
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useRouter as any).mockReturnValue(mockRouter);
-    mockSignInWithPassword.mockResolvedValue({ error: null });
-    mockResetPasswordForEmail.mockResolvedValue({ error: null });
+    mockSignInWithEmailAndPassword.mockResolvedValue({ user: { uid: 'admin-1' } });
+    mockSendPasswordResetEmail.mockResolvedValue(undefined);
+    mockVerifyPasswordResetCode.mockResolvedValue('user@example.com');
+    mockConfirmPasswordReset.mockResolvedValue(undefined);
 
     // Mock window.location.origin for reset password redirect
     Object.defineProperty(window, 'location', {
@@ -169,10 +194,11 @@ describe('Login Page', () => {
       await user.click(loginButton);
 
       await waitFor(() => {
-        expect(mockSignInWithPassword).toHaveBeenCalledWith({
-          email: 'admin@example.com',
-          password: 'password123',
-        });
+        expect(mockSignInWithEmailAndPassword).toHaveBeenCalledWith(
+          {},
+          'admin@example.com',
+          'password123'
+        );
       });
     });
 
@@ -189,15 +215,16 @@ describe('Login Page', () => {
       await user.click(loginButton);
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/admin');
+        expect(mockReplace).toHaveBeenCalledWith('/admin');
+        expect(mockRefresh).toHaveBeenCalled();
       });
     });
 
     it('shows error message on invalid credentials', async () => {
       const user = userEvent.setup();
-      mockSignInWithPassword.mockResolvedValue({
-        error: { message: 'Invalid login credentials' },
-      });
+      mockSignInWithEmailAndPassword.mockRejectedValue(
+        new Error('Invalid login credentials')
+      );
 
       render(<AdminLoginPage />);
 
@@ -228,8 +255,8 @@ describe('Login Page', () => {
 
     it('disables submit button while loading', async () => {
       const user = userEvent.setup();
-      mockSignInWithPassword.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ error: null }), 100))
+      mockSignInWithEmailAndPassword.mockImplementation(
+        () => new Promise(resolve => setTimeout(() => resolve({ user: { uid: 'admin-1' } }), 100))
       );
 
       render(<AdminLoginPage />);
@@ -246,7 +273,7 @@ describe('Login Page', () => {
       expect(loginButton).toBeDisabled();
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/admin');
+        expect(mockReplace).toHaveBeenCalledWith('/admin');
       });
     });
   });
@@ -272,11 +299,10 @@ describe('Login Page', () => {
       const forgotLink = screen.getByText(/Forgot password?/i);
       await user.click(forgotLink);
 
-      await waitFor(async () => {
-        const emailInput = screen.getByPlaceholderText(/manager@hotel.com/i);
-        await user.type(emailInput, 'user@example.com');
-        expect(emailInput).toHaveValue('user@example.com');
-      });
+      await screen.findByRole('heading', { name: /Forgot Password/i });
+      const emailInput = screen.getByLabelText('Email address');
+      await user.type(emailInput, 'user@example.com');
+      expect(emailInput).toHaveValue('user@example.com');
     });
 
     it('sends reset password email', async () => {
@@ -286,19 +312,19 @@ describe('Login Page', () => {
       const forgotLink = screen.getByText(/Forgot password?/i);
       await user.click(forgotLink);
 
-      await waitFor(async () => {
-        const emailInput = screen.getByPlaceholderText(/manager@hotel.com/i);
-        await user.type(emailInput, 'user@example.com');
+      await screen.findByRole('heading', { name: /Forgot Password/i });
+      const emailInput = screen.getByLabelText('Email address');
+      fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
 
-        const sendButton = screen.getByRole('button', { name: /Get OTP/i });
-        await user.click(sendButton);
-      });
+      const sendButton = screen.getByRole('button', { name: /Get OTP/i });
+      fireEvent.click(sendButton);
 
       await waitFor(() => {
-        expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
+        expect(mockSendPasswordResetEmail).toHaveBeenCalledWith(
+          {},
           'user@example.com',
           expect.objectContaining({
-            redirectTo: 'http://localhost:3000/admin/reset-password',
+            url: 'http://localhost:3000/admin/login',
           })
         );
       });
@@ -312,7 +338,7 @@ describe('Login Page', () => {
       await user.click(forgotLink);
 
       await waitFor(() => {
-        const emailInput = screen.getByPlaceholderText(/manager@hotel.com/i);
+        const emailInput = screen.getByLabelText('Email address');
         // Email field has HTML5 validation
         expect(emailInput).toHaveAttribute('type', 'email');
         expect(emailInput).toBeRequired();
@@ -326,13 +352,12 @@ describe('Login Page', () => {
       const forgotLink = screen.getByText(/Forgot password?/i);
       await user.click(forgotLink);
 
-      await waitFor(async () => {
-        const emailInput = screen.getByPlaceholderText(/manager@hotel.com/i);
-        await user.type(emailInput, 'user@example.com');
+      await screen.findByRole('heading', { name: /Forgot Password/i });
+      const emailInput = screen.getByLabelText('Email address');
+      fireEvent.change(emailInput, { target: { value: 'user@example.com' } });
 
-        const sendButton = screen.getByRole('button', { name: /Get OTP/i });
-        await user.click(sendButton);
-      });
+      const sendButton = screen.getByRole('button', { name: /Get OTP/i });
+      fireEvent.click(sendButton);
 
       await waitFor(() => {
         expect(screen.getByText(/Check your email/i)).toBeInTheDocument();
@@ -374,10 +399,9 @@ describe('Login Page', () => {
       await user.click(forgotLink);
 
       // Go back to login
-      await waitFor(async () => {
-        const backButton = screen.getByRole('button', { name: /Back to Login/i });
-        await user.click(backButton);
-      });
+      await screen.findByRole('heading', { name: /Forgot Password/i });
+      const backButton = await screen.findByRole('button', { name: /Back to Login/i });
+      await user.click(backButton);
 
       // Login form should be cleared (this is handled by state reset)
       await waitFor(() => {
@@ -389,9 +413,7 @@ describe('Login Page', () => {
   describe('Error Handling', () => {
     it('handles network errors during login', async () => {
       const user = userEvent.setup();
-      mockSignInWithPassword.mockResolvedValue({
-        error: { message: 'Network error' },
-      });
+      mockSignInWithEmailAndPassword.mockRejectedValue(new Error('Network error'));
 
       render(<AdminLoginPage />);
 
@@ -410,22 +432,19 @@ describe('Login Page', () => {
 
     it('handles network errors during password reset', async () => {
       const user = userEvent.setup();
-      mockResetPasswordForEmail.mockResolvedValue({
-        error: { message: 'Network error occurred' },
-      });
+      mockSendPasswordResetEmail.mockRejectedValue(new Error('Network error occurred'));
 
       render(<AdminLoginPage />);
 
       const forgotLink = screen.getByText(/Forgot password?/i);
       await user.click(forgotLink);
 
-      await waitFor(async () => {
-        const emailInput = screen.getByPlaceholderText(/manager@hotel.com/i);
-        await user.type(emailInput, 'user@example.com');
+      await screen.findByRole('heading', { name: /Forgot Password/i });
+      const emailInput = screen.getByLabelText('Email address');
+      await user.type(emailInput, 'user@example.com');
 
-        const sendButton = screen.getByRole('button', { name: /Get OTP/i });
-        await user.click(sendButton);
-      });
+      const sendButton = screen.getByRole('button', { name: /Get OTP/i });
+      await user.click(sendButton);
 
       await waitFor(() => {
         expect(screen.getByText(/Network error occurred/i)).toBeInTheDocument();

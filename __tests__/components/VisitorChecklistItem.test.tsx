@@ -51,19 +51,19 @@ describe('VisitorChecklistItem', () => {
 
     it('renders guest count badge with plural label', () => {
       render(<VisitorChecklistItem visitor={baseVisitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('2 guests')).toBeInTheDocument();
+      expect(screen.getByText('2 adults')).toBeInTheDocument();
     });
 
     it('renders singular "guest" when numberOfGuests is 1', () => {
-      const visitor = { ...baseVisitor, numberOfGuests: 1 };
+      const visitor = { ...baseVisitor, numberOfGuests: 1, adults: 1 };
       render(<VisitorChecklistItem visitor={visitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('1 guest')).toBeInTheDocument();
+      expect(screen.getByText('1 adult')).toBeInTheDocument();
     });
 
     it('renders 4 guests correctly', () => {
-      const visitor = { ...baseVisitor, numberOfGuests: 4 };
+      const visitor = { ...baseVisitor, numberOfGuests: 4, adults: 3, children: 1 };
       render(<VisitorChecklistItem visitor={visitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('4 guests')).toBeInTheDocument();
+      expect(screen.getByText('3A / 1C')).toBeInTheDocument();
     });
   });
 

@@ -19,6 +19,10 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HistoryPage from '@/app/admin/history/page';
 
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
+
 // ─── Mock child components ────────────────────────────────────────────────────
 
 vi.mock('@/app/admin/history/_components/HistoryToolbar', () => ({
@@ -140,7 +144,7 @@ const makeBooking = (id: string, overrides = {}) => ({
   ...overrides,
 });
 
-const makeApiResponse = (bookings: ReturnType<typeof makeBooking>[], total = bookings.length) => ({
+const makeApiResponse = (bookings: Array<Record<string, unknown>>, total = bookings.length) => ({
   success: true,
   bookings,
   total,

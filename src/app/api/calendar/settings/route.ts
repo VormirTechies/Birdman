@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getFirestoreCalendarSetting,
-  upsertFirestoreCalendarSetting,
-} from '@/lib/firebase/calendar-settings';
+import { getCalendarSettings, upsertCalendarSettings } from '@/lib/db/queries';
 import { requireAdmin } from '@/lib/require-admin';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const settings = await getFirestoreCalendarSetting(date);
+    const settings = await getCalendarSettings(date);
     return NextResponse.json({ success: true, settings });
   } catch (error) {
     console.error('[Calendar API] Error fetching settings:', error);
@@ -77,15 +74,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const settings = await upsertFirestoreCalendarSetting(
+    const settings = await upsertCalendarSettings({
       date,
-      {
-        maxCapacity: capacity,
-        startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
-        isOpen,
-      },
-      authResult.user.uid
-    );
+      maxCapacity: capacity,
+      startTime: startTime.length === 5 ? `${startTime}:00` : startTime,
+      isOpen,
+    });
 
     return NextResponse.json({ success: true, settings });
   } catch (error) {

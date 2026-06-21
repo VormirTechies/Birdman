@@ -120,7 +120,7 @@ describe('CalendarCell', () => {
   it('applies opacity for non-current month dates', () => {
     const { container } = render(<CalendarCell {...baseProps} isCurrentMonth={false} />);
     const button = container.querySelector('button');
-    expect(button?.className).toContain('opacity-40');
+    expect(button?.className).toContain('opacity-50');
   });
 
   it('applies correct text color for dark green background', () => {

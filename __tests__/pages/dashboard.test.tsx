@@ -239,14 +239,16 @@ describe('Dashboard Page', () => {
   });
 
   describe('Navigation', () => {
-    it('navigates to new booking page when button clicked', async () => {
+    it('opens instant booking modal when button clicked', async () => {
       const user = userEvent.setup();
       render(<AdminPage />);
 
       const newBookingButton = screen.getByText('New Booking');
       await user.click(newBookingButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/admin/bookings/new');
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+      });
     });
   });
 
@@ -262,7 +264,7 @@ describe('Dashboard Page', () => {
       const { container } = render(<AdminPage />);
 
       await waitFor(() => {
-        const statsGrid = container.querySelector('.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4');
+        const statsGrid = container.querySelector('.grid.grid-cols-2.sm\\:grid-cols-2.lg\\:grid-cols-4');
         expect(statsGrid).toBeInTheDocument();
       });
     });

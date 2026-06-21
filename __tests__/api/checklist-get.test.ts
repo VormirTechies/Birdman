@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '@/app/api/bookings/route';
+import type { Booking, Visitor } from '@/lib/db/schema';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -19,23 +20,37 @@ vi.mock('@/lib/push', () => ({
   sendPushToAllAdmins: vi.fn(),
 }));
 
+vi.mock('server-only', () => ({}));
+
+vi.mock('@/lib/require-admin', () => ({
+  requireAdmin: vi.fn().mockResolvedValue({ user: { id: 'admin-1' }, response: null }),
+}));
+
 import { getBookings } from '@/lib/db/queries';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeBooking(overrides = {}) {
+function makeBooking(overrides: Partial<Booking & { visitor: Visitor | null }> = {}): Booking & { visitor: Visitor | null } {
   return {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    bookingNumber: 1,
+    visitorId: null,
     visitorName: 'Arjun Krishnan',
     phone: '+919876543210',
     email: 'arjun@example.com',
     numberOfGuests: 2,
+    adults: 2,
+    children: 0,
     bookingDate: '2026-04-28',
     bookingTime: '10:00',
+    confirmationSent: false,
+    reminderSent: false,
+    reminderSentAt: null,
     status: 'confirmed',
     visited: false,
     createdAt: new Date('2026-04-01'),
     updatedAt: new Date('2026-04-01'),
+    visitor: null,
     ...overrides,
   };
 }
@@ -72,7 +87,7 @@ describe('GET /api/bookings – checklist query', () => {
       expect(data.success).toBe(true);
       expect(data.bookings).toHaveLength(2);
       expect(data.total).toBe(2);
-      expect(data.pagination).toEqual({ limit: 20, offset: 0, count: 2 });
+      expect(data.pagination).toEqual({ limit: 20, offset: 0, page: 1, count: 2 });
     });
 
     it('passes all checklist params to getBookings', async () => {
