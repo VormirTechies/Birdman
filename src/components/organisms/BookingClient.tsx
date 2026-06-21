@@ -105,6 +105,19 @@ function formatSessionTime(time: string): string {
   return `${displayHour}:${time.slice(3, 5)} ${startPeriod} – ${displayEnd}:${time.slice(3, 5)} ${endPeriod}`;
 }
 
+async function readApiJson<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return response.json() as Promise<T>;
+  }
+
+  const text = await response.text().catch(() => '');
+  const fallback = response.ok
+    ? 'The server returned an unexpected response.'
+    : `Booking service returned ${response.status}. Please try again in a few minutes.`;
+  throw new Error(text && !text.trim().startsWith('<') ? text : fallback);
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function BookingClient() {
@@ -152,7 +165,7 @@ export function BookingClient() {
       const monthStr = format(month, 'yyyy-MM');
       const res = await fetch(`/api/calendar?month=${monthStr}`);
       if (!res.ok) return;
-      const data: CalendarDay[] = await res.json();
+      const data = await readApiJson<CalendarDay[]>(res);
       const map: Record<string, CalendarDay> = {};
       data.forEach((d) => {
         map[d.date] = d;
@@ -172,7 +185,6 @@ export function BookingClient() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const selectedDateStr = formData.date ? format(formData.date, 'yyyy-MM-dd') : null;
   const selectedDateData = selectedDateStr ? calendarData[selectedDateStr] : null;
-  const maxGuests = selectedDateData?.maxCapacity ?? 100;
   const remaining = selectedDateData?.remaining ?? 100;
   const sessionTime = selectedDateData?.startTime ?? '16:30:00';
 
@@ -298,7 +310,16 @@ export function BookingClient() {
           bookingTime: sessionTime,
         }),
       });
-      const result = await response.json();
+      const result = await readApiJson<{
+        success?: boolean;
+        error?: string;
+        details?: Array<{ message?: string }>;
+        booking?: {
+          id?: string;
+          bookingNumber?: number;
+        };
+        id?: string;
+      }>(response);
       if (!response.ok) {
         throw new Error(result.error || result.details?.[0]?.message || 'Failed to confirm booking');
       }

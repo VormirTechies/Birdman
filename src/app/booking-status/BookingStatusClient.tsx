@@ -54,6 +54,15 @@ function formatTime(time: string) {
 }
 
 async function readJson(response: Response) {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    const text = await response.text().catch(() => '');
+    const fallback = response.ok
+      ? 'The server returned an unexpected response.'
+      : `Booking service returned ${response.status}. Please try again in a few minutes.`;
+    throw new Error(text && !text.trim().startsWith('<') ? text : fallback);
+  }
+
   const data = await response.json();
   if (!response.ok) {
     throw new Error(data.error || 'Something went wrong. Please try again.');

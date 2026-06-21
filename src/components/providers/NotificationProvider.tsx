@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { Bird, MessageSquare } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, hasSupabaseConfig } from '@/lib/supabase/client';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,10 @@ interface NotificationContextType {
   markAllRead: () => void;
   clearAll: () => void;
 }
+
+type SupabaseRealtimePayload<T extends Record<string, unknown>> = {
+  new: T;
+};
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +98,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // ─── Realtime Subscriptions ─────────────────────────────────────────────
 
   useEffect(() => {
+    if (!hasSupabaseConfig) return;
+
     // Initialize lazily — this only runs on the client, never during SSR
     if (!supabaseRef.current) supabaseRef.current = createClient();
     const supabase = supabaseRef.current;
@@ -104,14 +110,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'bookings' },
-        (payload: any) => {
+        (payload: SupabaseRealtimePayload<Record<string, unknown>>) => {
           const b = payload.new;
-          const body = `${b.visitor_name} scheduled a visit.`;
+          const visitorName = String(b.visitor_name ?? 'Visitor');
+          const body = `${visitorName} scheduled a visit.`;
 
           addNotification({
-            visitorName: b.visitor_name ?? 'Visitor',
+            visitorName,
             body,
-            bookingDate: b.booking_date ?? undefined,
+            bookingDate: typeof b.booking_date === 'string' ? b.booking_date : undefined,
             type: 'booking',
           });
 
@@ -137,9 +144,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'feedback' },
-        (payload: any) => {
+        (payload: SupabaseRealtimePayload<Record<string, unknown>>) => {
           const f = payload.new;
-          const visitorName = f.visitor_name ?? 'A visitor';
+          const visitorName = String(f.visitor_name ?? 'A visitor');
           const body = `${visitorName} submitted a new review.`;
 
           addNotification({
