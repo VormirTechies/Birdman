@@ -41,6 +41,13 @@ export const createBookingSchema = z.object({
       if (bookingDate < today) {
         return false;
       }
+
+      const maxBookingDate = new Date(today);
+      maxBookingDate.setDate(maxBookingDate.getDate() + 30);
+
+      if (bookingDate > maxBookingDate) {
+        return false;
+      }
       
       // Allow future dates (tomorrow onwards)
       if (bookingDate > today) {
@@ -65,7 +72,7 @@ export const createBookingSchema = z.object({
       }
       
       return true;
-    }, 'Booking date must be in the future or at least 1 hour before today\'s session'),
+    }, 'Booking date must be within the next 30 days and at least 1 hour before today\'s session'),
   bookingTime: z
     .string()
     .min(5, 'Time must be provided'),

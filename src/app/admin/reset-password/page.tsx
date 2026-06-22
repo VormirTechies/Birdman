@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { confirmPasswordReset } from 'firebase/auth';
+import { auth, firebaseConfigError } from '@/firebase';
 import Carousel from '../_components/Carousel';
 
 // Gallery images for carousel (same as login page)
@@ -24,7 +25,7 @@ const GALLERY_IMAGES = [
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const resetCode = searchParams.get('oobCode');
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -64,13 +65,10 @@ function ResetPasswordContent() {
     }
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      if (firebaseConfigError) throw new Error(firebaseConfigError);
+      if (!resetCode) throw new Error('Invalid or expired password reset link.');
 
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
+      await confirmPasswordReset(auth, resetCode, newPassword);
 
       // Success - show success state
       setIsSuccess(true);
@@ -79,8 +77,8 @@ function ResetPasswordContent() {
       setTimeout(() => {
         router.push('/admin/login?reset=success');
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to reset password. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   format,
+  addDays,
   addMonths,
   subMonths,
   startOfMonth,
@@ -91,6 +92,7 @@ const GUIDELINES = [
 ];
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const PUBLIC_BOOKING_WINDOW_DAYS = 30;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -198,6 +200,11 @@ export function BookingClient() {
   const lastOfMonth = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: firstOfMonth, end: lastOfMonth });
   const startDow = getDay(firstOfMonth);
+  const todayForBookingWindow = new Date();
+  todayForBookingWindow.setHours(0, 0, 0, 0);
+  const maxBookableDate = addDays(todayForBookingWindow, PUBLIC_BOOKING_WINDOW_DAYS);
+  const nextMonthStart = startOfMonth(addMonths(calendarMonth, 1));
+  const canGoNextMonth = nextMonthStart <= maxBookableDate;
 
   const getDayStatus = (date: Date): DayStatus => {
     const now = new Date();
@@ -206,6 +213,8 @@ export function BookingClient() {
     
     // Check if date is in the past
     if (isBefore(date, today)) return 'past';
+
+    if (date > maxBookableDate) return 'blocked';
     
     // Check if it's today and within 1 hour of session start time
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -267,6 +276,9 @@ export function BookingClient() {
   const validate = (): Partial<Record<keyof FormData, string>> => {
     const errs: Partial<Record<keyof FormData, string>> = {};
     if (!formData.date) errs.date = 'Please select a date';
+    if (formData.date && formData.date > maxBookableDate) {
+      errs.date = `Bookings are available up to ${PUBLIC_BOOKING_WINDOW_DAYS} days in advance`;
+    }
     if (formData.name.trim().length < 3) errs.name = 'Name must be at least 3 characters';
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
       errs.email = 'Please enter a valid email address';
@@ -465,8 +477,9 @@ export function BookingClient() {
                         </span>
                         <button
                           onClick={() => setCalendarMonth((m) => addMonths(m, 1))}
+                          disabled={!canGoNextMonth}
                           suppressHydrationWarning
-                          className="p-1.5 rounded-lg hover:bg-morning-mist transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-morning-mist disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                           aria-label="Next month"
                         >
                           <ChevronRight className="w-4 h-4 text-canopy-dark" />

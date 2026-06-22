@@ -1,11 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
-import { Bird, MessageSquare } from 'lucide-react';
-import { createClient, hasSupabaseConfig } from '@/lib/supabase/client';
-
-// ─── Types ──────────────────────────────────────────────────────────────────
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 export interface AppNotification {
   id: string;
@@ -20,74 +15,72 @@ export interface AppNotification {
 interface NotificationContextType {
   notifications: AppNotification[];
   unreadCount: number;
-  addNotification: (n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void;
+  addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void;
   markAllRead: () => void;
   clearAll: () => void;
 }
 
-type SupabaseRealtimePayload<T extends Record<string, unknown>> = {
-  new: T;
-};
-
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  // Session-scoped: React state only — clears on tab close (no localStorage)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  // Null initially — createClient() must never run during SSR/prerender
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
 
-  const addNotification = useCallback((n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => {
-    setNotifications(prev => {
-      // De-duplicate: skip if same body appeared within the last 3 seconds
-      const now = Date.now();
-      const isDuplicate = prev.some(
-        existing => existing.body === n.body && now - existing.createdAt.getTime() < 3000
-      );
-      if (isDuplicate) return prev;
+  const addNotification = useCallback(
+    (notificationInput: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => {
+      setNotifications((previous) => {
+        const now = Date.now();
+        const isDuplicate = previous.some(
+          (existing) =>
+            existing.body === notificationInput.body &&
+            now - existing.createdAt.getTime() < 3000
+        );
 
-      const notification: AppNotification = {
-        ...n,
-        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
-        createdAt: new Date(),
-        read: false,
-      };
-      return [notification, ...prev];
-    });
-  }, []);
+        if (isDuplicate) return previous;
+
+        const notification: AppNotification = {
+          ...notificationInput,
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          createdAt: new Date(),
+          read: false,
+        };
+
+        return [notification, ...previous];
+      });
+    },
+    []
+  );
 
   const markAllRead = useCallback(() => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications((previous) =>
+      previous.map((notification) => ({ ...notification, read: true }))
+    );
   }, []);
 
   const clearAll = useCallback(() => {
     setNotifications([]);
   }, []);
 
-  // ─── Service Worker push message listener ──────────────────────────────
-  // Fires when sw.js broadcasts NEW_NOTIFICATION after receiving a push.
-  // This is the reliable path — works even if Supabase Realtime is slow.
-
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type !== 'NEW_NOTIFICATION') return;
-      const p = event.data.payload ?? {};
-
-      // Derive a display name: prefer explicit visitorName from payload
-      const visitorName = p.visitorName || 'Visitor';
-      const body = p.body || `${visitorName} made a new booking.`;
+      const payload = event.data.payload ?? {};
+      const visitorName =
+        typeof payload.visitorName === 'string' && payload.visitorName
+          ? payload.visitorName
+          : 'Visitor';
+      const body =
+        typeof payload.body === 'string' && payload.body
+          ? payload.body
+          : `${visitorName} made a new booking.`;
+      const notificationType = payload.notifType === 'feedback' ? 'feedback' : 'booking';
 
       addNotification({
         visitorName,
         body,
-        bookingDate: p.bookingDate || undefined,
-        type: (p.notifType as 'booking' | 'feedback') ?? 'booking',
+        bookingDate: typeof payload.bookingDate === 'string' ? payload.bookingDate : undefined,
+        type: notificationType,
       });
     };
 
@@ -95,98 +88,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => navigator.serviceWorker.removeEventListener('message', handleMessage);
   }, [addNotification]);
 
-  // ─── Realtime Subscriptions ─────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!hasSupabaseConfig) return;
-
-    // Initialize lazily — this only runs on the client, never during SSR
-    if (!supabaseRef.current) supabaseRef.current = createClient();
-    const supabase = supabaseRef.current;
-
-    // New bookings
-    const bookingsChannel = supabase
-      .channel('admin_notifications_bookings')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bookings' },
-        (payload: SupabaseRealtimePayload<Record<string, unknown>>) => {
-          const b = payload.new;
-          const visitorName = String(b.visitor_name ?? 'Visitor');
-          const body = `${visitorName} scheduled a visit.`;
-
-          addNotification({
-            visitorName,
-            body,
-            bookingDate: typeof b.booking_date === 'string' ? b.booking_date : undefined,
-            type: 'booking',
-          });
-
-          toast.success('New Booking!', {
-            description: body,
-            icon: React.createElement(Bird, { className: 'w-4 h-4' }),
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => { window.location.href = '/admin'; },
-            },
-          });
-
-          // Signal dashboard components to refresh data
-          window.dispatchEvent(new CustomEvent('new-booking', { detail: b }));
-        }
-      )
-      .subscribe();
-
-    // New feedback
-    const feedbackChannel = supabase
-      .channel('admin_notifications_feedback')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'feedback' },
-        (payload: SupabaseRealtimePayload<Record<string, unknown>>) => {
-          const f = payload.new;
-          const visitorName = String(f.visitor_name ?? 'A visitor');
-          const body = `${visitorName} submitted a new review.`;
-
-          addNotification({
-            visitorName,
-            body,
-            type: 'feedback',
-          });
-
-          toast.info('Feedback Received!', {
-            description: body,
-            icon: React.createElement(MessageSquare, { className: 'w-4 h-4' }),
-            duration: 8000,
-            action: {
-              label: 'Moderate',
-              onClick: () => { window.location.href = '/admin/feedback'; },
-            },
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(bookingsChannel);
-      supabase.removeChannel(feedbackChannel);
-    };
-  }, [addNotification]);
-
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, addNotification, markAllRead, clearAll }}>
+    <NotificationContext.Provider
+      value={{ notifications, unreadCount, addNotification, markAllRead, clearAll }}
+    >
       {children}
     </NotificationContext.Provider>
   );
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
 export function useNotifications() {
-  const ctx = useContext(NotificationContext);
-  if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
-  return ctx;
+  const context = useContext(NotificationContext);
+  if (!context) throw new Error('useNotifications must be used within NotificationProvider');
+  return context;
 }
