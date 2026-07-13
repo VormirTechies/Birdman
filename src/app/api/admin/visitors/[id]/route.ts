@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
-  checkinBelongsToVisitor,
   normalizeCheckin,
   normalizeVisitor,
 } from '@/lib/firebase/visitors';
@@ -22,7 +21,31 @@ type RouteContext = {
 async function getVisitorReference(id: string) {
   const reference = getAdminDb().collection('visitors').doc(id);
   const snapshot = await reference.get();
+  console.log('[FIRESTORE READ]', 'GET /admin/visitors/[id]:visitor', 'docs:', snapshot.exists ? 1 : 0);
   return { reference, snapshot };
+}
+
+async function getVisitorCheckins(visitorId: string) {
+  const database = getAdminDb();
+  const byCamelCase = await database
+    .collection('visitor_checkins')
+    .where('visitorId', '==', visitorId)
+    .orderBy('bookingDate', 'desc')
+    .limit(50)
+    .get();
+  console.log('[FIRESTORE READ]', 'GET /admin/visitors/[id]:checkins:visitorId', 'docs:', byCamelCase.size);
+
+  if (!byCamelCase.empty) return byCamelCase.docs;
+
+  const bySnakeCase = await database
+    .collection('visitor_checkins')
+    .where('visitor_id', '==', visitorId)
+    .orderBy('booking_date', 'desc')
+    .limit(50)
+    .get();
+  console.log('[FIRESTORE READ]', 'GET /admin/visitors/[id]:checkins:visitor_id', 'docs:', bySnakeCase.size);
+
+  return bySnakeCase.docs;
 }
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
@@ -36,9 +59,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Visitor not found' }, { status: 404 });
     }
 
-    const checkinsSnapshot = await getAdminDb().collection('visitor_checkins').get();
-    const history = checkinsSnapshot.docs
-      .filter((document) => checkinBelongsToVisitor(document.data(), id))
+    // Replaced full visitor_checkins scan with visitorId-filtered queries.
+    const history = (await getVisitorCheckins(id))
       .map(normalizeCheckin)
       .sort((left, right) =>
         String(right.bookingDate ?? '').localeCompare(String(left.bookingDate ?? ''))

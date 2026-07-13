@@ -1,12 +1,82 @@
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
+import { AggregateField, type Query, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { requireAdmin } from '@/lib/require-admin';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GET /api/bookings/stats — Get Aggregated Booking Statistics
-// Returns only count numbers (not full booking data) for dashboard stat cards
-// ═══════════════════════════════════════════════════════════════════════════
+// GET /api/bookings/stats - Get aggregated booking statistics.
+// Returns only count numbers, not full booking data, for dashboard stat cards.
+
+async function sumVisitors(query: Query, label: string) {
+  const snapshot = await query
+    .aggregate({
+      totalGuests: AggregateField.sum('numberOfGuests'),
+      count: AggregateField.count(),
+    })
+    .get();
+  const data = snapshot.data();
+  console.log('[FIRESTORE READ] /api/bookings/stats', label, 'docs:', data.count);
+  return Number(data.totalGuests ?? 0);
+}
+
+function isCountedStatus(status: unknown) {
+  return status === 'confirmed' || status === 'completed';
+}
+
+function numberValue(value: unknown, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function guestCount(data: Record<string, unknown>) {
+  const storedTotal = data.numberOfGuests ?? data.number_of_guests;
+  if (storedTotal !== undefined && storedTotal !== null) {
+    return numberValue(storedTotal);
+  }
+
+  return numberValue(data.adults) + numberValue(data.children);
+}
+
+function sumBookingDocuments(documents: QueryDocumentSnapshot[]) {
+  return documents.reduce((total, document) => {
+    const data = document.data() as Record<string, unknown>;
+    if (!isCountedStatus(data.status)) return total;
+    return total + guestCount(data);
+  }, 0);
+}
+
+async function sumTotalVisitors(bookings: Query) {
+  try {
+    const [confirmedVisitors, completedVisitors] = await Promise.all([
+      sumVisitors(bookings.where('status', '==', 'confirmed'), 'totalVisitors:confirmed'),
+      sumVisitors(bookings.where('status', '==', 'completed'), 'totalVisitors:completed'),
+    ]);
+
+    return confirmedVisitors + completedVisitors;
+  } catch (aggregateError) {
+    console.warn(
+      '[API] Booking stats aggregate total failed; falling back to filtered reads',
+      aggregateError
+    );
+
+    const [confirmedSnapshot, completedSnapshot] = await Promise.all([
+      bookings.where('status', '==', 'confirmed').get(),
+      bookings.where('status', '==', 'completed').get(),
+    ]);
+
+    console.log(
+      '[FIRESTORE READ] /api/bookings/stats totalVisitors:fallback docs:',
+      confirmedSnapshot.size + completedSnapshot.size
+    );
+
+    return sumBookingDocuments([
+      ...confirmedSnapshot.docs,
+      ...completedSnapshot.docs,
+    ]);
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,44 +91,28 @@ export async function GET(request: NextRequest) {
     last30.setDate(last30.getDate() - 30);
     const last30Str = last30.toISOString().split('T')[0];
 
-    const snapshot = await getAdminDb().collection('bookings').get();
-    const bookings = snapshot.docs.map((document) => document.data());
+    const bookings = getAdminDb().collection('bookings');
 
-    const bookingDate = (booking: Record<string, unknown>) =>
-      String(booking.bookingDate ?? booking.booking_date ?? '');
-    const guestCount = (booking: Record<string, unknown>) => {
-      const storedTotal = booking.numberOfGuests ?? booking.number_of_guests;
-      if (storedTotal !== undefined && storedTotal !== null) {
-        const total = Number(storedTotal);
-        return Number.isFinite(total) ? total : 0;
-      }
+    const [windowSnapshot, totalVisitors] = await Promise.all([
+      bookings
+        .where('bookingDate', '>=', last30Str)
+        .where('bookingDate', '<=', next30Str)
+        .get(),
+      sumTotalVisitors(bookings),
+    ]);
+    console.log('[FIRESTORE READ] /api/bookings/stats dateWindow docs:', windowSnapshot.size);
 
-      const adults = Number(booking.adults ?? 0);
-      const children = Number(booking.children ?? 0);
-      return (Number.isFinite(adults) ? adults : 0) +
-        (Number.isFinite(children) ? children : 0);
-    };
+    const stats = windowSnapshot.docs.reduce(
+      (totals, document) => {
+        const data = document.data() as Record<string, unknown>;
+        if (!isCountedStatus(data.status)) return totals;
 
-    const stats = bookings.reduce(
-      (totals, booking) => {
-        const date = bookingDate(booking);
-        const guests = guestCount(booking);
-        const status = String(booking.status ?? 'confirmed');
+        const bookingDate = String(data.bookingDate ?? data.booking_date ?? '');
+        const guests = guestCount(data);
 
-        if (status === 'cancelled') {
-          return totals;
-        }
-
-        if (date === today) {
-          totals.todayVisitors += guests;
-        }
-        if (date >= today && date <= next30Str) {
-          totals.next30Days += guests;
-        }
-        if (date >= last30Str && date < today) {
-          totals.last30Days += guests;
-        }
-        totals.totalVisitors += guests;
+        if (bookingDate === today) totals.todayVisitors += guests;
+        if (bookingDate >= today && bookingDate <= next30Str) totals.next30Days += guests;
+        if (bookingDate >= last30Str && bookingDate < today) totals.last30Days += guests;
 
         return totals;
       },
@@ -66,11 +120,10 @@ export async function GET(request: NextRequest) {
         todayVisitors: 0,
         next30Days: 0,
         last30Days: 0,
-        totalVisitors: 0,
+        totalVisitors,
       }
     );
 
-    // Return stats with cache control headers to prevent stale data
     return NextResponse.json(
       {
         success: true,

@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import type { Query } from 'firebase-admin/firestore';
 
 console.log('[api/bookings] module loaded');
 
@@ -332,9 +333,75 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Visited must be true or false' }, { status: 400 });
     }
 
-    const snapshot = await getAdminDb().collection('bookings').get();
     const today = new Date().toISOString().split('T')[0];
     const searchLower = search?.trim().toLowerCase();
+    const database = getAdminDb();
+    let query: Query = database.collection('bookings');
+    let hasBookingDateRange = false;
+
+    // Replaced full bookings scan with Firestore-side filters where possible.
+    if (status) query = query.where('status', '==', status);
+    if (date) {
+      query = query.where('bookingDate', '==', date);
+    } else if (minDate) {
+      query = query.where('bookingDate', '>=', minDate);
+      hasBookingDateRange = true;
+    }
+    if (visitedParam) {
+      query = query.where('visited', '==', visitedParam === 'true');
+    }
+    if (visitedFilter === 'visited') {
+      query = query.where('visited', '==', true);
+    } else if (visitedFilter === 'not-visited') {
+      query = query.where('visited', '==', false).where('bookingDate', '<', today);
+      hasBookingDateRange = true;
+    } else if (visitedFilter === 'yet-to-visit') {
+      query = query.where('visited', '==', false).where('bookingDate', '>=', today);
+      hasBookingDateRange = true;
+    }
+
+    const hasSearch = Boolean(searchLower);
+    const usesInMemoryOnlySort =
+      sort === 'checklist' || sortBy === 'name' || sortBy === 'email' || sortBy === 'guestCount';
+    const defaultCreatedAtSort = !sort && !sortBy;
+    const canPageInFirestore =
+      !hasSearch &&
+      !usesInMemoryOnlySort &&
+      !(defaultCreatedAtSort && hasBookingDateRange) &&
+      !(date && minDate);
+
+    const countQuery = query;
+
+    if (canPageInFirestore) {
+      if (sortBy === 'date') {
+        const direction = sortDir === 'asc' ? 'asc' : 'desc';
+        query = query.orderBy('bookingDate', direction).orderBy('bookingTime', direction);
+      } else {
+        query = query.orderBy('createdAt', 'desc');
+      }
+
+      const countSnapshot = await countQuery.count().get();
+      const total = countSnapshot.data().count;
+      console.log('[FIRESTORE READ]', 'GET /api/bookings:count', 'docs:', total);
+
+      const snapshot = await query.offset(offset).limit(limit).get();
+      console.log('[FIRESTORE READ]', 'GET /api/bookings', 'docs:', snapshot.size);
+
+      return NextResponse.json({
+        success: true,
+        bookings: snapshot.docs.map((doc) => serializeValue({ id: doc.id, ...doc.data() })),
+        total,
+        pagination: {
+          limit,
+          offset,
+          page,
+          count: snapshot.size,
+        },
+      });
+    }
+
+    const snapshot = await query.get();
+    console.log('[FIRESTORE READ]', 'GET /api/bookings', 'docs:', snapshot.size);
 
     let bookings: Array<Record<string, unknown> & { id: string }> = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -355,6 +422,8 @@ export async function GET(request: NextRequest) {
       if (visitedFilter === 'yet-to-visit' && (visited || bookingDate < today)) return false;
 
       if (searchLower) {
+        // TODO: Replace reduced-set in-memory search with indexed normalized fields:
+        // visitorNameLowercase, phoneNormalized, emailLowercase, bookingNumberString.
         const searchable = [booking.visitorName, booking.email, booking.phone].map((value) =>
           String(value ?? '').toLowerCase()
         );

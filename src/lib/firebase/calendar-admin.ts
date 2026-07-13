@@ -28,14 +28,24 @@ function numberValue(value: unknown, fallback = 0) {
 }
 
 export async function getConfirmedBookingCounts(dates: Set<string>) {
-  const snapshot = await getAdminDb().collection('bookings').get();
   const counts = new Map<string, number>();
+  const sortedDates = [...dates].sort();
+
+  if (sortedDates.length === 0) return counts;
+
+  // Replaced full bookings scan with a confirmed-bookings date range query.
+  const snapshot = await getAdminDb()
+    .collection('bookings')
+    .where('status', '==', 'confirmed')
+    .where('bookingDate', '>=', sortedDates[0])
+    .where('bookingDate', '<=', sortedDates[sortedDates.length - 1])
+    .get();
+  console.log('[FIRESTORE READ]', 'getConfirmedBookingCounts', 'docs:', snapshot.size);
 
   for (const document of snapshot.docs) {
     const data = document.data() as Record<string, unknown>;
-    const status = String(data.status ?? 'confirmed').toLowerCase();
     const bookingDate = String(field(data, 'bookingDate', 'booking_date') ?? '');
-    if (status !== 'confirmed' || !dates.has(bookingDate)) continue;
+    if (!dates.has(bookingDate)) continue;
     counts.set(bookingDate, (counts.get(bookingDate) ?? 0) + 1);
   }
 
@@ -47,15 +57,15 @@ export async function cancelFirestoreBookingsForDates(
   endDate: string
 ): Promise<CancellationBooking[]> {
   const database = getAdminDb();
-  const snapshot = await database.collection('bookings').get();
-  const matches = snapshot.docs.filter((document) => {
-    const data = document.data() as Record<string, unknown>;
-    const status = String(data.status ?? 'confirmed').toLowerCase();
-    const bookingDate = String(field(data, 'bookingDate', 'booking_date') ?? '');
-    return status === 'confirmed'
-      && bookingDate >= startDate
-      && bookingDate <= endDate;
-  });
+  // Replaced full bookings scan with a confirmed-bookings date range query.
+  const snapshot = await database
+    .collection('bookings')
+    .where('status', '==', 'confirmed')
+    .where('bookingDate', '>=', startDate)
+    .where('bookingDate', '<=', endDate)
+    .get();
+  console.log('[FIRESTORE READ]', 'cancelFirestoreBookingsForDates', 'docs:', snapshot.size);
+  const matches = snapshot.docs;
 
   for (let offset = 0; offset < matches.length; offset += 500) {
     const batch = database.batch();

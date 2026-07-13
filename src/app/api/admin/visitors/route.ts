@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { OrderByDirection, Query } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   normalizeVisitor,
@@ -56,24 +57,55 @@ export async function GET(request: NextRequest) {
       ? requestedSort
       : 'lastVisitDate';
     const order = searchParams.get('order')?.toLowerCase() === 'asc' ? 1 : -1;
+    const orderDirection: OrderByDirection = order === 1 ? 'asc' : 'desc';
+    const offset = (page - 1) * limit;
+    let query: Query = getAdminDb().collection('visitors');
 
-    const snapshot = await getAdminDb().collection('visitors').get();
+    // Replaced the default full visitors scan with Firestore-side VIP filtering,
+    // sorting, count aggregation, and pagination when free-text search is absent.
+    if (vip === 'true' || vip === 'false') {
+      query = query.where('isVip', '==', vip === 'true');
+    }
+
+    if (!search) {
+      const countSnapshot = await query.count().get();
+      const total = countSnapshot.data().count;
+      console.log('[FIRESTORE READ]', 'GET /admin/visitors:count', 'docs:', total);
+
+      const snapshot = await query
+        .orderBy(sort, orderDirection)
+        .offset(offset)
+        .limit(limit)
+        .get();
+      console.log('[FIRESTORE READ]', 'GET /admin/visitors', 'docs:', snapshot.size);
+
+      const visitors = snapshot.docs.map((document) =>
+        normalizeVisitor(document.id, document.data())
+      );
+
+      return NextResponse.json({
+        visitors,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      });
+    }
+
+    // TODO: Backfill visitor search fields and query them directly:
+    // phoneNormalized, emailLowercase, nameLowercase.
+    // Until then, preserve existing substring search behavior on the reduced set.
+    const snapshot = await query.get();
+    console.log('[FIRESTORE READ]', 'GET /admin/visitors:search', 'docs:', snapshot.size);
     let visitorRows = snapshot.docs.map((document) =>
       normalizeVisitor(document.id, document.data())
     );
 
-    if (vip === 'true' || vip === 'false') {
-      const expectedVip = vip === 'true';
-      visitorRows = visitorRows.filter((visitor) => visitor.isVip === expectedVip);
-    }
-
-    if (search) {
-      visitorRows = visitorRows.filter((visitor) =>
-        [visitor.name, visitor.phone, visitor.email].some((value) =>
-          String(value ?? '').toLowerCase().includes(search)
-        )
-      );
-    }
+    visitorRows = visitorRows.filter((visitor) =>
+      [visitor.name, visitor.phone, visitor.email].some((value) =>
+        String(value ?? '').toLowerCase().includes(search)
+      )
+    );
 
     visitorRows.sort((left, right) => {
       const leftValue = comparableValue(left, sort);
@@ -85,7 +117,6 @@ export async function GET(request: NextRequest) {
     });
 
     const total = visitorRows.length;
-    const offset = (page - 1) * limit;
     const visitors = visitorRows.slice(offset, offset + limit);
 
     return NextResponse.json({

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  Timestamp,
+  type Query,
+  type QueryDocumentSnapshot,
+} from 'firebase-admin/firestore';
 import type { Booking } from '@/lib/db/schema';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createAdminBookingSchema } from '@/lib/validations';
@@ -50,7 +55,6 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0];
     const effectiveDate = isToday ? today : date;
     const effectiveMinDate = effectiveDate || showPast ? minDate : (minDate ?? today);
-    const snapshot = await getAdminDb().collection('bookings').get();
 
     const serializeValue = (value: unknown): unknown => {
       if (value instanceof Timestamp) return value.toDate().toISOString();
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
     const field = (data: Record<string, unknown>, camelCase: string, snakeCase: string) =>
       data[camelCase] ?? data[snakeCase];
 
-    let bookings = snapshot.docs.map((document) => {
+    const normalizeBooking = (document: QueryDocumentSnapshot) => {
       const data = document.data() as Record<string, unknown>;
       const visitorName = field(data, 'visitorName', 'visitor_name') ?? '';
       const numberOfGuests = field(data, 'numberOfGuests', 'number_of_guests') ?? 1;
@@ -93,6 +97,77 @@ export async function GET(request: NextRequest) {
         visited: data.visited === true,
         status: data.status ?? 'confirmed',
       };
+    };
+
+    const database = getAdminDb();
+    let query: Query = database.collection('bookings');
+    let hasBookingDateRange = false;
+
+    // Replaced full bookings scan with Firestore-side filters where possible.
+    if (status) query = query.where('status', '==', status);
+    if (effectiveDate) {
+      query = query.where('bookingDate', '==', effectiveDate);
+    } else if (effectiveMinDate) {
+      query = query.where('bookingDate', '>=', effectiveMinDate);
+      hasBookingDateRange = true;
+    }
+    if (visitedParam) {
+      query = query.where('visited', '==', visitedParam === 'true');
+    }
+    if (visitedFilter === 'visited') {
+      query = query.where('visited', '==', true);
+    } else if (visitedFilter === 'not-visited') {
+      query = query.where('visited', '==', false).where('bookingDate', '<', today);
+      hasBookingDateRange = true;
+    } else if (visitedFilter === 'yet-to-visit') {
+      query = query.where('visited', '==', false).where('bookingDate', '>=', today);
+      hasBookingDateRange = true;
+    }
+
+    const usesInMemoryOnlySort =
+      sort === 'checklist' ||
+      sort === 'name' ||
+      sort === 'visitorName' ||
+      sort === 'visitor_name' ||
+      sort === 'guests' ||
+      sort === 'numberOfGuests' ||
+      sort === 'number_of_guests';
+    const defaultCreatedAtSort = !sort;
+    const canPageInFirestore =
+      !search &&
+      !usesInMemoryOnlySort &&
+      !(defaultCreatedAtSort && hasBookingDateRange) &&
+      !(effectiveDate && effectiveMinDate);
+    const countQuery = query;
+
+    if (canPageInFirestore) {
+      if (sort === 'date' || sort === 'bookingDate' || sort === 'booking_date') {
+        query = query.orderBy('bookingDate', order).orderBy('bookingTime', order);
+      } else {
+        query = query.orderBy('createdAt', order);
+      }
+
+      const countSnapshot = await countQuery.count().get();
+      const total = countSnapshot.data().count;
+      console.log('[FIRESTORE READ]', 'GET /api/admin/bookings:count', 'docs:', total);
+
+      const snapshot = await query.offset(offset).limit(limit).get();
+      console.log('[FIRESTORE READ]', 'GET /api/admin/bookings', 'docs:', snapshot.size);
+      const paginatedBookings = snapshot.docs
+        .map(normalizeBooking)
+        .map((booking) => serializeValue(booking));
+
+      return NextResponse.json({
+        bookings: paginatedBookings,
+        total,
+      });
+    }
+
+    const snapshot = await query.get();
+    console.log('[FIRESTORE READ]', 'GET /api/admin/bookings', 'docs:', snapshot.size);
+
+    let bookings = snapshot.docs.map((document) => {
+      return normalizeBooking(document);
     });
 
     bookings = bookings.filter((booking) => {
@@ -109,6 +184,8 @@ export async function GET(request: NextRequest) {
       if (visitedFilter === 'yet-to-visit' && (isVisited || bookingDate < today)) return false;
 
       if (search) {
+        // TODO: Replace reduced-set in-memory search with indexed normalized fields:
+        // visitorNameLowercase, phoneNormalized, emailLowercase, bookingNumberString.
         const values = [booking.visitorName, booking.phone, booking.email]
           .map((value) => String(value ?? '').toLowerCase());
         if (!values.some((value) => value.includes(search))) return false;

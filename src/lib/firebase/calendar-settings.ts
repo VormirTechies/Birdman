@@ -5,6 +5,7 @@ import {
   Timestamp,
   type DocumentData,
   type DocumentReference,
+  type Query,
 } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 
@@ -63,17 +64,57 @@ export function normalizeCalendarSetting(id: string, data: DocumentData) {
 
 export type NormalizedCalendarSetting = ReturnType<typeof normalizeCalendarSetting>;
 
-async function calendarSettingDocuments() {
-  const snapshot = await getAdminDb().collection('calendar_settings').get();
+async function calendarSettingDocuments(startDate?: string, endDate?: string) {
+  let query: Query = getAdminDb().collection('calendar_settings');
+
+  if (startDate) query = query.where('date', '>=', startDate);
+  if (endDate) query = query.where('date', '<=', endDate);
+
+  // Range queries avoid scanning all calendar settings for month/day availability.
+  const snapshot = await query.get();
+  console.log('[FIRESTORE READ]', 'calendarSettingDocuments', 'docs:', snapshot.size);
+
   return snapshot.docs.map((document) => ({
     reference: document.ref,
     setting: normalizeCalendarSetting(document.id, document.data()),
   }));
 }
 
+async function calendarSettingDocumentForDate(date: string) {
+  const database = getAdminDb();
+  const directSnapshot = await database.collection('calendar_settings').doc(date).get();
+  console.log('[FIRESTORE READ]', 'calendarSettingDocumentForDate:direct', 'docs:', directSnapshot.exists ? 1 : 0);
+
+  if (directSnapshot.exists) {
+    return {
+      reference: directSnapshot.ref,
+      setting: normalizeCalendarSetting(
+        directSnapshot.id,
+        directSnapshot.data() ?? {}
+      ),
+    };
+  }
+
+  // Fallback for migrated data whose document ID is not the date.
+  const querySnapshot = await database
+    .collection('calendar_settings')
+    .where('date', '==', date)
+    .limit(1)
+    .get();
+  console.log('[FIRESTORE READ]', 'calendarSettingDocumentForDate:query', 'docs:', querySnapshot.size);
+
+  const document = querySnapshot.docs[0];
+  return document
+    ? {
+        reference: document.ref,
+        setting: normalizeCalendarSetting(document.id, document.data()),
+      }
+    : null;
+}
+
 export async function getFirestoreCalendarSetting(date: string) {
-  const documents = await calendarSettingDocuments();
-  return documents.find(({ setting }) => setting.date === date)?.setting ?? {
+  const document = await calendarSettingDocumentForDate(date);
+  return document?.setting ?? {
     date,
     maxCapacity: DEFAULT_CALENDAR_CAPACITY,
     startTime: DEFAULT_CALENDAR_START_TIME,
@@ -85,13 +126,9 @@ export async function getFirestoreCalendarSettings(
   startDate?: string,
   endDate?: string
 ) {
-  const documents = await calendarSettingDocuments();
+  const documents = await calendarSettingDocuments(startDate, endDate);
   return documents
     .map(({ setting }) => setting)
-    .filter((setting) =>
-      (!startDate || setting.date >= startDate)
-      && (!endDate || setting.date <= endDate)
-    )
     .sort((left, right) => left.date.localeCompare(right.date));
 }
 
@@ -101,8 +138,7 @@ export async function upsertFirestoreCalendarSetting(
   updatedBy: string | null
 ) {
   const database = getAdminDb();
-  const documents = await calendarSettingDocuments();
-  const existingDocument = documents.find(({ setting }) => setting.date === date);
+  const existingDocument = await calendarSettingDocumentForDate(date);
   const existingReference = existingDocument?.reference ?? null;
   const reference = existingReference ??
     database.collection('calendar_settings').doc(date);
@@ -135,7 +171,11 @@ export async function upsertFirestoreCalendarSettings(
   if (dates.length === 0) return 0;
 
   const database = getAdminDb();
-  const documents = await calendarSettingDocuments();
+  const sortedDates = [...dates].sort();
+  const documents = await calendarSettingDocuments(
+    sortedDates[0],
+    sortedDates[sortedDates.length - 1]
+  );
   const byDate = new Map(
     documents.map((document) => [document.setting.date, document])
   );
@@ -198,15 +238,14 @@ export async function updateFirestoreCalendarSettings(
 }
 
 export async function getFutureCalendarSettingReferences(startDate: string) {
-  const documents = await calendarSettingDocuments();
+  const documents = await calendarSettingDocuments(startDate);
   return documents
-    .filter(({ setting }) => setting.date >= startDate)
     .map(({ reference }) => reference);
 }
 
 export async function deletePastCalendarSettings(today: string) {
   const database = getAdminDb();
-  const documents = await calendarSettingDocuments();
+  const documents = await calendarSettingDocuments(undefined, today);
   const references = documents
     .filter(({ setting }) => setting.date && setting.date < today)
     .map(({ reference }) => reference);

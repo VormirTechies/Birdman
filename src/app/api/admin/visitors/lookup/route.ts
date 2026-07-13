@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Query } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   normalizePhone,
@@ -21,6 +22,18 @@ function lookupResponse(visitor: NormalizedVisitor | null) {
   };
 }
 
+async function firstVisitorFromQuery(query: Query, label: string) {
+  const snapshot = await query.limit(5).get();
+  console.log('[FIRESTORE READ]', `GET /admin/visitors/lookup:${label}`, 'docs:', snapshot.size);
+  const visitors = snapshot.docs
+    .map((document) => normalizeVisitor(document.id, document.data()))
+    .sort((left, right) =>
+      String(right.lastVisitDate ?? '').localeCompare(String(left.lastVisitDate ?? ''))
+    );
+
+  return visitors[0] ?? null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -40,34 +53,56 @@ export async function GET(request: NextRequest) {
 
     if (id) {
       const snapshot = await database.collection('visitors').doc(id).get();
+      console.log('[FIRESTORE READ]', 'GET /admin/visitors/lookup:id', 'docs:', snapshot.exists ? 1 : 0);
       const visitor = snapshot.exists
         ? normalizeVisitor(snapshot.id, snapshot.data() ?? {})
         : null;
       return NextResponse.json(lookupResponse(visitor));
     }
 
-    const snapshot = await database.collection('visitors').get();
     const normalizedPhone = normalizePhone(phone);
-    const visitors = snapshot.docs
-      .map((document) => normalizeVisitor(document.id, document.data()))
-      .filter((visitor) => {
-        const phoneMatches = normalizedPhone
-          ? normalizePhone(visitor.phone) === normalizedPhone
-          : false;
-        const emailMatches = email
-          ? visitor.email?.trim().toLowerCase() === email
-          : false;
-        const nameMatches = name
-          ? visitor.name.trim().toLowerCase().includes(name)
-          : false;
+    let visitor: NormalizedVisitor | null = null;
 
-        return phoneMatches || emailMatches || nameMatches;
-      })
-      .sort((left, right) =>
-        String(right.lastVisitDate ?? '').localeCompare(String(left.lastVisitDate ?? ''))
+    // TODO: Backfill phoneNormalized, emailLowercase, and nameLowercase for all existing visitors to improve lookup coverage.
+    if (normalizedPhone) {
+      visitor = await firstVisitorFromQuery(
+        database.collection('visitors').where('phoneNormalized', '==', normalizedPhone),
+        'phoneNormalized'
       );
+    }
 
-    return NextResponse.json(lookupResponse(visitors[0] ?? null));
+    if (!visitor && phone) {
+      visitor = await firstVisitorFromQuery(
+        database.collection('visitors').where('phone', '==', phone),
+        'phone'
+      );
+    }
+
+    if (!visitor && email) {
+      visitor = await firstVisitorFromQuery(
+        database.collection('visitors').where('emailLowercase', '==', email),
+        'emailLowercase'
+      );
+    }
+
+    if (!visitor && email) {
+      visitor = await firstVisitorFromQuery(
+        database.collection('visitors').where('email', '==', email),
+        'email'
+      );
+    }
+
+    if (!visitor && name) {
+      visitor = await firstVisitorFromQuery(
+        database
+          .collection('visitors')
+          .where('nameLowercase', '>=', name)
+          .where('nameLowercase', '<=', `${name}\uf8ff`),
+        'nameLowercase'
+      );
+    }
+
+    return NextResponse.json(lookupResponse(visitor));
   } catch (error) {
     console.error('[API] GET /admin/visitors/lookup failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
