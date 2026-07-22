@@ -14,7 +14,8 @@ function getSiteUrl() {
   if (
     configuredUrl.includes('localhost') ||
     configuredUrl.includes('127.0.0.1') ||
-    configuredUrl.includes('birdmanofchennai.vercel.app')
+    configuredUrl.includes('birdmanofchennai.vercel.app') ||
+    configuredUrl.includes('demo.parrotsudarson.org')
   ) {
     return productionUrl;
   }
