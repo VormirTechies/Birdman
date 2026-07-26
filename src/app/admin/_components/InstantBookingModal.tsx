@@ -198,6 +198,7 @@ export function InstantBookingModal({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          visitorId: visitorMatch?.id,
           visitorName: formData.visitorName.trim(),
           phone: formData.phone.trim(),
           email: formData.email.trim() || undefined,

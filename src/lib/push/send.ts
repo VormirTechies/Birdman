@@ -1,5 +1,7 @@
 'use client';
 
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
+
 /**
  * Sends a web push notification to the current user's subscription.
  * Only works if:
@@ -43,7 +45,7 @@ export async function sendPushNotification(notification: {
     }
 
     // Send push notification via API
-    const response = await fetch('/api/admin/push', {
+    const response = await authenticatedFetch('/api/admin/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

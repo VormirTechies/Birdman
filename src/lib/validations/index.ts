@@ -89,6 +89,7 @@ export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 // ─── Admin Booking Validation (Relaxed Rules) ────────────────────────────────
 
 export const createAdminBookingSchema = z.object({
+  visitorId: z.string().min(1).max(150).optional(),
   visitorName: z
     .string()
     .min(2, 'Name must be at least 2 characters')

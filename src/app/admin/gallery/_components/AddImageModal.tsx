@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { X, CloudUpload } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 import type { GalleryImageItem } from './ImageCard';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
@@ -77,7 +78,7 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
     try {
       if (isEdit) {
         // Edit mode: just update title and description
-        const res = await fetch(`/api/admin/gallery/${editImage!.id}`, {
+        const res = await authenticatedFetch(`/api/admin/gallery/${editImage!.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title: title.trim(), description: description.trim() || null }),

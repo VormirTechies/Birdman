@@ -1,43 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/require-admin';
 
-// Configure VAPID keys for web push
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+function configureWebPush() {
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    ?.replace(/['"]/g, '')
+    .trim();
+  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+    ?.replace(/['"]/g, '')
+    .trim();
 
-if (vapidPublicKey && vapidPrivateKey) {
+  if (!vapidPublicKey || !vapidPrivateKey) return false;
   webpush.setVapidDetails(
     'mailto:admin@parrotsudarson.org',
     vapidPublicKey,
     vapidPrivateKey
   );
-} else {
-  console.warn('[Push API] VAPID keys not configured. Push notifications will not work.');
+  return true;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Parse request body
     const { subscription, notification } = await request.json();
 
-    if (!subscription || !notification) {
+    if (
+      !subscription
+      || typeof subscription.endpoint !== 'string'
+      || !notification
+      || typeof notification.title !== 'string'
+      || typeof notification.body !== 'string'
+    ) {
       return NextResponse.json(
         { error: 'Missing subscription or notification data' },
         { status: 400 }
       );
     }
 
-    // Validate VAPID keys are configured
-    if (!vapidPublicKey || !vapidPrivateKey) {
+    if (!configureWebPush()) {
       return NextResponse.json(
         { error: 'Push notifications not configured on server' },
         { status: 500 }
@@ -57,12 +59,11 @@ export async function POST(request: NextRequest) {
     console.log('[Push API] Notification sent successfully');
     return NextResponse.json({ success: true });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Push API] Error:', error);
 
-    // Handle specific web-push errors
-    if (error.statusCode === 410 || error.statusCode === 404) {
-      // Subscription has expired or is no longer valid
+    const pushError = error as { statusCode?: number; message?: string };
+    if (pushError.statusCode === 410 || pushError.statusCode === 404) {
       return NextResponse.json(
         { error: 'Push subscription expired', expired: true },
         { status: 410 }
@@ -70,7 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to send push notification', details: error.message },
+      {
+        error: 'Failed to send push notification',
+        details: pushError.message ?? 'Unknown push delivery error',
+      },
       { status: 500 }
     );
   }

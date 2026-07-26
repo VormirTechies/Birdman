@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   FieldValue,
+  FieldPath,
   Timestamp,
   type Query,
   type QueryDocumentSnapshot,
@@ -11,6 +12,7 @@ import { createAdminBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
 import { requireAdmin } from '@/lib/require-admin';
+import { bookingSearchPrefixes } from '@/lib/firebase/booking-search';
 import { ZodError } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -25,7 +27,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = searchParams.has('offset')
+    const cursor = searchParams.get('cursor');
+    const offset = cursor
+      ? 0
+      : searchParams.has('offset')
       ? parseInt(searchParams.get('offset') || '0')
       : (page - 1) * limit;
     const status = searchParams.get('status');
@@ -105,6 +110,9 @@ export async function GET(request: NextRequest) {
 
     // Replaced full bookings scan with Firestore-side filters where possible.
     if (status) query = query.where('status', '==', status);
+    if (search && search.length >= 2) {
+      query = query.where('searchPrefixes', 'array-contains', search);
+    }
     if (effectiveDate) {
       query = query.where('bookingDate', '==', effectiveDate);
     } else if (effectiveMinDate) {
@@ -134,7 +142,6 @@ export async function GET(request: NextRequest) {
       sort === 'number_of_guests';
     const defaultCreatedAtSort = !sort;
     const canPageInFirestore =
-      !search &&
       !usesInMemoryOnlySort &&
       !(defaultCreatedAtSort && hasBookingDateRange) &&
       !(effectiveDate && effectiveMinDate);
@@ -142,9 +149,32 @@ export async function GET(request: NextRequest) {
 
     if (canPageInFirestore) {
       if (sort === 'date' || sort === 'bookingDate' || sort === 'booking_date') {
-        query = query.orderBy('bookingDate', order).orderBy('bookingTime', order);
+        query = query
+          .orderBy('bookingDate', order)
+          .orderBy('bookingTime', order)
+          .orderBy(FieldPath.documentId(), order);
       } else {
-        query = query.orderBy('createdAt', order);
+        query = query.orderBy('createdAt', order).orderBy(FieldPath.documentId(), order);
+      }
+
+      if (cursor) {
+        try {
+          const values = JSON.parse(
+            Buffer.from(cursor, 'base64url').toString('utf8')
+          ) as unknown[];
+          if (!Array.isArray(values) || values.length < 2) throw new Error();
+          if (
+            sort !== 'date' &&
+            sort !== 'bookingDate' &&
+            sort !== 'booking_date' &&
+            typeof values[0] === 'string'
+          ) {
+            values[0] = Timestamp.fromDate(new Date(values[0]));
+          }
+          query = query.startAfter(...values);
+        } catch {
+          return NextResponse.json({ error: 'Invalid pagination cursor' }, { status: 400 });
+        }
       }
 
       const countSnapshot = await countQuery.count().get();
@@ -156,10 +186,25 @@ export async function GET(request: NextRequest) {
       const paginatedBookings = snapshot.docs
         .map(normalizeBooking)
         .map((booking) => serializeValue(booking));
+      const lastDocument = snapshot.docs.at(-1);
+      const nextCursor = lastDocument && snapshot.size === limit
+        ? Buffer.from(
+            JSON.stringify(
+              sort === 'date' || sort === 'bookingDate' || sort === 'booking_date'
+                ? [
+                    lastDocument.get('bookingDate'),
+                    lastDocument.get('bookingTime'),
+                    lastDocument.id,
+                  ]
+                : [serializeValue(lastDocument.get('createdAt')), lastDocument.id]
+            )
+          ).toString('base64url')
+        : null;
 
       return NextResponse.json({
         bookings: paginatedBookings,
         total,
+        nextCursor,
       });
     }
 
@@ -255,8 +300,24 @@ export async function POST(request: NextRequest) {
     const counterRef = adminDb.collection('_counters').doc('bookings');
     const now = new Date();
     const numberOfGuests = validatedData.adults + validatedData.children;
+    const normalizedPhone = validatedData.phone.replace(/\D/g, '');
+    const normalizedEmail = (validatedData.email || '').trim().toLowerCase();
+    const normalizedName = validatedData.visitorName.trim().toLowerCase();
+    const searchPrefixes = bookingSearchPrefixes([
+      normalizedName,
+      normalizedPhone,
+      normalizedEmail,
+    ]);
 
-    const bookingNumber = await adminDb.runTransaction(async (transaction) => {
+    const creation = await adminDb.runTransaction(async (transaction) => {
+      const visitorRef = validatedData.visitorId
+        ? adminDb.collection('visitors').doc(validatedData.visitorId)
+        : null;
+      const visitorSnapshot = visitorRef ? await transaction.get(visitorRef) : null;
+      if (visitorRef && !visitorSnapshot?.exists) {
+        throw new Error('Selected visitor no longer exists');
+      }
+
       const counterSnapshot = await transaction.get(counterRef);
       const currentNumber = counterSnapshot.exists
         ? Number(counterSnapshot.data()?.value ?? 0)
@@ -279,20 +340,29 @@ export async function POST(request: NextRequest) {
         confirmationSent: false,
         reminderSent: false,
         reminderSentAt: null,
-        visitorId: null,
-        isVip: false,
+        visitorId: validatedData.visitorId ?? null,
+        isVip: visitorSnapshot?.data()?.isVip === true,
         vipNotes: null,
+        visitorNameLowercase: normalizedName,
+        phoneNormalized: normalizedPhone,
+        emailLowercase: normalizedEmail,
+        searchPrefixes,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      return nextNumber;
+      return {
+        bookingNumber: nextNumber,
+        visitorId: validatedData.visitorId ?? null,
+        isVip: visitorSnapshot?.data()?.isVip === true,
+      };
     });
+    const { bookingNumber, visitorId, isVip } = creation;
 
     const booking: Booking = {
       id: bookingRef.id,
       bookingNumber,
-      visitorId: null,
+      visitorId,
       visitorName: validatedData.visitorName,
       phone: validatedData.phone,
       email: validatedData.email || null,
@@ -359,10 +429,10 @@ export async function POST(request: NextRequest) {
           children: booking.children,
           numberOfGuests: booking.numberOfGuests,
           status: booking.status,
-          visitorId: null,
+          visitorId,
         },
-        isVip: false,
-        isReturning: false,
+        isVip,
+        isReturning: Boolean(visitorId),
         emailSent,
       },
       { status: 201 }

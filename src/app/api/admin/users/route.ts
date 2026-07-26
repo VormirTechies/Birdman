@@ -1,43 +1,24 @@
-import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getAdminAuth } from '@/lib/firebase/admin';
+import { requireAdmin } from '@/lib/require-admin';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const adminClient = createAdminClient();
-    const {
-      data: { users },
-      error,
-    } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-
-    if (error) {
-      console.error('[API] Failed to list users:', error);
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
-    }
-
-    const formatted = users.map((u) => ({
-      id: u.id,
-      email: u.email ?? '',
-      name:
-        (u.user_metadata?.name as string | undefined) ??
-        (u.user_metadata?.full_name as string | undefined) ??
-        u.email?.split('@')[0] ??
-        'Unknown',
-      avatarUrl: (u.user_metadata?.avatar_url as string | undefined) ?? null,
-      createdAt: u.created_at,
+    const result = await getAdminAuth().listUsers(1000);
+    const users = result.users.map((user) => ({
+      id: user.uid,
+      email: user.email ?? '',
+      name: user.displayName ?? user.email?.split('@')[0] ?? 'Unknown',
+      avatarUrl: user.photoURL ?? null,
+      createdAt: user.metadata.creationTime,
     }));
 
-    return NextResponse.json({ users: formatted, total: formatted.length });
+    return NextResponse.json({ users, total: users.length });
   } catch (error: unknown) {
-    console.error('[API] Unexpected error fetching users:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[API] Failed to list Firebase users:', error);
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
   }
 }

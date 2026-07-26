@@ -1,17 +1,34 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Users, CalendarCheck, CalendarClock, TrendingUp, RefreshCw, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatCard } from './_components/StatCard';
 import { RecentBookings } from './_components/RecentBookings';
+import type { RecentBooking } from './_components/RecentBookings';
 import { InstantBookingModal } from './_components/InstantBookingModal';
 import type { StatCardProps } from './_components/StatCard';
 import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
+function toDashboardBooking(booking: Record<string, unknown>): RecentBooking {
+  return {
+    id: String(booking.id),
+    visitorName: String(booking.visitorName ?? booking.visitor_name ?? ''),
+    numberOfGuests: Number(
+      booking.numberOfGuests ?? booking.number_of_guests ?? 1
+    ),
+    bookingDate: String(booking.bookingDate ?? booking.booking_date ?? ''),
+    bookingTime: String(booking.bookingTime ?? booking.booking_time ?? ''),
+    status: String(booking.status ?? 'confirmed'),
+    isVip: booking.isVip === true,
+  };
+}
+
 export default function AdminPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [stats, setStats] = useState({
     todayVisitors: 0,
     next30Days: 0,
@@ -59,30 +76,41 @@ export default function AdminPage() {
     },
   ], [stats]);
 
-  // Fetch stats from API
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await authenticatedFetch('/api/bookings/stats', {
-          cache: 'no-cache',
-        });
-        const data = await response.json();
+  const fetchDashboard = useCallback(async () => {
+    setIsDashboardLoading(true);
+    try {
+      const response = await authenticatedFetch('/api/admin/dashboard', {
+        cache: 'no-store',
+      });
+      const data = await response.json();
 
-        if (data.success && data.stats) {
-          setStats({
-            todayVisitors: data.stats.todayVisitors,
-            next30Days: data.stats.next30Days,
-            last30Days: data.stats.last30Days,
-            totalVisitors: data.stats.totalVisitors,
-          });
-        }
-      } catch (error) {
-        console.error('[Dashboard] Error fetching stats:', error);
+      if (!response.ok || !data.success || !data.stats) {
+        throw new Error(data.error || 'Failed to load dashboard');
       }
-    };
 
-    fetchStats();
-  }, [refreshKey]);
+      setStats({
+        todayVisitors: data.stats.todayVisitors,
+        next30Days: data.stats.next30Days,
+        last30Days: data.stats.last30Days,
+        totalVisitors: data.stats.totalVisitors,
+      });
+      setRecentBookings(
+        Array.isArray(data.recentBookings)
+          ? data.recentBookings.map((booking: Record<string, unknown>) =>
+              toDashboardBooking(booking)
+            )
+          : []
+      );
+    } catch (error) {
+      console.error('[Dashboard] Error fetching dashboard:', error);
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard, refreshKey]);
 
   // Manual refresh function
   const handleManualRefresh = () => {
@@ -143,7 +171,10 @@ export default function AdminPage() {
 
       {/* Recent Bookings section */}
       <div className="mb-8">
-        <RecentBookings refreshKey={refreshKey} />
+        <RecentBookings
+          bookings={recentBookings}
+          isLoading={isDashboardLoading}
+        />
       </div>
 
       {/* Instant Booking Modal */}

@@ -2,7 +2,10 @@
  * Sanctuary Push Client - Modular implementation
  */
 
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
+
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.replace(/['"]/g, '').trim();
+const SAVED_SUBSCRIPTION_KEY = 'firebase-admin-push-subscription-v1';
 
 /**
  * Converts a VAPID public key to a Uint8Array for the pushManager.
@@ -69,9 +72,14 @@ export async function subscribeUser() {
       console.log('[Push Client] New subscription created');
     }
 
-    // Save subscription to server database
+    const serializedSubscription = JSON.stringify(subscription.toJSON());
+    if (window.localStorage.getItem(SAVED_SUBSCRIPTION_KEY) === serializedSubscription) {
+      return subscription;
+    }
+
+    // Save a new or changed subscription to Firestore through the authenticated API.
     try {
-      const response = await fetch('/api/admin/push/subscribe', {
+      const response = await authenticatedFetch('/api/admin/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscription: subscription.toJSON() })
@@ -84,6 +92,7 @@ export async function subscribeUser() {
       }
 
       console.log('[Push Client] Subscription saved to server database');
+      window.localStorage.setItem(SAVED_SUBSCRIPTION_KEY, serializedSubscription);
     } catch (error) {
       console.error('[Push Client] Error saving subscription:', error);
       throw error;

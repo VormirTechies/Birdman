@@ -47,16 +47,7 @@ export function PushProvider({ children }: { children: React.ReactNode }) {
   const enablePush = useCallback(async () => {
     setIsLoading(true);
     try {
-      const subscription = await subscribeUser();
-      
-      // Update Backend
-      const res = await fetch('/api/admin/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscription }),
-      });
-
-      if (!res.ok) throw new Error('Failed to save subscription');
+      await subscribeUser();
 
       setIsSubscribed(true);
       setPermission(Notification.permission);

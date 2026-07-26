@@ -1,15 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getAdminAuth } from '@/lib/firebase/admin';
+import { requireAdmin } from '@/lib/require-admin';
+
+async function verifyCurrentPassword(email: string, password: string) {
+  const apiKey =
+    process.env.FIREBASE_WEB_API_KEY ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('Missing Firebase Web API key');
+  }
+
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: false,
+      }),
+      cache: 'no-store',
+    }
+  );
+
+  if (response.ok) return true;
+
+  const data = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+  } | null;
+  const code = data?.error?.message ?? '';
+
+  if (
+    code.includes('INVALID_PASSWORD') ||
+    code.includes('INVALID_LOGIN_CREDENTIALS') ||
+    code.includes('EMAIL_NOT_FOUND')
+  ) {
+    return false;
+  }
+
+  throw new Error(`Firebase password verification failed: ${code || response.status}`);
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!auth.user.email) {
+      return NextResponse.json(
+        { error: 'Authenticated user does not have an email address' },
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
@@ -45,35 +87,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify current password by attempting a re-authentication
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email!,
-      password: currentPassword,
-    });
-
-    if (signInError) {
+    const currentPasswordIsValid = await verifyCurrentPassword(
+      auth.user.email,
+      currentPassword
+    );
+    if (!currentPasswordIsValid) {
       return NextResponse.json(
         { error: 'Current password is incorrect' },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    // Update password
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (updateError) {
-      console.error('[API] Failed to update password:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to update password. Please try again.' },
-        { status: 500 },
-      );
-    }
+    await getAdminAuth().updateUser(auth.user.uid, { password: newPassword });
 
     return NextResponse.json({ success: true, message: 'Password updated successfully' });
   } catch (error: unknown) {
-    console.error('[API] Unexpected error changing password:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[API] Failed to change Firebase password:', error);
+    return NextResponse.json(
+      { error: 'Failed to update password. Please try again.' },
+      { status: 500 }
+    );
   }
 }

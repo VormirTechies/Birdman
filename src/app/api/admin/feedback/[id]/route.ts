@@ -1,47 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { approveFeedback, deleteFeedback } from '@/lib/db/queries';
+import { Timestamp } from 'firebase-admin/firestore';
+import { getAdminDb } from '@/lib/firebase/admin';
+import { requireAdmin } from '@/lib/require-admin';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+const COLLECTION = 'feedback';
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { id } = await params;
-    await approveFeedback(id);
+    const reference = getAdminDb().collection(COLLECTION).doc(id);
+    const snapshot = await reference.get();
 
-    return NextResponse.json({ success: true, message: 'Feedback approved' });
-  } catch (error: any) {
-    console.error('[API] Failed to approve feedback:', error);
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Feedback not found' }, { status: 404 });
+    }
+
+    await reference.update({
+      isApproved: true,
+      approvedAt: Timestamp.now(),
+      approvedBy: auth.user.uid,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Feedback approved',
+    });
+  } catch (error: unknown) {
+    console.error('[API] Failed to approve Firebase feedback:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
 
     const { id } = await params;
-    await deleteFeedback(id);
+    const reference = getAdminDb().collection(COLLECTION).doc(id);
+    const snapshot = await reference.get();
 
-    return NextResponse.json({ success: true, message: 'Feedback deleted' });
-  } catch (error: any) {
-    console.error('[API] Failed to delete feedback:', error);
+    if (!snapshot.exists) {
+      return NextResponse.json({ error: 'Feedback not found' }, { status: 404 });
+    }
+
+    await reference.delete();
+
+    return NextResponse.json({
+      success: true,
+      message: 'Feedback deleted',
+    });
+  } catch (error: unknown) {
+    console.error('[API] Failed to delete Firebase feedback:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

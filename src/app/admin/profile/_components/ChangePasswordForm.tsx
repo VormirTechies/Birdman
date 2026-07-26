@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, ShieldCheck, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
@@ -89,7 +90,7 @@ export function ChangePasswordForm() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/change-password', {
+      const res = await authenticatedFetch('/api/admin/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

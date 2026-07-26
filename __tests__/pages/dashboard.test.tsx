@@ -13,13 +13,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import AdminPage from '@/app/admin/page';
 
-// Mock Next.js navigation
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) =>
+    global.fetch(input, init),
 }));
 
 // Mock sonner toast
@@ -43,20 +42,22 @@ vi.mock('@/app/admin/_components/StatCard', () => ({
 
 // Mock RecentBookings component
 vi.mock('@/app/admin/_components/RecentBookings', () => ({
-  RecentBookings: ({ refreshKey }: any) => (
+  RecentBookings: ({ bookings, isLoading }: any) => (
     <div data-testid="recent-bookings">
-      Recent Bookings (refreshKey: {refreshKey})
+      Recent Bookings (items: {bookings.length}, loading: {String(isLoading)})
     </div>
   ),
 }));
 
-describe('Dashboard Page', () => {
-  const mockPush = vi.fn();
-  const mockRouter = { push: mockPush };
+vi.mock('@/app/admin/_components/InstantBookingModal', () => ({
+  InstantBookingModal: ({ open }: { open: boolean }) => (
+    <div data-testid="instant-booking-modal">{open ? 'modal open' : 'modal closed'}</div>
+  ),
+}));
 
+describe('Dashboard Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (useRouter as any).mockReturnValue(mockRouter);
 
     // Mock successful API response by default
     global.fetch = vi.fn().mockResolvedValue({
@@ -68,7 +69,19 @@ describe('Dashboard Page', () => {
           last30Days: 380,
           totalVisitors: 5200,
         },
+        recentBookings: [
+          {
+            id: 'booking-1',
+            visitorName: 'Sudarson',
+            numberOfGuests: 2,
+            bookingDate: '2026-07-25',
+            bookingTime: '16:30:00',
+            status: 'confirmed',
+            isVip: true,
+          },
+        ],
       }),
+      ok: true,
     });
   });
 
@@ -120,14 +133,14 @@ describe('Dashboard Page', () => {
   });
 
   describe('Stats Fetching', () => {
-    it('fetches stats on mount', async () => {
+    it('fetches the dashboard summary on mount', async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(
-          '/api/bookings/stats',
+          '/api/admin/dashboard',
           expect.objectContaining({
-            cache: 'no-cache',
+            cache: 'no-store',
           })
         );
       });
@@ -158,7 +171,7 @@ describe('Dashboard Page', () => {
 
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[Dashboard] Error fetching stats:',
+          '[Dashboard] Error fetching dashboard:',
           expect.any(Error)
         );
       });
@@ -176,6 +189,7 @@ describe('Dashboard Page', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
         json: async () => ({
           success: false,
         }),
@@ -221,32 +235,30 @@ describe('Dashboard Page', () => {
       expect(toast.success).toHaveBeenCalledWith('Refreshing data...');
     });
 
-    it('increments refreshKey for RecentBookings', async () => {
+    it('passes refreshed dashboard data to RecentBookings', async () => {
       const user = userEvent.setup();
       render(<AdminPage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/refreshKey: 0/)).toBeInTheDocument();
+        expect(screen.getByText(/items: 1/)).toBeInTheDocument();
       });
 
       const refreshButton = screen.getByTitle('Refresh data');
       await user.click(refreshButton);
 
-      await waitFor(() => {
-        expect(screen.getByText(/refreshKey: 1/)).toBeInTheDocument();
-      });
+      await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
     });
   });
 
   describe('Navigation', () => {
-    it('navigates to new booking page when button clicked', async () => {
+    it('opens the instant booking modal when button clicked', async () => {
       const user = userEvent.setup();
       render(<AdminPage />);
 
       const newBookingButton = screen.getByText('New Booking');
       await user.click(newBookingButton);
 
-      expect(mockPush).toHaveBeenCalledWith('/admin/bookings/new');
+      expect(screen.getByText('modal open')).toBeInTheDocument();
     });
   });
 
@@ -262,22 +274,21 @@ describe('Dashboard Page', () => {
       const { container } = render(<AdminPage />);
 
       await waitFor(() => {
-        const statsGrid = container.querySelector('.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4');
+        const statsGrid = container.querySelector('.grid.grid-cols-2.sm\\:grid-cols-2.lg\\:grid-cols-4');
         expect(statsGrid).toBeInTheDocument();
       });
     });
   });
 
   describe('Integration', () => {
-    it('passes refreshKey to RecentBookings component', async () => {
+    it('passes initial dashboard data to RecentBookings component', async () => {
       render(<AdminPage />);
 
       await waitFor(() => {
         expect(screen.getByTestId('recent-bookings')).toBeInTheDocument();
       });
 
-      // RecentBookings should receive refreshKey prop
-      expect(screen.getByText(/refreshKey: 0/)).toBeInTheDocument();
+      expect(screen.getByText(/items: 1/)).toBeInTheDocument();
     });
 
     it('maintains state between renders', async () => {
@@ -300,6 +311,7 @@ describe('Dashboard Page', () => {
   describe('Edge Cases', () => {
     it('handles zero stats gracefully', async () => {
       global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
         json: async () => ({
           success: true,
           stats: {
@@ -322,6 +334,7 @@ describe('Dashboard Page', () => {
 
     it('handles large numbers formatting', async () => {
       global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
         json: async () => ({
           success: true,
           stats: {

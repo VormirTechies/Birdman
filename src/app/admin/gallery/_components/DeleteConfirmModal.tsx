@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { GalleryImageItem } from './ImageCard';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
@@ -26,10 +27,8 @@ export function DeleteConfirmModal({ image, onClose, onDeleted }: DeleteConfirmM
     setError('');
     setDeleting(true);
     try {
-      const res = await fetch(`/api/admin/gallery/${image.id}`, {
+      const res = await authenticatedFetch(`/api/admin/gallery/${image.id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: image.url }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -68,7 +67,7 @@ export function DeleteConfirmModal({ image, onClose, onDeleted }: DeleteConfirmM
           <span className="font-medium text-[#212121]">
             {image.altText ?? 'this image'}
           </span>
-          ? It will be removed from both the gallery and storage.
+          ? It will be removed from the gallery.
         </p>
 
         {error && (

@@ -21,6 +21,11 @@ import userEvent from '@testing-library/user-event';
 import GalleryPage from '@/app/admin/gallery/page';
 import type { GalleryImageItem } from '@/app/admin/gallery/_components/ImageCard';
 
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) =>
+    global.fetch(input, init),
+}));
+
 // ─── Mock child components ────────────────────────────────────────────────────
 
 vi.mock('@/app/admin/gallery/_components/ImageCard', () => ({

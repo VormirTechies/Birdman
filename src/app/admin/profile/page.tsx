@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Select } from '@/app/admin/_components/Select';
 import { SearchBar } from '@/app/admin/_components/SearchBar';
 import { ChangePasswordForm } from './_components/ChangePasswordForm';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
@@ -324,7 +325,7 @@ export default function ProfilePage() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users', { cache: 'no-store' });
+      const res = await authenticatedFetch('/api/admin/users', { cache: 'no-store' });
       if (res.ok) {
         const data = (await res.json()) as { users: AdminUser[] };
         setAllUsers(data.users ?? []);

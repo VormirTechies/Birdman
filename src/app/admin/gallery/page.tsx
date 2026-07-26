@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { ImageCard, type GalleryImageItem } from './_components/ImageCard';
 import { AddImageModal } from './_components/AddImageModal';
 import { DeleteConfirmModal } from './_components/DeleteConfirmModal';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
@@ -44,7 +45,7 @@ export default function GalleryPage() {
   const fetchImages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/gallery', { cache: 'no-store' });
+      const res = await authenticatedFetch('/api/admin/gallery', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setImages(Array.isArray(data) ? data : []);
