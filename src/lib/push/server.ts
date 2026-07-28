@@ -21,6 +21,8 @@ export interface PushPayload {
     url?: string;
     icon?: string;
     badge?: string;
+    visitorName?: string;
+    bookingDate?: string;
 }
 
 /**
@@ -31,6 +33,10 @@ export async function broadcastPush(payload: PushPayload) {
   console.log(`[PUSH] Broadcasting: "${payload.title}"`);
 
   try {
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      throw new Error('Push notifications are not configured: VAPID keys are missing');
+    }
+
     const snapshot = await getAdminDb().collection('admin_push_subscriptions').get();
     const subscriptions = snapshot.docs.map((document) => ({
       id: document.id,
@@ -48,13 +54,17 @@ export async function broadcastPush(payload: PushPayload) {
             try {
                 await webpush.sendNotification(row.subscription, JSON.stringify(payload));
                 return { id: row.id, success: true };
-            } catch (error: any) {
+            } catch (error: unknown) {
+                const pushError = error as { statusCode?: number; message?: string };
                 // Remove stale subscriptions (410 Gone or 404 Not Found)
-                if (error.statusCode === 410 || error.statusCode === 404) {
+                if (pushError.statusCode === 410 || pushError.statusCode === 404) {
                     console.warn(`[PUSH] Pruning stale subscription: ${row.id}`);
                     await row.reference.delete();
                 } else {
-                    console.error(`[PUSH] Delivery failed for ${row.id}:`, error.message);
+                    console.error(
+                      `[PUSH] Delivery failed for ${row.id}:`,
+                      pushError.message ?? 'Unknown push delivery error'
+                    );
                 }
                 return { id: row.id, success: false };
             }
@@ -62,9 +72,10 @@ export async function broadcastPush(payload: PushPayload) {
     );
 
     const successCount = results.filter(r => r.success).length;
-    console.log(`[PUSH] Dispatch Complete. Sent: ${successCount}, Pruned: ${subscriptions.length - successCount}`);
+    const failedCount = subscriptions.length - successCount;
+    console.log(`[PUSH] Dispatch Complete. Sent: ${successCount}, Failed or pruned: ${failedCount}`);
     
-    return { success: true, count: successCount };
+    return { success: true, count: successCount, failedCount };
   } catch (error) {
     console.error('[PUSH] Global Broadcast Error:', error);
     throw error;

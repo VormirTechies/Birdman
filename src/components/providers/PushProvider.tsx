@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { subscribeUser } from '@/lib/push/client';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 import { toast } from 'sonner';
 
 interface PushContextType {
@@ -54,10 +55,12 @@ export function PushProvider({ children }: { children: React.ReactNode }) {
       toast.success('Sanctuary Alerts Active!', {
          description: 'You will now receive real-time Emerald-Flight notifications.'
       });
-    } catch (err: any) {
-      console.error('[PushProvider] Enable failed:', err);
+    } catch (error: unknown) {
+      const errorName =
+        error instanceof Error ? error.name : 'UnknownError';
+      console.error('[PushProvider] Enable failed:', error);
       toast.error('Alert Activation Failed', {
-         description: err.name === 'AbortError' 
+         description: errorName === 'AbortError'
             ? 'Browser push service rejected the request. Please check site permissions.'
             : 'Internal connection error.'
       });
@@ -69,7 +72,7 @@ export function PushProvider({ children }: { children: React.ReactNode }) {
   // 🛠️ ACTION: Test Push (Manual Trigger)
   const testPush = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/push/test', { method: 'POST' });
+      const res = await authenticatedFetch('/api/admin/push/test', { method: 'POST' });
       if (res.ok) {
         toast.info('Test Alert Dispatched', {
            description: 'A manual pulse has been sent to all registered devices.'
@@ -77,7 +80,7 @@ export function PushProvider({ children }: { children: React.ReactNode }) {
       } else {
         throw new Error('Test failed');
       }
-    } catch (err) {
+    } catch {
       toast.error('Test Failed', { description: 'Could not reach the sanctuary push engine.' });
     }
   }, []);
