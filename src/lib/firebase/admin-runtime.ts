@@ -10,6 +10,9 @@ function getFirebaseAdminApp() {
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
     ?.trim()
+    // Accept values copied directly from a service-account JSON property,
+    // where the closing quote may be followed by a comma.
+    .replace(/,\s*$/, '')
     .replace(/^["']|["']$/g, '')
     .replace(/\\n/g, '\n');
 
