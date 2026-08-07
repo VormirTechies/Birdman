@@ -340,3 +340,25 @@ The locale is set via URL prefix (`/en/...`, `/ta/...`) and detected automatical
 ## License
 
 MIT — see [LICENSE](./LICENSE)
+
+# Firebase Connect 
+
+## Install Google Cloud SDK (gcloud) on your local machine if you haven't already.
+
+`https://docs.cloud.google.com/sdk/docs/install-sdk`
+
+### On your development machine, install/authenticate the Google Cloud CLI:
+
+`gcloud auth application-default login`
+
+### A browser will open. Sign in with the Google account that has access to your Firebase project.
+
+### Then verify:
+
+`gcloud auth application-default print-access-token`
+
+### If that returns an access token, your local machine has ADC configured.
+
+### Now run:
+
+`npm run dev`

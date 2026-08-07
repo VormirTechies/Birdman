@@ -74,3 +74,6 @@ supabase-export/
 credentials.json
 secret*.json
 secrets.json
+
+.agents/
+.claude/
