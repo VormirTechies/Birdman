@@ -2,8 +2,11 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import {
+  LOCAL_FIRESTORE_DATABASE_ID,
+  resolveFirestoreDatabaseId,
+} from '@/lib/firebase/database-id';
 
-const FIRESTORE_DATABASE_ID = 'birdman-db';
 const FIREBASE_PROJECT_ID = 'birdman-7e745';
 
 // The Admin SDK only redirects to the Firestore emulator when this environment
@@ -14,6 +17,8 @@ if (process.env.NODE_ENV !== 'production') {
   process.env.GCLOUD_PROJECT ??= FIREBASE_PROJECT_ID;
 }
 
+export const firestoreDatabaseId = resolveFirestoreDatabaseId();
+
 const app = getApps().length
   ? getApps()[0]
   : initializeApp(
@@ -23,7 +28,9 @@ const app = getApps().length
     );
 
 export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app, FIRESTORE_DATABASE_ID);
+export const adminDb = firestoreDatabaseId === LOCAL_FIRESTORE_DATABASE_ID
+  ? getFirestore(app)
+  : getFirestore(app, firestoreDatabaseId);
 export const adminStorage = getStorage(app);
 
 export function getAdminAuth() {

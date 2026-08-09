@@ -5,3 +5,7 @@ env:
     value: 127.0.0.1:7003
     availability:
       - RUNTIME
+  - variable: FIRESTORE_DATABASE_ID
+    value: (default)
+    availability:
+      - RUNTIME

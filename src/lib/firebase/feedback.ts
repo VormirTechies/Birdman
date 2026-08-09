@@ -1,7 +1,10 @@
 import 'server-only';
 
 import { FieldPath, Timestamp, type Query } from 'firebase-admin/firestore';
-import firebaseAdminApp, { getAdminDb } from '@/lib/firebase/admin';
+import firebaseAdminApp, {
+  firestoreDatabaseId,
+  getAdminDb,
+} from '@/lib/firebase/admin';
 import type {
   AdminFeedback,
   FeedbackDocument,
@@ -86,7 +89,7 @@ export async function createFirestoreFeedback(input: FeedbackSubmission) {
   console.info('[feedback] Firestore document created', {
     id: reference.id,
     project: firebaseAdminApp.options.projectId ?? null,
-    database: 'birdman-db',
+    database: firestoreDatabaseId,
     target: process.env.FIRESTORE_EMULATOR_HOST ? 'emulator' : 'production',
     emulatorHost: process.env.FIRESTORE_EMULATOR_HOST ?? null,
   });

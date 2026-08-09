@@ -13,6 +13,20 @@ describe('FeedbackClient', () => {
     expect(screen.getByRole('link', { name: /write your story/i })).toHaveAttribute('href', '/blog/submit');
   });
 
+  it('expands a longer visitor review with a read more control', async () => {
+    const user = userEvent.setup();
+    const message = 'This is a beautifully calm visit '.repeat(8);
+    render(
+      <FeedbackClient
+        initialFeedback={[{ id: 'long-review', name: 'A Visitor', message, createdAt: '2026-04-21T00:00:00.000Z' }]}
+      />
+    );
+    const readMore = screen.getByRole('button', { name: 'Read more' });
+    expect(readMore).toHaveAttribute('aria-expanded', 'false');
+    await user.click(readMore);
+    expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('validates the feedback minimum before sending', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     const user = userEvent.setup();

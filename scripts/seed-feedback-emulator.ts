@@ -2,7 +2,7 @@ import { deleteApp, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 const PROJECT_ID = 'birdman-7e745';
-const DATABASE_ID = 'birdman-db';
+const DATABASE_ID = '(default)';
 const COLLECTION = 'feedback';
 const DEFAULT_EMULATOR_HOST = '127.0.0.1:7003';
 
@@ -71,7 +71,7 @@ async function run() {
   process.env.GCLOUD_PROJECT = PROJECT_ID;
 
   const app = initializeApp({ projectId: PROJECT_ID }, `feedback-emulator-seed-${Date.now()}`);
-  const db = getFirestore(app, DATABASE_ID);
+  const db = getFirestore(app);
   const batch = db.batch();
   const now = Date.now();
 
