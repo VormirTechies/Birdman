@@ -27,6 +27,22 @@ describe('FeedbackClient', () => {
     expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('shows the visitor name initial before the name', () => {
+    render(
+      <FeedbackClient
+        initialFeedback={[{
+          id: 'initial-review',
+          name: 'Ananya Rao',
+          message: 'A wonderfully peaceful and memorable visit for our family.',
+          createdAt: '2026-04-21T00:00:00.000Z',
+        }]}
+      />
+    );
+
+    expect(screen.getByTestId('feedback-initial-initial-review')).toHaveTextContent('A');
+    expect(screen.getByText('Ananya Rao')).toBeInTheDocument();
+  });
+
   it('validates the feedback minimum before sending', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     const user = userEvent.setup();
