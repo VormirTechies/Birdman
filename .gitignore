@@ -52,6 +52,8 @@ serviceAccount*.json
 google-credentials.json
 gcloud-service-account.json
 firebase-debug.log
+firestore-debug.log
+ui-debug.log
 .firebase/
 # Google Android / iOS config (may contain identifiers)
 google-services.json

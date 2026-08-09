@@ -226,6 +226,29 @@ npm run dev
 # http://localhost:3000
 ```
 
+### Firebase Emulator Suite
+
+Start the complete local Firebase environment with persistent emulator data:
+
+```powershell
+npm run emulators:start
+```
+
+Local Firestore uses the `(default)` database so it can be inspected in the
+official Emulator Suite UI:
+
+```text
+http://127.0.0.1:7000/firestore/default/data
+```
+
+Production continues to use the named `birdman-db` database. Emulator data is
+imported from and exported to `.firebase/emulator-data/`, which is ignored by
+Git. Seed approved feedback after the first start with:
+
+```powershell
+npm run seed:feedback:emulator
+```
+
 ---
 
 ## Available Scripts
@@ -235,6 +258,8 @@ npm run dev
 | `npm run dev` | Start Next.js dev server |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
+| `npm run emulators:start` | Start Firebase emulators with persistent `(default)` Firestore data |
+| `npm run seed:feedback:emulator` | Seed approved feedback into the local Firestore emulator |
 | `npm run lint` | ESLint check |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Run pending migrations |

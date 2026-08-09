@@ -1,27 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getPendingFeedback } from '@/lib/db/queries';
+import { listPendingFirestoreFeedback } from '@/lib/firebase/feedback';
+import { requireAdmin } from '@/lib/require-admin';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const pending = await getPendingFeedback();
-    
-    return NextResponse.json(pending.map(f => ({
-        id: f.id,
-        visitorName: f.visitorName,
-        message: f.message,
-        rating: f.rating,
-        isApproved: f.isApproved,
-        createdAt: f.createdAt.toISOString()
-    })));
-  } catch (error: any) {
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
+    return NextResponse.json(await listPendingFirestoreFeedback());
+  } catch (error: unknown) {
     console.error('[API] Failed to fetch feedback:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

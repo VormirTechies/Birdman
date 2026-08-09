@@ -1,325 +1,234 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Star,
-  MessageSquare,
-  Send,
-  CheckCircle2,
-  Bird,
-  Quote,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Counter } from '@/components/ui/counter';
-import {
-  AnimatedSection,
-  StaggerContainer,
-  StaggerItem,
-} from '@/components/ui/animated-section';
+import { ArrowRight, CheckCircle2, Feather, Loader2, MessageCircle, Quote } from 'lucide-react';
 import { toast } from 'sonner';
+import { feedbackSubmissionSchema, type PublicFeedback } from '@/models/firestore/feedback';
 
-interface FeedbackItem {
-  id: string;
-  name: string;
-  rating: number;
-  message: string;
-  visitDate: string;
-}
+type FormState = { name: string; email: string; feedback: string; website: string };
+type FieldErrors = Partial<Record<keyof FormState, string>>;
+const EMPTY_FORM: FormState = { name: '', email: '', feedback: '', website: '' };
 
-function StarRatingSelector({
-  value,
-  onChange,
+export function FeedbackClient({
+  initialFeedback,
+  initialNextCursor = null,
 }: {
-  value: number;
-  onChange: (v: number) => void;
+  initialFeedback: PublicFeedback[];
+  initialNextCursor?: string | null;
 }) {
-  const [hover, setHover] = useState(0);
-
-  return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => onChange(star)}
-          onMouseEnter={() => setHover(star)}
-          onMouseLeave={() => setHover(0)}
-          className="p-1 transition-transform hover:scale-110"
-          aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
-          suppressHydrationWarning
-        >
-          <Star
-            className={`w-8 h-8 transition-colors ${
-              star <= (hover || value)
-                ? 'text-golden-hour fill-golden-hour'
-                : 'text-canopy-dark/10'
-            }`}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function FeedbackClient({ initialFeedback }: { initialFeedback: FeedbackItem[] }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    rating: 0,
-    message: '',
-  });
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [feedbackItems, setFeedbackItems] = useState(initialFeedback);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [expandedFeedback, setExpandedFeedback] = useState<Set<string>>(new Set());
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.rating === 0 || !formData.message) return;
-    
+  function updateField(field: keyof FormState, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) return;
+    const parsed = feedbackSubmissionSchema.safeParse(form);
+    if (!parsed.success) {
+      const fields = parsed.error.flatten().fieldErrors;
+      setErrors({
+        name: fields.name?.[0],
+        email: fields.email?.[0],
+        feedback: fields.feedback?.[0],
+        website: fields.website?.[0],
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/feedback', {
+      const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(parsed.data),
       });
-
-      if (!res.ok) throw new Error();
-      
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          response.status === 429
+            ? 'You have shared several responses recently. Please try again later.'
+            : result.error || 'We could not submit your feedback.'
+        );
+      }
+      setForm(EMPTY_FORM);
+      setErrors({});
       setIsSubmitted(true);
-      toast.success('Feedback received!', {
-          description: 'Thank you for sharing your experience. We will review and approve it shortly.'
-      });
-    } catch (err) {
-      toast.error('Submission failed', { description: 'Please try again later' });
+      toast.success('Thank you for sharing your experience.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
 
-  const avgRating = initialFeedback.length > 0
-    ? initialFeedback.reduce((sum, f) => sum + f.rating, 0) / initialFeedback.length
-    : 5;
+  async function loadMoreFeedback() {
+    if (!nextCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/feedback?limit=12&cursor=${encodeURIComponent(nextCursor)}`,
+        { cache: 'no-store' }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to load more feedback');
+      setFeedbackItems((current) => [...current, ...result.feedback]);
+      setNextCursor(result.pagination.nextCursor);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load more feedback');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  function toggleFeedback(id: string) {
+    setExpandedFeedback((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <main className="min-h-screen bg-feather-cream">
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="pt-24 pb-20 bg-canopy-dark relative overflow-hidden">
-        {/* Background Aura */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-sanctuary-green/5 blur-[120px] rounded-full pointer-events-none" />
-        
-        <div className="container-wide text-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8 }}
-          >
-            <span className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white/60 text-xs font-bold uppercase tracking-widest px-6 py-2 rounded-full mb-8 backdrop-blur-md">
-              <MessageSquare className="w-3.5 h-3.5 text-sanctuary-green" />
-              Community Voices
+      <section className="relative overflow-hidden bg-canopy-dark px-4 pb-20 pt-32 text-white md:pb-28">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(62,176,140,0.18),transparent_35%)]" />
+        <div className="container-wide relative">
+          <div className="max-w-3xl">
+            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-white/70">
+              <MessageCircle className="h-4 w-4 text-sanctuary-green-light" /> Visitor voices
             </span>
-            <h1 className="font-display font-black text-white text-5xl md:text-8xl mb-8 tracking-tighter leading-[0.85]">
-              Visions of <span className="text-sanctuary-green">Emerald</span>
+            <h1 className="font-display text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
+              Every visit leaves a <span className="text-sanctuary-green-light">story.</span>
             </h1>
-
-            {/* Stats Display */}
-            <div className="flex items-center justify-center gap-12 mt-12 bg-white/5 backdrop-blur-2xl border border-white/5 p-8 rounded-[3rem] w-fit mx-auto shadow-2xl">
-              <div className="text-center group">
-                <div className="flex items-center gap-2 justify-center mb-1">
-                  <Star className="w-6 h-6 text-golden-hour fill-golden-hour group-hover:scale-125 transition-transform" />
-                  <span className="font-display font-black text-4xl text-white">
-                    {avgRating.toFixed(1)}
-                  </span>
-                </div>
-                <span className="text-white/30 text-[10px] font-bold uppercase tracking-widest">Sanctuary Rating</span>
-              </div>
-              <div className="w-px h-12 bg-white/10" />
-              <div className="text-center group">
-                <div className="font-display font-black text-4xl text-white mb-1">
-                  <Counter target={initialFeedback.length} />
-                </div>
-                <span className="text-white/30 text-[10px] font-bold uppercase tracking-widest">Testimonials</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── REVIEWS MASONRY ──────────────────────────────────────────────── */}
-      <section className="py-20 md:py-32">
-        <div className="container-wide">
-          {initialFeedback.length === 0 ? (
-             <div className="text-center py-40 bg-white/50 rounded-[4rem] border border-dashed border-canopy-dark/10">
-                <Bird className="w-16 h-16 text-canopy-dark/10 mx-auto mb-6" />
-                <h3 className="font-display font-bold text-2xl text-canopy-dark">Be the first to share</h3>
-                <p className="text-canopy-dark/40 mt-2 max-w-sm mx-auto">Your experience at the sanctuary is valuable. Share it with the community below.</p>
-             </div>
-          ) : (
-            <StaggerContainer className="columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 md:gap-8">
-              {initialFeedback.map((review) => (
-                <StaggerItem key={review.id} className="break-inside-avoid mb-6 md:mb-8">
-                  <motion.div 
-                    whileHover={{ scale: 1.02 }}
-                    className="bg-white p-10 rounded-[3rem] shadow-xl border border-canopy-dark/5 hover:border-sanctuary-green/20 transition-all active:scale-95 cursor-default relative overflow-hidden"
-                  >
-                    <Quote className="absolute top-8 right-8 w-12 h-12 text-sanctuary-green/5" />
-                    
-                    {/* Stars */}
-                    <div className="flex gap-0.5 mb-6">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-4 h-4 ${
-                            i < review.rating
-                              ? 'text-golden-hour fill-golden-hour'
-                              : 'text-canopy-dark/5'
-                          }`}
-                        />
-                      ))}
-                    </div>
-
-                    <p className="text-canopy-dark/80 text-base leading-relaxed mb-8 font-medium italic">
-                      &ldquo;{review.message}&rdquo;
-                    </p>
-
-                    <div className="flex items-center gap-4 pt-8 border-t border-canopy-dark/5">
-                      <div className="w-12 h-12 bg-gradient-to-br from-sanctuary-green/10 to-canopy-dark/5 text-sanctuary-green rounded-2xl flex items-center justify-center text-lg font-black shrink-0 shadow-inner">
-                        {review.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="text-sm font-black text-canopy-dark tracking-tight leading-none mb-1">
-                          {review.name}
-                        </div>
-                        <div className="text-[10px] text-canopy-dark/30 font-bold uppercase tracking-widest leading-none">
-                          {review.visitDate}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                </StaggerItem>
-              ))}
-            </StaggerContainer>
-          )}
-        </div>
-      </section>
-
-      {/* ── SUBMIT FORM ──────────────────────────────────────────────────── */}
-      <section className="py-24 bg-canopy-dark relative overflow-hidden">
-        {/* Glow Effects */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(62,176,140,0.05),transparent_60%)] pointer-events-none" />
-        
-        <div className="container-wide max-w-2xl relative z-10">
-          <AnimatedSection className="text-center mb-12">
-            <h2 className="font-display text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
-              Honoring the <span className="text-sanctuary-green">Bond</span>
-            </h2>
-            <p className="text-white/40 text-lg max-w-md mx-auto">
-              Did the emerald flight touch your heart? Please share your story of arrival with us.
+            <p className="mt-7 max-w-2xl text-lg leading-relaxed text-white/65 md:text-xl">
+              Tell us what stayed with you after the sky filled with green. Your words help this sanctuary grow with care.
             </p>
-          </AnimatedSection>
+          </div>
+        </div>
+      </section>
 
-          <AnimatePresence mode="wait">
+      <section className="container-wide -mt-10 relative z-10 pb-20">
+        <div className="grid overflow-hidden rounded-4xl border border-canopy-dark/10 bg-white shadow-2xl lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="bg-sanctuary-green p-8 text-white md:p-12">
+            <Feather className="h-10 w-10" />
+            <p className="mt-8 text-xs font-bold uppercase tracking-[0.2em] text-white/70">Your voice matters</p>
+            <h2 className="mt-3 font-display text-3xl font-bold">Share a few honest words</h2>
+            <p className="mt-4 max-w-sm text-base leading-7 text-white/80">
+              Tell us about the moment you want to remember. Every response is read by our team before it is shared here.
+            </p>
+            <div className="mt-10 border-t border-white/20 pt-6 text-sm leading-6 text-white/75">
+              <p className="font-bold text-white">A few helpful notes</p>
+              <ul className="mt-3 space-y-2">
+                <li>20 to 500 characters is perfect.</li>
+                <li>Your email stays private.</li>
+                <li>Approved feedback appears below.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="p-6 md:p-12 lg:p-14">
             {isSubmitted ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white/[0.03] backdrop-blur-3xl p-16 rounded-[4rem] border border-white/5 text-center shadow-2xl"
-              >
-                <div className="w-24 h-24 bg-sanctuary-green/10 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce">
-                  <CheckCircle2 className="w-10 h-10 text-sanctuary-green" />
+              <div className="flex min-h-105 flex-col items-center justify-center text-center" role="status">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sanctuary-green/10">
+                  <CheckCircle2 className="h-10 w-10 text-sanctuary-green" />
                 </div>
-                <h3 className="font-display font-black text-3xl text-white mb-4 tracking-tight">
-                  Story Recorded
-                </h3>
-                <p className="text-white/40 text-lg mb-10 leading-relaxed">
-                  Your testimony has been sent for archival. It will join the emerald collective shortly.
+                <h2 className="mt-6 font-display text-3xl font-bold text-canopy-dark">Feedback received</h2>
+                <p className="mt-3 max-w-md text-canopy-dark/60">
+                  Thank you. Your feedback is awaiting review and will appear here after approval.
                 </p>
-                <Button
-                  onClick={() => setIsSubmitted(false)}
-                  variant="outline"
-                  className="rounded-full px-12 h-14 border-white/10 text-white hover:bg-white hover:text-canopy-dark transition-all text-base font-bold shadow-2xl"
-                >
-                  Share Another Perspective
-                </Button>
-              </motion.div>
+                <button type="button" onClick={() => setIsSubmitted(false)} className="mt-8 rounded-full bg-canopy-dark px-7 py-3 font-semibold text-white hover:bg-sanctuary-green">
+                  Share another response
+                </button>
+              </div>
             ) : (
-              <motion.form
-                key="form"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                onSubmit={handleSubmit}
-                className="bg-white p-12 rounded-[4rem] space-y-8 shadow-2xl border border-canopy-dark/5 relative group"
-              >
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-canopy-dark/30 ml-4">
-                    Full Name (Official or Alias)
-                  </label>
-                  <Input
-                    placeholder="e.g. A Friend of the Sanctuary"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="rounded-[1.5rem] h-14 border-canopy-dark/5 bg-canopy-dark/[0.02] focus:bg-white transition-all text-base px-6 font-medium"
-                  />
+              <form onSubmit={handleSubmit} noValidate className="space-y-6">
+                <div className="mb-8">
+                  <p className="text-sm font-bold uppercase tracking-[0.16em] text-sanctuary-green">Visitor feedback</p>
+                  <h2 className="mt-2 font-display text-3xl font-bold text-canopy-dark">What stayed with you?</h2>
+                  <p className="mt-2 text-base leading-7 text-canopy-dark/60">Your note may help someone else plan a thoughtful visit.</p>
+                </div>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Field label="Full name" id="feedback-name" error={errors.name}>
+                    <input id="feedback-name" name="name" autoComplete="name" required maxLength={100} value={form.name} onChange={(e) => updateField('name', e.target.value)} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'feedback-name-error' : undefined} className="field-control" placeholder="Your name" />
+                  </Field>
+                  <Field label="Email address" id="feedback-email" error={errors.email} hint="Kept private; never shown publicly.">
+                    <input id="feedback-email" name="email" type="email" autoComplete="email" required maxLength={254} value={form.email} onChange={(e) => updateField('email', e.target.value)} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? 'feedback-email-error' : 'feedback-email-hint'} className="field-control" placeholder="you@example.com" />
+                  </Field>
                 </div>
 
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-canopy-dark/30 ml-4">
-                    The Intensity of Flight
-                  </label>
-                  <StarRatingSelector
-                    value={formData.rating}
-                    onChange={(v) =>
-                      setFormData((prev) => ({ ...prev, rating: v }))
-                    }
-                  />
+                <Field label="Your feedback" id="feedback-message" error={errors.feedback}>
+                  <textarea id="feedback-message" name="feedback" required minLength={20} maxLength={500} rows={7} value={form.feedback} onChange={(e) => updateField('feedback', e.target.value)} aria-invalid={Boolean(errors.feedback)} aria-describedby="feedback-message-help" className="field-control min-h-44 resize-y" placeholder="What did your visit mean to you?" />
+                  <div id="feedback-message-help" className="mt-2 flex justify-between text-xs text-canopy-dark/45">
+                    <span>{errors.feedback ? 'Please review the message above.' : 'Minimum 20 characters'}</span>
+                    <span className={form.feedback.length > 500 ? 'text-red-600' : ''}>{form.feedback.length}/500</span>
+                  </div>
+                </Field>
+
+                <div className="absolute -left-2500 top-auto h-px w-px overflow-hidden" aria-hidden="true">
+                  <label htmlFor="feedback-website">Website</label>
+                  <input id="feedback-website" name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => updateField('website', e.target.value)} />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-canopy-dark/30 ml-4">
-                    Your Testimonial
-                  </label>
-                  <Textarea
-                    placeholder="Describe the moment the sky turned green..."
-                    value={formData.message}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        message: e.target.value,
-                      }))
-                    }
-                    rows={5}
-                    className="rounded-[1.5rem] border-canopy-dark/5 bg-canopy-dark/[0.02] focus:bg-white transition-all text-base p-6 resize-none font-medium"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={
-                    isSubmitting || formData.rating === 0 || !formData.message
-                  }
-                  className="w-full bg-sanctuary-green hover:bg-canopy-dark text-white rounded-[1.5rem] h-16 text-lg font-black gap-4 shadow-xl shadow-sanctuary-green/20 transition-all active:scale-95"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Bird className="w-6 h-6 animate-spin" />
-                      Archiving...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                      Submit to the Wall
-                    </>
-                  )}
-                </Button>
-              </motion.form>
+                <button type="submit" disabled={isSubmitting} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-canopy-dark px-6 font-bold text-white transition hover:bg-sanctuary-green disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmitting ? <><Loader2 className="h-5 w-5 animate-spin" /> Sending feedback</> : <>Send feedback <ArrowRight className="h-5 w-5" /></>}
+                </button>
+              </form>
             )}
-          </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-col items-start justify-between gap-5 rounded-2xl border border-sanctuary-green/15 bg-morning-mist p-6 md:flex-row md:items-center md:p-8">
+          <div><h2 className="font-display text-xl font-bold text-canopy-dark">Have a longer story with photos to share?</h2><p className="mt-1 text-sm text-canopy-dark/60">Our community story submissions are opening soon.</p></div>
+          <Link href="/blog/submit" className="inline-flex items-center gap-2 font-bold text-sanctuary-green hover:gap-3">Write your story <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+      </section>
+
+      <section className="bg-white py-20 md:py-28">
+        <div className="container-wide">
+          <div className="mb-12 flex flex-col gap-5 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><p className="text-sm font-bold uppercase tracking-[0.2em] text-sanctuary-green">From our visitors</p><h2 className="mt-3 font-display text-4xl font-black text-canopy-dark md:text-5xl">Shared moments</h2><p className="mt-4 max-w-xl text-lg leading-8 text-canopy-dark/60">Read what other visitors carried home from their time with the parakeets.</p></div><span className="text-sm font-semibold text-canopy-dark/45">{feedbackItems.length} {feedbackItems.length === 1 ? 'story' : 'stories'} shared</span></div>
+          {feedbackItems.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-canopy-dark/15 bg-feather-cream px-6 py-20 text-center"><Feather className="mx-auto h-10 w-10 text-sanctuary-green/40" /><h3 className="mt-5 font-display text-2xl font-bold text-canopy-dark">Be the first to share</h3><p className="mt-2 text-canopy-dark/55">Approved visitor feedback will appear here.</p></div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {feedbackItems.map((item) => {
+                const isExpanded = expandedFeedback.has(item.id);
+                const canExpand = item.message.length > 180;
+                const nameInitial = item.name.trim().charAt(0).toLocaleUpperCase() || '?';
+                return <article key={item.id} className="flex flex-col rounded-2xl border border-canopy-dark/10 bg-feather-cream p-7 shadow-sm"><Quote className="h-8 w-8 text-sanctuary-green/40" /><p className={`mt-5 flex-1 leading-8 text-canopy-dark/80 ${!isExpanded && canExpand ? 'line-clamp-5' : ''}`}>&ldquo;{item.message}&rdquo;</p>{canExpand && <button type="button" onClick={() => toggleFeedback(item.id)} aria-expanded={isExpanded} className="mt-4 self-start text-sm font-bold text-sanctuary-green underline decoration-sanctuary-green/30 underline-offset-4 hover:text-canopy-dark">{isExpanded ? 'Show less' : 'Read more'}</button>}<div className="mt-7 flex items-center gap-3 border-t border-canopy-dark/10 pt-5"><span aria-hidden="true" data-testid={`feedback-initial-${item.id}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-canopy-dark text-sm font-black text-white shadow-sm">{nameInitial}</span><div className="min-w-0"><p className="truncate font-bold text-canopy-dark">{item.name}</p><time className="mt-1 block text-xs text-canopy-dark/50" dateTime={item.createdAt}>{new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(new Date(item.createdAt))}</time></div></div></article>;
+              })}
+            </div>
+          )}
+          {nextCursor && (
+            <div className="mt-10 text-center">
+              <button
+                type="button"
+                onClick={() => void loadMoreFeedback()}
+                disabled={isLoadingMore}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-sanctuary-green/25 px-7 font-bold text-sanctuary-green transition hover:bg-morning-mist disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isLoadingMore ? 'Loading feedback' : 'Load more feedback'}
+              </button>
+            </div>
+          )}
         </div>
       </section>
     </main>
   );
+}
+
+function Field({ label, id, error, hint, children }: { label: string; id: string; error?: string; hint?: string; children: React.ReactNode }) {
+  return <div><label htmlFor={id} className="mb-2 block text-sm font-bold text-canopy-dark">{label} <span className="text-red-600">*</span></label>{children}{error ? <p id={`${id}-error`} className="mt-2 text-xs text-red-600">{error}</p> : hint ? <p id={`${id}-hint`} className="mt-2 text-xs text-canopy-dark/45">{hint}</p> : null}</div>;
 }
