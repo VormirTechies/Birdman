@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { approveFeedback, deleteFeedback } from '@/lib/db/queries';
+import {
+  approveFirestoreFeedback,
+  deleteFirestoreFeedback,
+  FeedbackNotFoundError,
+} from '@/lib/firebase/feedback';
+import { requireAdmin } from '@/lib/require-admin';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
     const { id } = await params;
-    await approveFeedback(id);
+    await approveFirestoreFeedback(id, auth.user.uid);
 
     return NextResponse.json({ success: true, message: 'Feedback approved' });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof FeedbackNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error('[API] Failed to approve feedback:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -29,18 +31,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const auth = await requireAdmin(request);
+    if (auth.response) return auth.response;
     const { id } = await params;
-    await deleteFeedback(id);
+    await deleteFirestoreFeedback(id);
 
     return NextResponse.json({ success: true, message: 'Feedback deleted' });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof FeedbackNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     console.error('[API] Failed to delete feedback:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

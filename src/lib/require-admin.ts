@@ -29,15 +29,7 @@ export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
 
   try {
     const user = await getAdminAuth().verifyIdToken(token);
-    const allowedEmails = process.env.ADMIN_EMAILS
-      ?.split(',')
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (
-      allowedEmails?.length
-      && (!user.email || !allowedEmails.includes(user.email.toLowerCase()))
-    ) {
+    if (user.admin !== true) {
       return {
         user: null,
         response: NextResponse.json(

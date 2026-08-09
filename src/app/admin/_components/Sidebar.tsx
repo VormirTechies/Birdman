@@ -15,6 +15,7 @@ import {
   X,
   Users,
   SearchCheck,
+  MessageSquareText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut } from 'firebase/auth';
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { label: 'History', icon: History, href: '/admin/history' },
   { label: 'Visitors', icon: Users, href: '/admin/visitors' },
   { label: 'Gallery', icon: Images, href: '/admin/gallery' },
+  { label: 'Feedback', icon: MessageSquareText, href: '/admin/feedback' },
   { label: 'Settings', icon: Settings, href: '/admin/settings' },
   { label: 'Profile', icon: UserCircle, href: '/admin/profile' },
 ];

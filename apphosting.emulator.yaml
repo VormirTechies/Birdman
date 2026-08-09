@@ -1,5 +1,7 @@
 env:
-#- variable: ENV_VAR_NAME
-#  value: plaintext value
-#- variable: SECRET_ENV_VAR_NAME
-#  secret: cloud-secret-manager-id
+  # The Admin SDK reads this variable automatically. Keep the value without
+  # an http:// prefix, as required by the Firestore emulator.
+  - variable: FIRESTORE_EMULATOR_HOST
+    value: 127.0.0.1:7003
+    availability:
+      - RUNTIME
