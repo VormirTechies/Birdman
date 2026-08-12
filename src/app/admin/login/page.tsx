@@ -1,776 +1,195 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Bird, Mail, Lock, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Bird, CheckCircle2, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
-  confirmPasswordReset,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  verifyPasswordResetCode,
+  signOut,
 } from 'firebase/auth';
 import { auth, firebaseConfigError } from '@/firebase';
 import Carousel from '../_components/Carousel';
-import OTPInput from '../_components/OTPInput';
 
-type CardView = 'login' | 'forgot' | 'verify' | 'reset' | 'success';
+type CardView = 'login' | 'forgot' | 'sent';
 
-// Gallery images for carousel
-const GALLERY_IMAGES = [
-  '/images/gallery/001.jpeg',
-  '/images/gallery/002.jpeg',
-  '/images/gallery/003.jpeg',
-  '/images/gallery/004.jpeg',
-  '/images/gallery/005.jpeg',
-  '/images/gallery/006.jpeg',
-  '/images/gallery/007.jpeg',
-  '/images/gallery/008.jpeg',
-  '/images/gallery/009.jpeg',
-  '/images/gallery/010.jpeg',
-];
+const GALLERY_IMAGES = Array.from(
+  { length: 10 },
+  (_, index) => `/images/gallery/${String(index + 1).padStart(3, '0')}.jpeg`
+);
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+const PERMISSION_MESSAGE =
+  "You don't have permission to enter this page. Please contact your admin.";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [currentView, setCurrentView] = useState<CardView>('login');
-  const [resetCode, setResetCode] = useState<string | null>(null);
-  
-  // Login state
+  const [view, setView] = useState<CardView>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Forgot password state
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotError, setForgotError] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    const reset = new URLSearchParams(window.location.search).get('reset');
+    if (reason === 'forbidden') setError(PERMISSION_MESSAGE);
+    if (reset === 'success') setError('Password reset complete. Sign in with your new password.');
+  }, []);
 
-  // OTP state
-  const [otp, setOtp] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-
-  // Reset password state
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [resetError, setResetError] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-
-  // Slide animation variants
-  const slideVariants = {
-    enter: {
-      x: '100%',
-      opacity: 0,
-    },
-    center: {
-      x: 0,
-      opacity: 1,
-    },
-    exit: {
-      x: '-100%',
-      opacity: 0,
-    },
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleLogin(event: React.FormEvent) {
+    event.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      if (firebaseConfigError) {
-        throw new Error(firebaseConfigError);
+      if (firebaseConfigError) throw new Error(firebaseConfigError);
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password
+      );
+      const token = await credential.user.getIdToken();
+      const response = await fetch('/api/admin/session', {
+        cache: 'no-store',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        await signOut(auth);
+        setError(response.status === 403 ? PERMISSION_MESSAGE : 'Unable to verify administrator access.');
+        return;
       }
 
-      // Validate inputs
-      if (!email || !password) {
-        throw new Error('Please fill in all fields');
-      }
-
-      await signInWithEmailAndPassword(auth, email, password);
-
-      // Successful login - redirect to dashboard
       router.replace('/admin');
       router.refresh();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Invalid login credentials'));
+    } catch {
+      setError('Unable to sign in. Check your email and password and try again.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotError('');
-    setForgotLoading(true);
-
-    try {
-      if (firebaseConfigError) {
-        throw new Error(firebaseConfigError);
-      }
-
-      // Validate email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(forgotEmail)) {
-        throw new Error('Please enter a valid email address');
-      }
-
-      // Send password reset email
-      await sendPasswordResetEmail(auth, forgotEmail, {
-        url: `${window.location.origin}/admin/login`,
-      });
-
-      // Show success state
-      setCurrentView('success');
-    } catch (err: unknown) {
-      setForgotError(getErrorMessage(err, 'Failed to send reset email. Please try again.'));
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setOtpError('');
-    setOtpLoading(true);
-
-    if (otp.length !== 6) {
-      setOtpError('Please enter the complete 6-digit code');
-      setOtpLoading(false);
-      return;
-    }
-
-    try {
-      if (firebaseConfigError) {
-        throw new Error(firebaseConfigError);
-      }
-
-      await verifyPasswordResetCode(auth, otp);
-      setResetCode(otp);
-      setCurrentView('reset');
-    } catch {
-      setOtpError('Invalid or expired code. Please try again.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResetError('');
-    setResetLoading(true);
-
-    // Validate passwords
-    if (newPassword.length < 8) {
-      setResetError('Password must be at least 8 characters');
-      setResetLoading(false);
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setResetError('Passwords do not match');
-      setResetLoading(false);
-      return;
-    }
-
-    try {
-      if (firebaseConfigError) {
-        throw new Error(firebaseConfigError);
-      }
-
-      if (!resetCode) {
-        throw new Error('Invalid reset code');
-      }
-
-      await confirmPasswordReset(auth, resetCode, newPassword);
-
-      setCurrentView('success');
-    } catch {
-      setResetError('Failed to reset password. Please try again.');
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleBackToLogin = () => {
-    setCurrentView('login');
-    // Reset all states
-    setForgotEmail('');
-    setOtp('');
-    setNewPassword('');
-    setConfirmPassword('');
+  async function handleForgotPassword(event: React.FormEvent) {
+    event.preventDefault();
     setError('');
-    setForgotError('');
-    setOtpError('');
-    setResetError('');
-    setResetCode(null);
-  };
+    setIsLoading(true);
 
-  const handleResendOTP = () => {
-    // TODO: Resend OTP
-    setOtpError('');
-    setOtp('');
+    try {
+      if (firebaseConfigError) throw new Error(firebaseConfigError);
+      const normalizedEmail = forgotEmail.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        setError('Enter a valid email address.');
+        return;
+      }
+      await sendPasswordResetEmail(auth, normalizedEmail, {
+        url: `${window.location.origin}/admin/login?reset=success`,
+      });
+      setView('sent');
+    } catch {
+      // Keep the response generic so the form does not disclose registered emails.
+      setView('sent');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function backToLogin() {
+    setView('login');
+    setError('');
+    setForgotEmail('');
+  }
+
+  const slide = {
+    initial: { x: 40, opacity: 0 },
+    animate: { x: 0, opacity: 1 },
+    exit: { x: -40, opacity: 0 },
   };
 
   return (
-    <div className="min-h-screen flex bg-white overflow-hidden">
-      {/* Left Side - Carousel (Desktop) / Background (Mobile) */}
-      <div className="hidden lg:block lg:w-1/2 relative">
+    <div className="flex min-h-screen overflow-hidden bg-white">
+      <div className="relative hidden lg:block lg:w-1/2">
         <Carousel images={GALLERY_IMAGES} interval={4000} />
-        
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] z-10 opacity-50" />
-        
-        {/* Content overlay */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-end p-12">
-          {/* Main content */}
-          <div className="max-w-md">
-            <h1 
-              className="text-4xl lg:text-5xl font-bold text-white mb-4"
-              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-            >
-              Where the sky turns green.
-            </h1>
-            <p className="text-lg text-white/90 leading-relaxed">
-              The administrative heart of Chennai&apos;s urban bird sanctuary. Manage the daily miracle and protect the legacy of a 16-year bond with nature.
-            </p>
-          </div>
-
-          {/* Indicators moved to bottom of carousel content */}
-          <div className="h-8" />
+        <div className="absolute inset-0 z-10 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] opacity-50" />
+        <div className="absolute inset-0 z-20 flex flex-col justify-end p-12 text-white">
+          <h1 className="max-w-md text-5xl font-bold">Where the sky turns green.</h1>
+          <p className="mt-4 max-w-md text-lg text-white/90">
+            The administrative heart of Chennai&apos;s urban bird sanctuary.
+          </p>
         </div>
       </div>
 
-      {/* Right Side - Login Form (Desktop) / Full screen with background (Mobile) */}
-      <div className="w-full lg:w-1/2 relative flex items-center justify-center p-6 lg:p-12">
-        {/* Mobile background carousel */}
-        <div className="lg:hidden absolute inset-0 z-0">
+      <div className="relative flex w-full items-center justify-center p-6 lg:w-1/2 lg:p-12">
+        <div className="absolute inset-0 z-0 lg:hidden">
           <Carousel images={GALLERY_IMAGES} interval={4000} />
           <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] opacity-75" />
         </div>
 
-        {/* Card container with AnimatePresence */}
         <div className="relative z-10 w-full max-w-sm">
           <AnimatePresence mode="wait">
-            {/* LOGIN CARD */}
-            {currentView === 'login' && (
-              <motion.div
-                key="login"
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                  {/* Header */}
-                  <div className="text-center mb-6">
-                    {/* Logo */}
-                    <div className="flex justify-center items-center gap-3 mb-4">
-                      <div className="w-12 h-12 rounded-2xl bg-[#2E7D32] flex items-center justify-center">
-                        <Bird className="w-7 h-7 text-white" />
-                      </div>
-                    </div>
-                    
-                    <h2 
-                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Birdman of Chennai
-                    </h2>
-                    <p className="text-xs lg:text-sm text-[#616161]">
-                      Sign in to manage your properties
-                    </p>
+            <motion.div key={view} {...slide} transition={{ duration: 0.25 }}>
+              <div className="rounded-2xl bg-white p-6 shadow-2xl lg:p-8">
+                <div className="mb-6 text-center">
+                  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2E7D32]">
+                    {view === 'login' ? <Bird className="h-7 w-7 text-white" /> : view === 'forgot' ? <KeyRound className="h-6 w-6 text-white" /> : <CheckCircle2 className="h-7 w-7 text-white" />}
                   </div>
+                  <h2 className="text-2xl font-bold text-[#212121]">
+                    {view === 'login' ? 'Birdman of Chennai' : view === 'forgot' ? 'Forgot Password' : 'Check your email'}
+                  </h2>
+                  <p className="mt-1 text-sm text-[#616161]">
+                    {view === 'login'
+                      ? 'Sign in to manage the sanctuary'
+                      : view === 'forgot'
+                        ? 'We will send a secure password-reset link.'
+                        : 'If an account exists, a password-reset link has been sent.'}
+                  </p>
+                </div>
 
-                  {/* Error message */}
-                  {error && (
-                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
-                      {error}
-                    </div>
-                  )}
+                {error && <div role="alert" className="mb-4 rounded-lg bg-[#ffdad6] p-3 text-sm text-[#ba1a1a]">{error}</div>}
 
-                  {/* Form */}
+                {view === 'login' && (
                   <form onSubmit={handleLogin} className="space-y-4">
-                    {/* Email field */}
-                    <div>
-                      <label 
-                        htmlFor="email" 
-                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      >
-                        Email Address
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                        <input
-                          id="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="admin@example.com"
-                          required
-                          className="w-full pl-10 pr-3 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        />
-                      </div>
-                    </div>
-
-                    {/* Password field */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label 
-                          htmlFor="password" 
-                          className="text-xs lg:text-sm font-semibold text-[#212121]"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                        >
-                          Password
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentView('forgot')}
-                          className="text-xs lg:text-sm font-medium text-[#2E7D32] hover:text-[#1B5E20] transition-colors cursor-pointer"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                        <input
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                          suppressHydrationWarning
-                        >
-                          {showPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Submit button */}
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      {isLoading ? 'Logging in...' : 'Log In'}
-                    </button>
+                    <Field id="email" label="Email Address" icon={<Mail className="h-4 w-4" />}>
+                      <input id="email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
+                    </Field>
+                    <Field id="password" label="Password" icon={<Lock className="h-4 w-4" />} action={<button type="button" onClick={() => { setError(''); setForgotEmail(email); setView('forgot'); }} className="text-xs font-medium text-[#2E7D32]">Forgot password?</button>}>
+                      <input id="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
+                      <button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+                    </Field>
+                    <Submit loading={isLoading} label="Log In" loadingLabel="Signing in..." />
                   </form>
-                </div>
-              </motion.div>
-            )}
+                )}
 
-            {/* FORGOT PASSWORD CARD */}
-            {currentView === 'forgot' && (
-              <motion.div
-                key="forgot"
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                  {/* Header */}
-                  <div className="text-center mb-6">
-                    {/* Icon */}
-                    <div className="flex justify-center items-center mb-4">
-                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
-                        <KeyRound className="w-6 h-6 text-[#2E7D32]" />
-                      </div>
-                    </div>
-                    
-                    <h2 
-                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Forgot Password
-                    </h2>
-                    <p className="text-xs lg:text-sm text-[#616161]">
-                      Enter your email address to receive a 6-digit OTP.
-                    </p>
-                  </div>
-
-                  {/* Error message */}
-                  {forgotError && (
-                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
-                      {forgotError}
-                    </div>
-                  )}
-
-                  {/* Form */}
+                {view === 'forgot' && (
                   <form onSubmit={handleForgotPassword} className="space-y-4">
-                    {/* Email field */}
-                    <div>
-                      <label 
-                        htmlFor="forgot-email" 
-                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      >
-                        Email address
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                        <input
-                          id="forgot-email"
-                          type="email"
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          placeholder="e.g. manager@hotel.com"
-                          required
-                          className="w-full pl-10 pr-3 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        />
-                      </div>
-                    </div>
-
-                    {/* Submit button */}
-                    <button
-                      type="submit"
-                      disabled={forgotLoading}
-                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      {forgotLoading ? 'Sending...' : 'Get OTP'}
-                    </button>
-
-                    {/* Back to login */}
-                    <button
-                      type="button"
-                      onClick={handleBackToLogin}
-                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Back to Login
-                    </button>
+                    <Field id="forgot-email" label="Email Address" icon={<Mail className="h-4 w-4" />}>
+                      <input id="forgot-email" type="email" required autoComplete="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
+                    </Field>
+                    <Submit loading={isLoading} label="Send reset link" loadingLabel="Sending..." />
+                    <BackButton onClick={backToLogin} />
                   </form>
-                </div>
-              </motion.div>
-            )}
+                )}
 
-            {/* VERIFY OTP CARD */}
-            {currentView === 'verify' && (
-              <motion.div
-                key="verify"
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                  {/* Header */}
-                  <div className="text-center mb-6">
-                    {/* Icon */}
-                    <div className="flex justify-center items-center mb-4">
-                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
-                        <Mail className="w-6 h-6 text-[#2E7D32]" />
-                      </div>
-                    </div>
-                    
-                    <h2 
-                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Verify OTP
-                    </h2>
-                    <p className="text-xs lg:text-sm text-[#616161]">
-                      Enter the 6-digit code sent to your email.
-                    </p>
-                    {forgotEmail && (
-                      <p className="text-xs lg:text-sm text-[#2E7D32] font-medium mt-1">
-                        {forgotEmail}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Error message */}
-                  {otpError && (
-                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
-                      {otpError}
-                    </div>
-                  )}
-
-                  {/* Form */}
-                  <form onSubmit={handleVerifyOTP} className="space-y-4">
-                    {/* OTP Input */}
-                    <div className="py-2">
-                      <OTPInput 
-                        length={6}
-                        value={otp}
-                        onChange={setOtp}
-                        onComplete={(code) => setOtp(code)}
-                      />
-                    </div>
-
-                    {/* Submit button */}
-                    <button
-                      type="submit"
-                      disabled={otpLoading}
-                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      {otpLoading ? 'Verifying...' : 'Verify OTP'}
-                    </button>
-
-                    {/* Resend code */}
-                    <div className="text-center">
-                      <button
-                        type="button"
-                        onClick={handleResendOTP}
-                        className="text-xs lg:text-sm font-medium text-[#2E7D32] hover:text-[#1B5E20] transition-colors cursor-pointer"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                        suppressHydrationWarning
-                      >
-                        Resend Code
-                      </button>
-                    </div>
-
-                    {/* Back to login */}
-                    <button
-                      type="button"
-                      onClick={handleBackToLogin}
-                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Back to Login
-                    </button>
-                  </form>
-                </div>
-              </motion.div>
-            )}
-
-            {/* RESET PASSWORD CARD */}
-            {currentView === 'reset' && (
-              <motion.div
-                key="reset"
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                  {/* Header */}
-                  <div className="text-center mb-6">
-                    {/* Icon */}
-                    <div className="flex justify-center items-center mb-4">
-                      <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
-                        <Lock className="w-6 h-6 text-[#2E7D32]" />
-                      </div>
-                    </div>
-                    
-                    <h2 
-                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Reset Password
-                    </h2>
-                    <p className="text-xs lg:text-sm text-[#616161]">
-                      Please enter your new password below.
-                    </p>
-                  </div>
-
-                  {/* Error message */}
-                  {resetError && (
-                    <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
-                      {resetError}
-                    </div>
-                  )}
-
-                  {/* Form */}
-                  <form onSubmit={handleResetPassword} className="space-y-4">
-                    {/* New Password field */}
-                    <div>
-                      <label 
-                        htmlFor="new-password" 
-                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      >
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                        <input
-                          id="new-password"
-                          type={showNewPassword ? 'text' : 'password'}
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                          suppressHydrationWarning
-                        >
-                          {showNewPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                      <p className="text-xs text-[#616161] mt-1">
-                        At least 8 characters with a mix of letters and numbers.
-                      </p>
-                    </div>
-
-                    {/* Confirm Password field */}
-                    <div>
-                      <label 
-                        htmlFor="confirm-password" 
-                        className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      >
-                        Confirm Password
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                        <input
-                          id="confirm-password"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                          style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                          suppressHydrationWarning
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                          suppressHydrationWarning
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Submit button */}
-                    <button
-                      type="submit"
-                      disabled={resetLoading}
-                      className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      {resetLoading ? 'Resetting...' : 'Submit'}
-                    </button>
-
-                    {/* Back to login */}
-                    <button
-                      type="button"
-                      onClick={handleBackToLogin}
-                      className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                      suppressHydrationWarning
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      Back to Login
-                    </button>
-                  </form>
-                </div>
-              </motion.div>
-            )}
-
-            {/* SUCCESS CARD */}
-            {currentView === 'success' && (
-              <motion.div
-                key="success"
-                variants={slideVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                  {/* Header */}
-                  <div className="text-center mb-6">
-                    {/* Icon */}
-                    <div className="flex justify-center items-center mb-4">
-                      <div className="w-16 h-16 rounded-full bg-[#2E7D32] flex items-center justify-center">
-                        <CheckCircle2 className="w-9 h-9 text-white" />
-                      </div>
-                    </div>
-                    
-                    <h2 
-                      className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Check Your Email
-                    </h2>
-                    <p className="text-xs lg:text-sm text-[#616161]">
-                      We&apos;ve sent a password reset link to your email. Click the link in the email to reset your password.
-                    </p>
-                  </div>
-
-                  {/* Log In button */}
-                  <button
-                    type="button"
-                    onClick={handleBackToLogin}
-                    className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer"
-                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    suppressHydrationWarning
-                  >
-                    Log In
-                  </button>
-                </div>
-              </motion.div>
-            )}
+                {view === 'sent' && <BackButton onClick={backToLogin} />}
+              </div>
+            </motion.div>
           </AnimatePresence>
-
-          {/* Copyright */}
-          <p className="text-center text-xs text-[#616161] lg:text-[#9E9E9E] mt-4">
-            © 2026 Vormir Techies. All rights reserved.
-          </p>
         </div>
       </div>
     </div>
   );
+}
+
+function Field({ id, label, icon, action, children }: { id: string; label: string; icon: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+  return <div><div className="mb-1.5 flex items-center justify-between"><label htmlFor={id} className="text-sm font-semibold text-[#212121]">{label}</label>{action}</div><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#616161]">{icon}</span>{children}</div></div>;
+}
+
+function Submit({ loading, label, loadingLabel }: { loading: boolean; label: string; loadingLabel: string }) {
+  return <button type="submit" disabled={loading} className="w-full rounded-lg bg-[#2E7D32] py-2.5 text-sm font-bold text-white hover:bg-[#1B5E20] disabled:cursor-not-allowed disabled:bg-[#BDBDBD]">{loading ? loadingLabel : label}</button>;
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="flex w-full items-center justify-center gap-2 text-sm font-medium text-[#616161] hover:text-[#212121]"><ArrowLeft className="h-4 w-4" />Back to Login</button>;
 }

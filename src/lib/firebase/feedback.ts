@@ -28,6 +28,20 @@ export class InvalidFeedbackCursorError extends Error {
   }
 }
 
+export class FeedbackRecommendationLimitError extends Error {
+  constructor() {
+    super('Only 5 feedback entries can be recommended at a time');
+    this.name = 'FeedbackRecommendationLimitError';
+  }
+}
+
+export class InvalidFeedbackStateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidFeedbackStateError';
+  }
+}
+
 export interface ApprovedFeedbackPage {
   feedback: PublicFeedback[];
   nextCursor: string | null;
@@ -70,6 +84,7 @@ function toAdminFeedback(id: string, data: FeedbackDocument): AdminFeedback {
     status: data.status,
     approvedAt: data.approvedAt?.toDate().toISOString() ?? null,
     approvedBy: data.approvedBy,
+    isRecommended: data.isRecommended === true,
   };
 }
 
@@ -84,6 +99,7 @@ export async function createFirestoreFeedback(input: FeedbackSubmission) {
     updatedAt: now,
     approvedAt: null,
     approvedBy: null,
+    isRecommended: false,
   };
   const reference = await getAdminDb().collection(COLLECTION).add(document);
   console.info('[feedback] Firestore document created', {
@@ -127,16 +143,70 @@ export async function listApprovedFirestoreFeedbackPage(
   };
 }
 
-export async function listPendingFirestoreFeedback(limit = 100): Promise<AdminFeedback[]> {
+export interface AdminFeedbackPage {
+  feedback: AdminFeedback[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export async function listAdminFirestoreFeedbackPage(
+  status: 'pending' | 'approved',
+  pageSize = 10,
+  cursor?: string
+): Promise<AdminFeedbackPage> {
+  let query: Query = getAdminDb()
+    .collection(COLLECTION)
+    .where('status', '==', status)
+    .orderBy('createdAt', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc');
+
+  if (cursor) {
+    const decoded = decodeCursor(cursor);
+    query = query.startAfter(decoded.createdAt, decoded.id);
+  }
+
+  const snapshot = await query.limit(pageSize + 1).get();
+  const pageDocs = snapshot.docs.slice(0, pageSize);
+  const lastDocument = pageDocs.at(-1);
+  const hasMore = snapshot.docs.length > pageSize;
+
+  return {
+    feedback: pageDocs.map((doc) =>
+      toAdminFeedback(doc.id, doc.data() as FeedbackDocument)
+    ),
+    hasMore,
+    nextCursor: hasMore && lastDocument
+      ? encodeCursor((lastDocument.data() as FeedbackDocument).createdAt, lastDocument.id)
+      : null,
+  };
+}
+
+export async function countRecommendedFirestoreFeedback() {
   const snapshot = await getAdminDb()
     .collection(COLLECTION)
-    .where('status', '==', 'pending')
-    .orderBy('createdAt', 'desc')
-    .limit(limit)
+    .where('isRecommended', '==', true)
+    .limit(6)
     .get();
-  return snapshot.docs.map((doc) =>
-    toAdminFeedback(doc.id, doc.data() as FeedbackDocument)
-  );
+  return snapshot.docs.filter(
+    (doc) => (doc.data() as FeedbackDocument).status === 'approved'
+  ).length;
+}
+
+export async function listRecommendedFirestoreFeedback(): Promise<PublicFeedback[]> {
+  const snapshot = await getAdminDb()
+    .collection(COLLECTION)
+    .where('isRecommended', '==', true)
+    .limit(5)
+    .get();
+
+  return snapshot.docs
+    .filter((doc) => (doc.data() as FeedbackDocument).status === 'approved')
+    .sort((left, right) => {
+      const leftTime = (left.data() as FeedbackDocument).createdAt?.toMillis?.() ?? 0;
+      const rightTime = (right.data() as FeedbackDocument).createdAt?.toMillis?.() ?? 0;
+      return rightTime - leftTime;
+    })
+    .map((doc) => toPublicFeedback(doc.id, doc.data() as FeedbackDocument));
 }
 
 export async function approveFirestoreFeedback(id: string, adminUid: string) {
@@ -149,6 +219,36 @@ export async function approveFirestoreFeedback(id: string, adminUid: string) {
     approvedAt: now,
     approvedBy: adminUid,
     updatedAt: now,
+    isRecommended: false,
+  });
+}
+
+export async function setFirestoreFeedbackRecommended(id: string, isRecommended: boolean) {
+  const db = getAdminDb();
+  const reference = db.collection(COLLECTION).doc(id);
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) throw new FeedbackNotFoundError();
+    const feedback = snapshot.data() as FeedbackDocument;
+    if (feedback.status !== 'approved') {
+      throw new InvalidFeedbackStateError('Only approved feedback can be recommended');
+    }
+    if (feedback.isRecommended === isRecommended) return;
+
+    if (isRecommended) {
+      const recommendedQuery = db
+        .collection(COLLECTION)
+        .where('isRecommended', '==', true)
+        .limit(5);
+      const recommended = await transaction.get(recommendedQuery);
+      if (recommended.size >= 5) throw new FeedbackRecommendationLimitError();
+    }
+
+    transaction.update(reference, {
+      isRecommended,
+      updatedAt: Timestamp.now(),
+    });
   });
 }
 

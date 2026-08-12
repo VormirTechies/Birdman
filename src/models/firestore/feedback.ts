@@ -26,6 +26,7 @@ export interface FeedbackDocument {
   updatedAt: Timestamp;
   approvedAt: Timestamp | null;
   approvedBy: string | null;
+  isRecommended?: boolean;
 }
 
 export interface PublicFeedback {
@@ -40,4 +41,5 @@ export interface AdminFeedback extends PublicFeedback {
   status: FeedbackStatus;
   approvedAt: string | null;
   approvedBy: string | null;
+  isRecommended: boolean;
 }

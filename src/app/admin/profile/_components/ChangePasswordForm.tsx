@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { Eye, EyeOff, ShieldCheck, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from 'firebase/auth';
 import { cn } from '@/lib/utils';
+import { auth, firebaseConfigError } from '@/firebase';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 
@@ -89,27 +95,27 @@ export function ChangePasswordForm() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentPassword: current.value,
-          newPassword: newPw.value,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success('Password updated successfully');
-        setCurrent({ value: '', show: false });
-        setNewPw({ value: '', show: false });
-        setConfirmPw({ value: '', show: false });
-      } else {
-        toast.error((data as { error?: string }).error ?? 'Failed to update password');
-      }
-    } catch {
-      toast.error('Something went wrong. Please try again.');
+      if (firebaseConfigError) throw new Error(firebaseConfigError);
+      const user = auth.currentUser;
+      if (!user?.email) throw new Error('Your Firebase session has expired. Please sign in again.');
+      const credential = EmailAuthProvider.credential(user.email, current.value);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPw.value);
+      toast.success('Password updated successfully');
+      setCurrent({ value: '', show: false });
+      setNewPw({ value: '', show: false });
+      setConfirmPw({ value: '', show: false });
+    } catch (error: unknown) {
+      const code = typeof error === 'object' && error && 'code' in error
+        ? String((error as { code: unknown }).code)
+        : '';
+      toast.error(
+        code === 'auth/invalid-credential' || code === 'auth/wrong-password'
+          ? 'Current password is incorrect'
+          : error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }

@@ -249,6 +249,55 @@ Git. Seed approved feedback after the first start with:
 npm run seed:feedback:emulator
 ```
 
+Seed five local email/password accounts, including three Firestore-authorized
+administrators, after the Auth and Firestore emulators are running:
+
+```powershell
+npm run seed:auth:emulator
+```
+
+The local seed password is `Birdman123!`. The script is idempotent and refuses
+non-loopback emulator hosts. Seeded administrator emails are
+`admin.one@birdman.local`, `admin.two@birdman.local`, and
+`admin.three@birdman.local`.
+
+### Firebase administrator setup
+
+Admin identity uses Firebase email/password Authentication. Access is granted
+separately by a server-only Firestore document at `adminUsers/{firebaseUid}`.
+Direct client reads and writes remain denied by Firestore rules.
+
+For local development:
+
+1. Create an email/password user in the Authentication emulator UI and copy its UID.
+2. Add the role document to the local `(default)` Firestore database. This
+   PowerShell request uses the emulator's owner override:
+
+```powershell
+$firebaseUid = 'PASTE_FIREBASE_UID'
+$roleBody = '{"fields":{"role":{"stringValue":"admin"},"displayName":{"stringValue":"Local Admin"}}}'
+$roleUrl = "http://127.0.0.1:7003/v1/projects/birdman-7e745/databases/(default)/documents/adminUsers/$firebaseUid"
+Invoke-RestMethod -Method Patch -Uri $roleUrl -Headers @{ Authorization = 'Bearer owner' } -ContentType 'application/json' -Body $roleBody
+```
+
+The client connects to the Auth emulator at
+`NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL` (default `http://127.0.0.1:7002`). The
+Auth emulator does not deliver password-reset email; open the generated reset
+link from the Authentication emulator UI or emulator logs.
+
+For production:
+
+1. Enable the Email/Password provider in Firebase Authentication.
+2. Add localhost and the deployed App Hosting domain to Authorized domains.
+3. Configure the password-reset email template action URL to the deployed
+   `/admin/reset-password` page.
+4. Create the administrator in Firebase Authentication and copy its UID.
+5. In the production `birdman-db` database, create `adminUsers/{uid}` with
+   `role` set to the string `admin`; `displayName` is optional.
+
+Production deliberately defaults to `birdman-db`; the local emulator uses
+`(default)` through `FIRESTORE_DATABASE_ID`.
+
 ---
 
 ## Available Scripts
@@ -260,6 +309,7 @@ npm run seed:feedback:emulator
 | `npm run start` | Start production server |
 | `npm run emulators:start` | Start Firebase emulators with persistent `(default)` Firestore data |
 | `npm run seed:feedback:emulator` | Seed approved feedback into the local Firestore emulator |
+| `npm run seed:auth:emulator` | Seed five local Auth users, including three Firestore administrators |
 | `npm run lint` | ESLint check |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Run pending migrations |

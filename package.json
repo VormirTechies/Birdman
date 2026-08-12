@@ -15,6 +15,7 @@
     "db:seed": "tsx src/lib/db/seed.ts",
     "seed:bookings": "tsx scripts/seed-bookings.ts",
     "seed:feedback:emulator": "tsx scripts/seed-feedback-emulator.ts",
+    "seed:auth:emulator": "tsx scripts/seed-auth-users-emulator.ts",
     "migrate:bookings": "tsx scripts/migrate-bookings-to-firestore.ts",
     "migrate:visitors": "tsx scripts/migrate-visitors-to-firestore.ts",
     "migrate:calendar-settings": "tsx scripts/migrate-calendar-settings-to-firestore.ts",

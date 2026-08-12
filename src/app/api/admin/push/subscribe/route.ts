@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/require-admin';
 import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.user) return auth.response;
 
     const { subscription } = await request.json();
     if (!subscription) {
@@ -31,15 +27,15 @@ export async function POST(request: NextRequest) {
 
     const subscriptionString = JSON.stringify(subscription);
     
-    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, auth.user.uid));
     
     await db.insert(pushSubscriptions).values({
-        userId: user.id,
+        userId: auth.user.uid,
         subscription: subscriptionString
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Push subscription failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

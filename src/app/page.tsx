@@ -5,7 +5,6 @@ import {
   Calendar,
   Clock,
   Users,
-  Star,
   ArrowRight,
   Heart,
   Camera,
@@ -20,8 +19,17 @@ import {
   StaggerContainer,
   StaggerItem,
 } from "@/components/ui/animated-section";
+import { listRecommendedFirestoreFeedback } from "@/lib/firebase/feedback";
+import type { PublicFeedback } from "@/models/firestore/feedback";
+import { unstable_cache } from "next/cache";
 
-export const revalidate = 86400;
+export const dynamic = 'force-dynamic';
+
+const getRecommendedFeedback = unstable_cache(
+  listRecommendedFirestoreFeedback,
+  ['home-recommended-feedback'],
+  { revalidate: 86400, tags: ['recommended-feedback'] }
+);
 
 /* ════════════════════════════════════════════════════════════════════════════
    HOMEPAGE — Cinematic Landing Page
@@ -64,28 +72,14 @@ const galleryPreview = [
   { src: "/images/gallery/014.jpeg", alt: "Green parakeets gathering" },
 ];
 
-const testimonials = [
-  {
-    name: "Priya Sundaram",
-    rating: 5,
-    text: "An absolutely magical experience! Watching thousands of parakeets arrive at feeding time is something I will never forget. Mr. Sah is truly an inspiration.",
-    date: "March 2026",
-  },
-  {
-    name: "Raj Krishnamurthy",
-    rating: 5,
-    text: "We visited during the evening session and it was breathtaking. The birds know him by heart. A must-visit for anyone in Chennai.",
-    date: "February 2026",
-  },
-  {
-    name: "Sarah Mitchell",
-    rating: 5,
-    text: "I traveled from London specifically to see this. It exceeded all expectations. The connection between Mr. Sah and these birds is truly extraordinary.",
-    date: "January 2026",
-  },
-];
+export default async function HomePage() {
+  let testimonials: PublicFeedback[] = [];
+  try {
+    testimonials = await getRecommendedFeedback();
+  } catch (error) {
+    console.error('[home] Failed to load recommended feedback', error);
+  }
 
-export default function HomePage() {
   return (
     <>
       <Header />
@@ -192,7 +186,7 @@ export default function HomePage() {
           </AnimatedSection>
 
           <StaggerContainer className="grid md:grid-cols-3 gap-5">
-            {galleryPreview.map((img, i) => (
+            {galleryPreview.map((img) => (
               <StaggerItem key={img.src}>
                 <Link href="/gallery" className="block group">
                   <div className="relative aspect-4/3 rounded-2xl overflow-hidden shadow-card">
@@ -289,22 +283,12 @@ export default function HomePage() {
             </h2>
           </AnimatedSection>
 
-          <StaggerContainer className="grid md:grid-cols-3 gap-6">
+          {testimonials.length > 0 ? <StaggerContainer className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {testimonials.map((review) => (
-              <StaggerItem key={review.name}>
+              <StaggerItem key={review.id}>
                 <div className="bg-white p-6 rounded-2xl shadow-card hover:shadow-card-hover transition-shadow duration-300 h-full flex flex-col">
-                  {/* Stars */}
-                  <div className="flex gap-0.5 mb-3">
-                    {Array.from({ length: review.rating }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className="w-4 h-4 text-golden-hour fill-golden-hour"
-                      />
-                    ))}
-                  </div>
-
                   <p className="text-canopy-dark/70 text-sm leading-relaxed flex-1 mb-4">
-                    &ldquo;{review.text}&rdquo;
+                    &ldquo;{review.message}&rdquo;
                   </p>
 
                   <div className="flex items-center gap-3 pt-3 border-t border-canopy-dark/5">
@@ -316,14 +300,14 @@ export default function HomePage() {
                         {review.name}
                       </div>
                       <div className="text-xs text-canopy-dark/40">
-                        {review.date}
+                        {new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(new Date(review.createdAt))}
                       </div>
                     </div>
                   </div>
                 </div>
               </StaggerItem>
             ))}
-          </StaggerContainer>
+          </StaggerContainer> : <div className="rounded-2xl border border-dashed border-canopy-dark/15 bg-white px-6 py-12 text-center text-canopy-dark/55">Recommended visitor reviews will appear here soon.</div>}
 
           <AnimatedSection className="text-center mt-10">
             <Link
