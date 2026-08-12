@@ -30,6 +30,7 @@
     "singleProjectMode": true
   },
   "auth": {
+    "authorizedDomains": ["localhost", "127.0.0.1"],
     "providers": {
       "emailPassword": true
     }

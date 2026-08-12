@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { Select } from '@/app/admin/_components/Select';
 import { SearchBar } from '@/app/admin/_components/SearchBar';
 import { ChangePasswordForm } from './_components/ChangePasswordForm';
+import { CreateUserDialog } from './_components/CreateUserDialog';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
@@ -320,11 +322,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [createUserOpen, setCreateUserOpen] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users', { cache: 'no-store' });
+      const res = await authenticatedFetch('/api/admin/users', { cache: 'no-store' });
       if (res.ok) {
         const data = (await res.json()) as { users: AdminUser[] };
         setAllUsers(data.users ?? []);
@@ -375,24 +378,24 @@ export default function ProfilePage() {
           </h1>
         </div>
 
-        {/* Desktop add user button (disabled) */}
+        {/* Only authorized administrators can render this protected page. */}
         {activeTab === 'users' && (
           <div className="flex items-center gap-2 shrink-0">
             {/* Mobile: icon only */}
             <button
-              disabled
-              aria-disabled="true"
-              title="Add User — coming soon"
-              className="lg:hidden w-10 h-10 rounded-full bg-[#2E7D32] text-white flex items-center justify-center opacity-40 cursor-not-allowed"
+              type="button"
+              onClick={() => setCreateUserOpen(true)}
+              aria-label="Add User"
+              title="Add User"
+              className="lg:hidden w-10 h-10 rounded-full bg-[#2E7D32] text-white flex items-center justify-center hover:bg-[#1B5E20]"
             >
               <UserPlus className="w-4 h-4" />
             </button>
             {/* Desktop: icon + label */}
             <button
-              disabled
-              aria-disabled="true"
-              title="Add User — coming soon"
-              className="hidden lg:flex items-center gap-2 h-10 px-4 rounded-full bg-[#2E7D32] text-white text-sm font-semibold opacity-40 cursor-not-allowed"
+              type="button"
+              onClick={() => setCreateUserOpen(true)}
+              className="hidden lg:flex items-center gap-2 h-10 px-4 rounded-full bg-[#2E7D32] text-white text-sm font-semibold hover:bg-[#1B5E20]"
             >
               <UserPlus className="w-4 h-4" />
               <span>Add User</span>
@@ -470,6 +473,12 @@ export default function ProfilePage() {
       ) : (
         <ChangePasswordForm />
       )}
+
+      <CreateUserDialog
+        open={createUserOpen}
+        onOpenChange={setCreateUserOpen}
+        onCreated={fetchUsers}
+      />
     </div>
   );
 }

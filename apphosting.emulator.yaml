@@ -9,3 +9,8 @@ env:
     value: (default)
     availability:
       - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL
+    value: http://127.0.0.1:7002
+    availability:
+      - BUILD
+      - RUNTIME

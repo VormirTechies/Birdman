@@ -88,6 +88,7 @@ async function run() {
       updatedAt: createdAt,
       approvedAt: createdAt,
       approvedBy: 'emulator-seed',
+      isRecommended: index < 5,
     });
   });
 

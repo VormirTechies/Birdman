@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/require-admin';
 
 // Configure VAPID keys for web push
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -18,13 +18,8 @@ if (vapidPublicKey && vapidPrivateKey) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = await requireAdmin(request);
+    if (!auth.user) return auth.response;
 
     // Parse request body
     const { subscription, notification } = await request.json();
@@ -57,11 +52,13 @@ export async function POST(request: NextRequest) {
     console.log('[Push API] Notification sent successfully');
     return NextResponse.json({ success: true });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Push API] Error:', error);
 
+    const pushError = error as { statusCode?: number; message?: string };
+
     // Handle specific web-push errors
-    if (error.statusCode === 410 || error.statusCode === 404) {
+    if (pushError.statusCode === 410 || pushError.statusCode === 404) {
       // Subscription has expired or is no longer valid
       return NextResponse.json(
         { error: 'Push subscription expired', expired: true },
@@ -70,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to send push notification', details: error.message },
+      { error: 'Failed to send push notification', details: pushError.message },
       { status: 500 }
     );
   }

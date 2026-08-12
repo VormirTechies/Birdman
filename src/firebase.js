@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { connectAuthEmulator, getAuth } from "firebase/auth";
 
 const cleanEnv = (value) => value?.trim().replace(/^["']|["']$/g, "");
 
@@ -42,6 +42,17 @@ if (!firebaseConfigError) {
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     dbInstance = getFirestore(app);
     authInstance = getAuth(app);
+    if (
+      process.env.NODE_ENV !== "production" &&
+      typeof window !== "undefined" &&
+      !globalThis.__birdmanAuthEmulatorConnected
+    ) {
+      const emulatorUrl =
+        cleanEnv(process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL) ||
+        "http://127.0.0.1:7002";
+      connectAuthEmulator(authInstance, emulatorUrl, { disableWarnings: true });
+      globalThis.__birdmanAuthEmulatorConnected = true;
+    }
   } catch (error) {
     firebaseConfigError =
       error instanceof Error

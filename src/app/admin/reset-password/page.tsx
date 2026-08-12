@@ -1,341 +1,115 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { motion } from 'framer-motion';
-import { Eye, EyeOff, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
+import { CheckCircle2, Eye, EyeOff, Lock } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { confirmPasswordReset } from 'firebase/auth';
+import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { auth, firebaseConfigError } from '@/firebase';
-import Carousel from '../_components/Carousel';
 
-// Gallery images for carousel (same as login page)
-const GALLERY_IMAGES = [
-  '/images/gallery/001.jpeg',
-  '/images/gallery/002.jpeg',
-  '/images/gallery/003.jpeg',
-  '/images/gallery/004.jpeg',
-  '/images/gallery/005.jpeg',
-  '/images/gallery/006.jpeg',
-  '/images/gallery/007.jpeg',
-  '/images/gallery/008.jpeg',
-  '/images/gallery/009.jpeg',
-  '/images/gallery/010.jpeg',
-];
+type LinkState = 'checking' | 'valid' | 'invalid' | 'success';
 
 function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const resetCode = searchParams.get('oobCode');
-
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const mode = searchParams.get('mode');
+  const oobCode = searchParams.get('oobCode');
+  const [linkState, setLinkState] = useState<LinkState>('checking');
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
-    // When arriving via magic link, the session is created from URL hash
-    // Just mark as ready after a brief delay
-    const timer = setTimeout(() => {
-      setIsCheckingSession(false);
-    }, 500);
+    let active = true;
+    if (firebaseConfigError || mode !== 'resetPassword' || !oobCode) {
+      setLinkState('invalid');
+      return;
+    }
+    verifyPasswordResetCode(auth, oobCode)
+      .then(() => active && setLinkState('valid'))
+      .catch(() => active && setLinkState('invalid'));
+    return () => { active = false; };
+  }, [mode, oobCode]);
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError('');
-    setIsLoading(true);
-
-    // Validation
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters');
-      setIsLoading(false);
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError('Use at least 8 characters, one uppercase letter, and one number.');
       return;
     }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
+    if (password !== confirmation) {
+      setError('Passwords do not match.');
       return;
     }
+    if (!oobCode || linkState !== 'valid') return;
 
+    setSubmitting(true);
     try {
-      if (firebaseConfigError) throw new Error(firebaseConfigError);
-      if (!resetCode) throw new Error('Invalid or expired password reset link.');
-
-      await confirmPasswordReset(auth, resetCode, newPassword);
-
-      // Success - show success state
-      setIsSuccess(true);
-
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        router.push('/admin/login?reset=success');
-      }, 2000);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
+      await confirmPasswordReset(auth, oobCode, password);
+      setLinkState('success');
+      window.setTimeout(() => router.replace('/admin/login?reset=success'), 1500);
+    } catch {
+      setLinkState('invalid');
     } finally {
-      setIsLoading(false);
+      setSubmitting(false);
     }
-  };
-
-  const handleBackToLogin = () => {
-    router.push('/admin/login');
-  };
-
-  // Show loading state while checking session
-  if (isCheckingSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#2E7D32] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sm text-[#616161]">Verifying your session...</p>
-        </div>
-      </div>
-    );
   }
 
   return (
-    <div className="min-h-screen flex bg-white overflow-hidden">
-      {/* Left Side - Carousel (Desktop) / Background (Mobile) */}
-      <div className="hidden lg:block lg:w-1/2 relative">
-        <Carousel images={GALLERY_IMAGES} interval={4000} />
-        
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] z-10 opacity-50" />
-        
-        {/* Content overlay */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-end p-12">
-          {/* Main content */}
-          <div className="max-w-md">
-            <h1 
-              className="text-4xl lg:text-5xl font-bold text-white mb-4"
-              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-            >
-              Where the sky turns green.
-            </h1>
-            <p className="text-lg text-white/90 leading-relaxed">
-              The administrative heart of Chennai&apos;s urban bird sanctuary. Manage the daily miracle and protect the legacy of a 16-year bond with nature.
-            </p>
+    <main className="min-h-screen bg-linear-to-br from-[#1B5E20] to-[#2E7D32] flex items-center justify-center p-6">
+      <section className="w-full max-w-md rounded-2xl bg-white p-6 lg:p-8 shadow-2xl">
+        {linkState === 'checking' && (
+          <div className="py-10 text-center" role="status">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#2E7D32] border-t-transparent" />
+            <p className="text-sm text-[#616161]">Checking your reset link...</p>
           </div>
+        )}
 
-          {/* Indicators moved to bottom of carousel content */}
-          <div className="h-8" />
-        </div>
-      </div>
+        {linkState === 'invalid' && (
+          <div className="text-center">
+            <Lock className="mx-auto mb-4 h-12 w-12 text-[#BA1A1A]" />
+            <h1 className="text-2xl font-bold text-[#212121]">Link expired or invalid</h1>
+            <p className="mt-2 text-sm text-[#616161]">Request a new password reset link from the admin sign-in page.</p>
+            <button onClick={() => router.replace('/admin/login')} className="mt-6 w-full rounded-lg bg-[#2E7D32] py-3 font-semibold text-white">Back to sign in</button>
+          </div>
+        )}
 
-      {/* Right Side - Reset Password Form (Desktop) / Full screen with background (Mobile) */}
-      <div className="w-full lg:w-1/2 relative flex items-center justify-center p-6 lg:p-12">
-        {/* Mobile background carousel */}
-        <div className="lg:hidden absolute inset-0 z-0">
-          <Carousel images={GALLERY_IMAGES} interval={4000} />
-          <div className="absolute inset-0 bg-linear-to-br from-[#1B5E20] to-[#2E7D32] opacity-75" />
-        </div>
+        {linkState === 'success' && (
+          <div className="py-6 text-center" role="status">
+            <CheckCircle2 className="mx-auto mb-4 h-14 w-14 text-[#2E7D32]" />
+            <h1 className="text-2xl font-bold text-[#212121]">Password updated</h1>
+            <p className="mt-2 text-sm text-[#616161]">Redirecting you to sign in...</p>
+          </div>
+        )}
 
-        {/* Card Container */}
-        <div className="w-full max-w-md relative z-10">
-          {!isSuccess ? (
-            /* RESET PASSWORD CARD */
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                {/* Header */}
-                <div className="text-center mb-6">
-                  {/* Icon */}
-                  <div className="flex justify-center items-center mb-4">
-                    <div className="w-12 h-12 rounded-full bg-[#2E7D32]/10 flex items-center justify-center">
-                      <Lock className="w-6 h-6 text-[#2E7D32]" />
-                    </div>
-                  </div>
-                  
-                  <h2 
-                    className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                  >
-                    Reset Password
-                  </h2>
-                  <p className="text-xs lg:text-sm text-[#616161]">
-                    Please enter your new password below.
-                  </p>
-                </div>
-
-                {/* Error message */}
-                {error && (
-                  <div className="mb-4 p-2.5 rounded-lg bg-[#ffdad6] text-[#ba1a1a] text-xs lg:text-sm">
-                    {error}
-                  </div>
-                )}
-
-                {/* Form */}
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  {/* New Password field */}
-                  <div>
-                    <label 
-                      htmlFor="new-password" 
-                      className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      New Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                      <input
-                        id="new-password"
-                        type={showNewPassword ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                        suppressHydrationWarning
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                        suppressHydrationWarning
-                      >
-                        {showNewPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-[#616161] mt-1">
-                      At least 8 characters with a mix of letters and numbers.
-                    </p>
-                  </div>
-
-                  {/* Confirm Password field */}
-                  <div>
-                    <label 
-                      htmlFor="confirm-password" 
-                      className="block text-xs lg:text-sm font-semibold text-[#212121] mb-1.5"
-                      style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    >
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616161]" />
-                      <input
-                        id="confirm-password"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        className="w-full pl-10 pr-11 py-2.5 bg-[#F5F5F5] border-2 border-transparent rounded-xl text-sm text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:border-transparent focus:bg-white transition-colors"
-                        style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                        suppressHydrationWarning
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                        suppressHydrationWarning
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Submit button */}
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] disabled:bg-[#BDBDBD] text-white font-bold py-2.5 rounded-lg transition-colors shadow-sm text-sm cursor-pointer disabled:cursor-not-allowed"
-                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    suppressHydrationWarning
-                  >
-                    {isLoading ? 'Resetting...' : 'Reset Password'}
-                  </button>
-
-                  {/* Back to login */}
-                  <button
-                    type="button"
-                    onClick={handleBackToLogin}
-                    className="w-full flex items-center justify-center gap-2 text-xs lg:text-sm font-medium text-[#616161] hover:text-[#212121] transition-colors cursor-pointer"
-                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                    suppressHydrationWarning
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back to Login
-                  </button>
-                </form>
+        {linkState === 'valid' && (
+          <>
+            <div className="mb-6 text-center">
+              <Lock className="mx-auto mb-3 h-10 w-10 text-[#2E7D32]" />
+              <h1 className="text-2xl font-bold text-[#212121]">Reset password</h1>
+              <p className="mt-1 text-sm text-[#616161]">Choose a secure password for your admin account.</p>
+            </div>
+            {error && <p className="mb-4 rounded-lg bg-[#ffdad6] p-3 text-sm text-[#ba1a1a]" role="alert">{error}</p>}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <label className="block text-sm font-semibold text-[#212121]" htmlFor="new-password">New password</label>
+              <div className="relative">
+                <input id="new-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required className="w-full rounded-xl border border-[#E0E0E0] px-4 py-3 pr-12" />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
               </div>
-            </motion.div>
-          ) : (
-            /* SUCCESS CARD */
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="bg-white rounded-2xl shadow-2xl p-6 lg:p-8">
-                {/* Success Icon */}
-                <div className="text-center mb-6">
-                  <div className="flex justify-center items-center mb-4">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                      className="w-16 h-16 rounded-full bg-[#2E7D32]/10 flex items-center justify-center"
-                    >
-                      <CheckCircle2 className="w-10 h-10 text-[#2E7D32]" />
-                    </motion.div>
-                  </div>
-                  
-                  <h2 
-                    className="text-xl lg:text-2xl font-bold text-[#212121] mb-1.5"
-                    style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-                  >
-                    Password Reset Successful!
-                  </h2>
-                  <p className="text-xs lg:text-sm text-[#616161]">
-                    Your password has been successfully reset.
-                  </p>
-                </div>
-
-                {/* Redirecting message */}
-                <div className="text-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2E7D32]/10 text-[#2E7D32] text-xs lg:text-sm">
-                    <div className="w-3 h-3 border-2 border-[#2E7D32] border-t-transparent rounded-full animate-spin" />
-                    Redirecting to login...
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </div>
-    </div>
+              <p className="text-xs text-[#616161]">At least 8 characters, one uppercase letter, and one number.</p>
+              <label className="block text-sm font-semibold text-[#212121]" htmlFor="confirm-password">Confirm password</label>
+              <input id="confirm-password" type="password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} autoComplete="new-password" required className="w-full rounded-xl border border-[#E0E0E0] px-4 py-3" />
+              <button type="submit" disabled={submitting} className="w-full rounded-lg bg-[#2E7D32] py-3 font-semibold text-white disabled:opacity-60">{submitting ? 'Updating...' : 'Update password'}</button>
+            </form>
+          </>
+        )}
+      </section>
+    </main>
   );
 }
 
 export default function ResetPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <div className="w-12 h-12 border-4 border-[#2E7D32] border-t-transparent rounded-full animate-spin" />
-        </div>
-      }
-    >
-      <ResetPasswordContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<main className="min-h-screen bg-white" />}><ResetPasswordContent /></Suspense>;
 }

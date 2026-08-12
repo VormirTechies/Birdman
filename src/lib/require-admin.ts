@@ -3,9 +3,11 @@ import 'server-only';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase/admin';
+import { authorizeAdminToken } from '@/lib/firebase/admin-users';
+import type { AdminSessionUser } from '@/models/firestore/admin-user';
 
 type AdminAuthResult =
-  | { user: DecodedIdToken; response: null }
+  | { user: DecodedIdToken; admin: AdminSessionUser; response: null }
   | { user: null; response: NextResponse };
 
 function unauthorized(message = 'Unauthorized') {
@@ -29,7 +31,8 @@ export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
 
   try {
     const user = await getAdminAuth().verifyIdToken(token);
-    if (user.admin !== true) {
+    const admin = await authorizeAdminToken(user);
+    if (!admin) {
       return {
         user: null,
         response: NextResponse.json(
@@ -39,7 +42,7 @@ export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
       };
     }
 
-    return { user, response: null };
+    return { user, admin, response: null };
   } catch (error) {
     console.warn('[Auth] Firebase ID token verification failed:', error);
     return { user: null, response: unauthorized('Invalid or expired Firebase ID token') };

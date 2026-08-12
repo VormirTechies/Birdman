@@ -1,43 +1,60 @@
 import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createFirebaseUser, listFirebaseUsers } from '@/lib/firebase/admin-users';
+import { requireAdmin } from '@/lib/require-admin';
+import { createFirebaseUserSchema } from '@/models/firebase/auth-user';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await requireAdmin(request);
+    if (!auth.user) return auth.response;
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const users = await listFirebaseUsers();
+    return NextResponse.json({ users, total: users.length });
+  } catch (error) {
+    console.error('[Admin users] Failed to list Firebase Authentication users:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to fetch users' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  const auth = await requireAdmin(request);
+  if (!auth.user) return auth.response;
+
+  try {
+    const body: unknown = await request.json();
+    const parsed = createFirebaseUserSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please correct the highlighted fields.',
+          fields: parsed.error.flatten().fieldErrors,
+        },
+        { status: 400 }
+      );
     }
 
-    const adminClient = createAdminClient();
-    const {
-      data: { users },
-      error,
-    } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-
-    if (error) {
-      console.error('[API] Failed to list users:', error);
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
-    }
-
-    const formatted = users.map((u) => ({
-      id: u.id,
-      email: u.email ?? '',
-      name:
-        (u.user_metadata?.name as string | undefined) ??
-        (u.user_metadata?.full_name as string | undefined) ??
-        u.email?.split('@')[0] ??
-        'Unknown',
-      avatarUrl: (u.user_metadata?.avatar_url as string | undefined) ?? null,
-      createdAt: u.created_at,
-    }));
-
-    return NextResponse.json({ users: formatted, total: formatted.length });
+    const user = await createFirebaseUser(parsed.data);
+    return NextResponse.json({ success: true, user }, { status: 201 });
   } catch (error: unknown) {
-    console.error('[API] Unexpected error fetching users:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const code = typeof error === 'object' && error && 'code' in error
+      ? String((error as { code: unknown }).code)
+      : '';
+    if (code === 'auth/email-already-exists') {
+      return NextResponse.json(
+        { success: false, error: 'A Firebase user with this email already exists.' },
+        { status: 409 }
+      );
+    }
+    console.error('[Admin users] Failed to create Firebase user:', error);
+    return NextResponse.json(
+      { success: false, error: 'Unable to create the user. Please try again.' },
+      { status: 500 }
+    );
   }
 }
