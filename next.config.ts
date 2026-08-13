@@ -32,6 +32,22 @@ const nextConfig: NextConfig = {
         hostname: 'ympyaabsjfaoxvbtxbox.supabase.co',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'firebasestorage.googleapis.com',
+        pathname: '/v0/b/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '7004',
+        pathname: '/v0/b/**',
+      },
     ],
   },
   async redirects() {

@@ -16,15 +16,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import GalleryPage from '@/app/admin/gallery/page';
 import type { GalleryImageItem } from '@/app/admin/gallery/_components/ImageCard';
 
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
+
 // ─── Mock child components ────────────────────────────────────────────────────
 
 vi.mock('@/app/admin/gallery/_components/ImageCard', () => ({
-  ImageCard: ({ image, onEdit, onDelete }: any) => (
+  ImageCard: ({ image, onEdit, onDelete }: { image: GalleryImageItem; onEdit: (image: GalleryImageItem) => void; onDelete: (image: GalleryImageItem) => void }) => (
     <div data-testid={`image-card-${image.id}`}>
       <span data-testid={`card-title-${image.id}`}>{image.altText}</span>
       <button data-testid={`edit-btn-${image.id}`} onClick={() => onEdit(image)}>
@@ -38,7 +42,7 @@ vi.mock('@/app/admin/gallery/_components/ImageCard', () => ({
 }));
 
 vi.mock('@/app/admin/gallery/_components/AddImageModal', () => ({
-  AddImageModal: ({ editImage, onClose, onSaved }: any) => (
+  AddImageModal: ({ editImage, onClose, onSaved }: { editImage?: GalleryImageItem; onClose: () => void; onSaved: (image: GalleryImageItem) => void }) => (
     <div data-testid="add-image-modal">
       <span data-testid="modal-mode">{editImage ? 'edit' : 'add'}</span>
       {editImage && (
@@ -70,7 +74,7 @@ vi.mock('@/app/admin/gallery/_components/AddImageModal', () => ({
 }));
 
 vi.mock('@/app/admin/gallery/_components/DeleteConfirmModal', () => ({
-  DeleteConfirmModal: ({ image, onClose, onDeleted }: any) => (
+  DeleteConfirmModal: ({ image, onClose, onDeleted }: { image: GalleryImageItem; onClose: () => void; onDeleted: (id: string) => void }) => (
     <div data-testid="delete-confirm-modal">
       <span data-testid="delete-modal-id">{image.id}</span>
       <button data-testid="confirm-delete" onClick={() => onDeleted(image.id)}>
@@ -88,8 +92,14 @@ vi.mock('@/app/admin/gallery/_components/DeleteConfirmModal', () => ({
 const makeImage = (id: string, overrides: Partial<GalleryImageItem> = {}): GalleryImageItem => ({
   id,
   url: `https://example.com/${id}.jpg`,
+  thumbnailUrl: `https://example.com/${id}-thumbnail.jpg`,
   altText: `Title ${id}`,
   caption: `Caption ${id}`,
+  aspect: 'landscape',
+  width: 1200,
+  height: 800,
+  categories: [],
+  order: 0,
   uploadedAt: new Date().toISOString(),
   ...overrides,
 });
@@ -211,7 +221,7 @@ describe('Gallery Page', () => {
     it('fetches from /api/admin/gallery on mount', async () => {
       render(<GalleryPage />);
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/admin/gallery', { cache: 'no-store' });
+        expect(global.fetch).toHaveBeenCalledWith('/api/admin/gallery?limit=15', { cache: 'no-store' });
       });
     });
 

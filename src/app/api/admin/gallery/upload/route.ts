@@ -1,73 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { addGalleryImage } from '@/lib/db/queries';
+import { createFirestoreGalleryImage } from '@/lib/firebase/gallery';
+import { InvalidGalleryImageError, processGalleryImage } from '@/lib/firebase/gallery-storage';
+import { galleryMetadataSchema } from '@/models/firestore/gallery';
 import { requireAdmin } from '@/lib/require-admin';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
-const BUCKET = 'gallery';
-
-const getAdminClient = () =>
-  createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+function parseJsonField(value: FormDataEntryValue | null, fallback: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return fallback;
+  return JSON.parse(value);
+}
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdmin(request);
+  if (!auth.user) return auth.response;
+
   try {
-    const auth = await requireAdmin(request);
-    if (!auth.user) return auth.response;
-
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const title = (formData.get('title') as string | null)?.trim() ?? '';
-    const description = (formData.get('description') as string | null)?.trim() || undefined;
-
-    // Validate
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    const allowedFields = new Set(['file', 'title', 'description', 'categories', 'order']);
+    if ([...formData.keys()].some((key) => !allowedFields.has(key))) {
+      return NextResponse.json({ success: false, error: 'Unknown upload field' }, { status: 400 });
     }
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: 'Only JPG, PNG, WebP, or GIF images are allowed' }, { status: 400 });
+    const file = formData.get('file');
+    if (!(file instanceof File)) {
+      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
-    if (file.size > MAX_SIZE_BYTES) {
-      return NextResponse.json({ error: 'Image must be 5 MB or smaller' }, { status: 400 });
+    const metadata = galleryMetadataSchema.safeParse({
+      title: formData.get('title'),
+      description: formData.get('description') || null,
+      categories: parseJsonField(formData.get('categories'), []),
+      order: Number(formData.get('order') || 0),
+    });
+    if (!metadata.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid gallery metadata', fieldErrors: metadata.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
-    }
-
-    // Upload to Supabase Storage (admin client bypasses RLS)
-    const adminClient = getAdminClient();
-    const ext = file.name.split('.').pop() ?? 'jpg';
-    const storagePath = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const { error: uploadError } = await adminClient.storage
-      .from(BUCKET)
-      .upload(storagePath, arrayBuffer, {
-        contentType: file.type,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('[Gallery Upload] Supabase storage error:', uploadError);
-      return NextResponse.json({ error: `Storage upload failed: ${uploadError.message}` }, { status: 500 });
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = adminClient.storage
-      .from(BUCKET)
-      .getPublicUrl(storagePath);
-
-    // Save to DB (altText = title, caption = description)
-    const inserted = await addGalleryImage(publicUrl, title, description);
-
-    return NextResponse.json({ success: true, image: inserted }, { status: 201 });
+    const processed = await processGalleryImage(Buffer.from(await file.arrayBuffer()), file.type);
+    const image = await createFirestoreGalleryImage({ metadata: metadata.data, processed, uploadedBy: auth.user.uid });
+    return NextResponse.json({ success: true, image }, { status: 201 });
   } catch (error) {
-    console.error('[Gallery Upload] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (error instanceof InvalidGalleryImageError || error instanceof SyntaxError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+    console.error('[Admin Gallery Upload] Failed:', error);
+    return NextResponse.json({ success: false, error: 'Unable to upload image' }, { status: 500 });
   }
 }

@@ -1,21 +1,17 @@
 rules_version = '2';
 
-// Assumed model: feedback/{feedbackId}
+// Assumed models:
+// feedback/{feedbackId}
 // name (2..100), email (private, <=254), message (20..500),
 // status (pending|approved), createdAt/updatedAt timestamps,
 // approvedAt timestamp|null, approvedBy string|null.
+// gallery/{galleryId}
+// altText/caption, Firebase Storage paths, image dimensions/aspect, categories,
+// display order, checksums/sizes, uploader UID, and timestamps.
 // All application access is intentionally mediated by server APIs using the
 // Admin SDK. Admin SDK access is controlled by IAM and bypasses these rules.
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
-    }
-
     match /{document=**} {
       allow read, write: if false;
     }

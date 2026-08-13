@@ -5,10 +5,11 @@ import { X, CloudUpload } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import type { GalleryImageItem } from './ImageCard';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface AddImageModalProps {
   /** When provided, the modal is in edit mode (no file upload) */
@@ -44,7 +45,7 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
   const validateAndSetFile = useCallback((f: File) => {
     setError('');
     if (!ALLOWED_TYPES.includes(f.type)) {
-      setError('Only JPG, PNG, WebP, or GIF images are allowed.');
+      setError('Only JPG, PNG, or WebP images are allowed.');
       return;
     }
     if (f.size > MAX_SIZE_BYTES) {
@@ -77,10 +78,10 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
     try {
       if (isEdit) {
         // Edit mode: just update title and description
-        const res = await fetch(`/api/admin/gallery/${editImage!.id}`, {
+        const res = await authenticatedFetch(`/api/admin/gallery/${editImage!.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), description: description.trim() || null }),
+          body: JSON.stringify({ title: title.trim(), description: description.trim() || null, categories: editImage!.categories, order: editImage!.order }),
         });
         const data = await res.json();
         if (!res.ok) { setError(data.error ?? 'Failed to update image.'); return; }
@@ -91,8 +92,10 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
         fd.append('file', file!);
         fd.append('title', title.trim());
         if (description.trim()) fd.append('description', description.trim());
+        fd.append('categories', '[]');
+        fd.append('order', '0');
 
-        const res = await fetch('/api/admin/gallery/upload', { method: 'POST', body: fd });
+        const res = await authenticatedFetch('/api/admin/gallery/upload', { method: 'POST', body: fd });
         const data = await res.json();
         if (!res.ok) { setError(data.error ?? 'Failed to upload image.'); return; }
         onSaved(data.image);
@@ -151,7 +154,7 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp"
                 className="hidden"
                 onChange={handleFilePick}
               />
@@ -176,7 +179,7 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-medium text-[#212121]">Click to upload or drag and drop</p>
-                    <p className="text-xs text-[#9E9E9E] mt-0.5">SVG, PNG, JPG or GIF (max. 5MB)</p>
+                    <p className="text-xs text-[#9E9E9E] mt-0.5">PNG, JPG or WebP (max. 5MB)</p>
                   </div>
                 </div>
               )}
@@ -193,7 +196,7 @@ export function AddImageModal({ editImage, onClose, onSaved }: AddImageModalProp
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Ocean View Suite"
-              maxLength={200}
+              maxLength={160}
               className="h-10 px-3 rounded-lg border border-[#E0E0E0] bg-white text-sm text-[#212121] placeholder-[#BDBDBD] focus:outline-none focus:border-[#2E7D32] focus:ring-1 focus:ring-[#2E7D32] transition"
             />
           </div>
