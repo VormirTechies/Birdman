@@ -437,3 +437,39 @@ MIT — see [LICENSE](./LICENSE)
 ### Now run:
 
 `npm run dev`
+## Firebase gallery migration
+
+The active gallery stores metadata in Firestore and optimized WebP media in
+Firebase Storage. Local development targets the `(default)` database and the
+Storage emulator; production targets `birdman-db` in `birdman-7e745`.
+
+Start the local suite and seed the 18 checked-in gallery images:
+
+```bash
+npm run emulators:start
+npm run seed:gallery:emulator
+```
+
+The seed is checksum- and legacy-ID-aware, so it can be run repeatedly without
+creating duplicates. Production seeding has an explicit confirmation guard:
+
+```bash
+npm run seed:gallery:production -- --confirm-production
+```
+
+Set `FIRESTORE_DATABASE_ID=birdman-db`,
+`FIREBASE_STORAGE_BUCKET=birdman-7e745.firebasestorage.app`, and the matching
+`NEXT_PUBLIC_FIREBASE_*` client configuration in App Hosting. Apply bucket CORS
+from `firebase-storage-cors.json` before serving media to deployed domains.
+
+The deferred Postgres/Supabase import supports dry runs and does not remove any
+legacy objects:
+
+```bash
+npm run migrate:gallery:firebase -- --production --dry-run
+npm run migrate:gallery:firebase -- --production --confirm-production
+```
+
+Until the legacy video can be copied, `/gallery` uses a local image hero. Set
+`GALLERY_HERO_VIDEO_URL` to the fixed Firebase Storage video URL after that
+copy is complete.

@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ImagePlus, Images } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, Images } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImageCard, type GalleryImageItem } from './_components/ImageCard';
 import { AddImageModal } from './_components/AddImageModal';
 import { DeleteConfirmModal } from './_components/DeleteConfirmModal';
+import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
 
 const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
+const PAGE_SIZE = 15;
 
 // ─── Bento grid class per index ───────────────────────────────────────────────
 // Pattern repeats every 4 items (desktop only):
@@ -39,29 +41,58 @@ export default function GalleryPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<GalleryImageItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryImageItem | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([]);
+  const [error, setError] = useState('');
 
   // Fetch gallery images
-  const fetchImages = useCallback(async () => {
+  const fetchImages = useCallback(async (pageCursor: string | null) => {
     setLoading(true);
+    setError('');
     try {
-      const res = await fetch('/api/admin/gallery', { cache: 'no-store' });
+      const url = `/api/admin/gallery?limit=${PAGE_SIZE}${pageCursor ? `&cursor=${encodeURIComponent(pageCursor)}` : ''}`;
+      const res = await authenticatedFetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setImages(Array.isArray(data) ? data : []);
+        setImages(Array.isArray(data) ? data : Array.isArray(data.images) ? data.images : []);
+        setNextCursor(data.pagination?.nextCursor ?? null);
+        setHasMore(data.pagination?.hasMore === true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? 'Unable to load gallery.');
       }
     } catch {
-      // silently fail; user sees empty state
+      setError('Unable to load gallery.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchImages(); }, [fetchImages]);
+  useEffect(() => { fetchImages(cursor); }, [fetchImages, cursor]);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const goNext = () => {
+    if (!nextCursor) return;
+    setCursorHistory((previous) => [...previous, cursor]);
+    setCursor(nextCursor);
+    scrollToTop();
+  };
+  const goPrevious = () => {
+    const previous = cursorHistory.at(-1);
+    if (previous === undefined) return;
+    setCursorHistory((history) => history.slice(0, -1));
+    setCursor(previous);
+    scrollToTop();
+  };
 
   // Handlers
   const handleAdded = (img: GalleryImageItem) => {
-    setImages((prev) => [img, ...prev]); // prepend (most recent first)
+    setImages((previous) => [img, ...previous].slice(0, PAGE_SIZE));
     setAddOpen(false);
+    setCursorHistory([]);
+    setCursor(null);
   };
 
   const handleEdited = (img: GalleryImageItem) => {
@@ -96,6 +127,7 @@ export default function GalleryPage() {
       </div>
 
       {/* Gallery grid */}
+      {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
       {loading ? (
         /* Skeleton */
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:auto-rows-[220px]">
@@ -132,6 +164,27 @@ export default function GalleryPage() {
             />
           ))}
         </div>
+      )}
+
+      {!loading && images.length > 0 && (
+        <nav aria-label="Gallery pagination" className="flex items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={goPrevious}
+            disabled={cursorHistory.length === 0}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E0E0E0] px-4 text-sm font-medium disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" /> Previous
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={!hasMore || !nextCursor}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#2E7D32] px-4 text-sm font-medium text-white disabled:opacity-40"
+          >
+            Next <ChevronRight className="h-4 w-4" />
+          </button>
+        </nav>
       )}
 
       {/* Add modal */}

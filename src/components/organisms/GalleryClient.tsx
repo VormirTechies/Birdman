@@ -18,14 +18,21 @@ import Link from "next/link";
 interface GalleryImage {
   id: string;
   src: string;
+  thumbnailSrc: string;
   title: string;
   description?: string;
   aspect: "square" | "landscape" | "portrait";
+  width: number;
+  height: number;
+  uploadedAt: string;
 }
 
 interface GalleryClientProps {
   initialImages: GalleryImage[];
+  initialCursor: string | null;
+  initialHasMore: boolean;
   totalCount: number;
+  heroVideoUrl?: string;
 }
 
 // ─── Bento span helper ──────────────────────────────────────────────────────────
@@ -52,17 +59,18 @@ function SkeletonCard({ index }: { index: number }) {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 15;
-const VIDEO_URL =
-  "https://ympyaabsjfaoxvbtxbox.supabase.co/storage/v1/object/public/videos/Meiyazhagan_wide.mp4";
 // ──────────────────────────────────────────────────────────────────────────────
 
 export function GalleryClient({
   initialImages,
+  initialCursor,
+  initialHasMore,
   totalCount,
+  heroVideoUrl,
 }: GalleryClientProps) {
   const [images, setImages] = useState<GalleryImage[]>(initialImages);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(initialImages.length < totalCount);
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const [muted, setMuted] = useState(true);
   const [videoReady, setVideoReady] = useState(false);
   const [lightbox, setLightbox] = useState<{ open: boolean; index: number }>({
@@ -72,7 +80,7 @@ export function GalleryClient({
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const offsetRef = useRef(initialImages.length);
+  const cursorRef = useRef(initialCursor);
   // ── Mute toggle ──────────────────────────────────────────────────────────────
 
   const toggleMute = () => {
@@ -89,31 +97,17 @@ export function GalleryClient({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/gallery?offset=${offsetRef.current}&limit=${PAGE_SIZE}`,
+        `/api/gallery?limit=${PAGE_SIZE}${cursorRef.current ? `&cursor=${encodeURIComponent(cursorRef.current)}` : ""}`,
       );
       if (!res.ok) throw new Error("Fetch failed");
       const data = await res.json();
-      const fetched: GalleryImage[] = (data.images ?? []).map(
-        (img: {
-          id: string;
-          url: string;
-          altText?: string;
-          caption?: string;
-          aspect?: string;
-        }) => ({
-          id: img.id,
-          src: img.url,
-          title: img.altText || img.caption || "Parakeet at Birdman Sanctuary",
-          description: img.caption ?? undefined,
-          aspect: (img.aspect as GalleryImage["aspect"]) || "square",
-        }),
-      );
+      const fetched: GalleryImage[] = data.images ?? [];
       if (fetched.length === 0) {
         setHasMore(false);
       } else {
         setImages((prev) => [...prev, ...fetched]);
-        offsetRef.current += fetched.length;
-        if (fetched.length < PAGE_SIZE) setHasMore(false);
+        cursorRef.current = data.pagination?.nextCursor ?? null;
+        setHasMore(data.pagination?.hasMore === true);
       }
     } catch {
       // silently fail — sentinel will retry on next intersection
@@ -162,9 +156,9 @@ export function GalleryClient({
         {/* Fallback gradient visible while video loads */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,176,140,0.08),transparent_70%)]" />
 
-        <video
+        {heroVideoUrl ? <video
           ref={videoRef}
-          src={VIDEO_URL}
+          src={heroVideoUrl}
           autoPlay
           muted={muted}
           loop
@@ -174,13 +168,20 @@ export function GalleryClient({
             videoReady ? "opacity-100" : "opacity-0"
           }`}
           onCanPlay={() => setVideoReady(true)}
-        />
+        /> : <Image
+          src="/images/gallery/005.jpeg"
+          alt="Parakeets gathering above the Birdman of Chennai sanctuary"
+          fill
+          priority
+          className="object-cover"
+          sizes="100vw"
+        />}
 
         {/* Overlay gradient */}
         <div className="absolute inset-0 bg-linear-to-t from-canopy-dark/85 via-canopy-dark/20 to-transparent" />
 
         {/* Mute toggle — top right below header */}
-        <button
+        {heroVideoUrl && <button
           onClick={toggleMute}
           aria-label={muted ? "Unmute video" : "Mute video"}
           className="absolute top-24 right-5 z-20 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white border border-white/10 transition-all duration-200"
@@ -190,7 +191,7 @@ export function GalleryClient({
           ) : (
             <Volume2 className="w-4 h-4" />
           )}
-        </button>
+        </button>}
 
         {/* Hero copy — bottom left */}
         <div className="absolute inset-0 flex items-end">
@@ -233,7 +234,7 @@ export function GalleryClient({
                 transition={{ duration: 0.5, delay: (i % 8) * 0.04 }}
               >
                 <Image
-                  src={img.src}
+                  src={img.thumbnailSrc}
                   alt={img.title}
                   fill
                   unoptimized

@@ -6,10 +6,10 @@ const PROJECT_ID = 'birdman-7e745';
 const AUTH_EMULATOR_HOST = '127.0.0.1:7002';
 const FIRESTORE_EMULATOR_HOST = '127.0.0.1:7003';
 const DATABASE_ID = '(default)';
-const PASSWORD = 'Birdman123!';
+const PASSWORD = 'Admin@123';
 
 const users = [
-  { uid: 'local-admin-01', email: 'admin.one@birdman.local', displayName: 'Ananya Admin', isAdmin: true },
+  { uid: 'local-admin-01', email: 'admin@birdman.com', displayName: 'Ananya Admin', isAdmin: true },
   { uid: 'local-admin-02', email: 'admin.two@birdman.local', displayName: 'Arjun Admin', isAdmin: true },
   { uid: 'local-admin-03', email: 'admin.three@birdman.local', displayName: 'Meera Admin', isAdmin: true },
   { uid: 'local-user-01', email: 'user.one@birdman.local', displayName: 'Karthik User', isAdmin: false },

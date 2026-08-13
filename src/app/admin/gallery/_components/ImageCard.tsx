@@ -10,8 +10,14 @@ const FONT = 'var(--font-work-sans, Work Sans, sans-serif)';
 export interface GalleryImageItem {
   id: string;
   url: string;
-  altText: string | null;   // title
+  thumbnailUrl: string;
+  altText: string;
   caption: string | null;   // description
+  aspect: 'square' | 'landscape' | 'portrait';
+  width: number;
+  height: number;
+  categories: string[];
+  order: number;
   uploadedAt: string;
 }
 
@@ -47,7 +53,7 @@ export function ImageCard({ image, onEdit, onDelete, className }: ImageCardProps
     >
       {/* Image */}
       <Image
-        src={image.url}
+        src={image.thumbnailUrl}
         alt={image.altText ?? 'Gallery image'}
         fill
         unoptimized

@@ -1,4 +1,4 @@
-import { getGalleryImagesPaginated, getGalleryCount } from '@/lib/db/queries';
+import { countGalleryImages, listPublicGalleryPage } from '@/lib/firebase/gallery';
 import { Header } from '@/components/organisms/Header';
 import { Footer } from '@/components/organisms/Footer';
 import { GalleryClient } from '@/components/organisms/GalleryClient';
@@ -8,29 +8,30 @@ import { GalleryClient } from '@/components/organisms/GalleryClient';
 export const dynamic = 'force-dynamic';
 
 export default async function GalleryPage() {
-  let images: Awaited<ReturnType<typeof getGalleryImagesPaginated>> = [];
+  let page: Awaited<ReturnType<typeof listPublicGalleryPage>> = {
+    images: [],
+    pagination: { limit: 15, hasMore: false, nextCursor: null },
+  };
   let totalCount = 0;
   try {
-    [images, totalCount] = await Promise.all([
-      getGalleryImagesPaginated(0, 15),
-      getGalleryCount(),
+    [page, totalCount] = await Promise.all([
+      listPublicGalleryPage(15),
+      countGalleryImages(),
     ]);
   } catch {
     // DB unavailable during build — render with empty list
   }
 
-  const initialImages = images.map((img) => ({
-    id: img.id,
-    src: img.url,
-    title: img.altText || img.caption || 'Parakeet at Birdman Sanctuary',
-    description: img.caption ?? undefined,
-    aspect: (img.aspect as 'portrait' | 'landscape' | 'square') || 'square',
-  }));
-
   return (
     <>
       <Header />
-      <GalleryClient initialImages={initialImages} totalCount={totalCount} />
+      <GalleryClient
+        initialImages={page.images}
+        initialCursor={page.pagination.nextCursor}
+        initialHasMore={page.pagination.hasMore}
+        totalCount={totalCount}
+        heroVideoUrl={process.env.GALLERY_HERO_VIDEO_URL}
+      />
       <Footer />
     </>
   );

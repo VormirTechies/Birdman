@@ -8,10 +8,21 @@
         { "fieldPath": "createdAt", "order": "DESCENDING" },
         { "fieldPath": "__name__", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "gallery",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uploadedAt", "order": "DESCENDING" },
+        { "fieldPath": "__name__", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
     { "collectionGroup": "feedback", "fieldPath": "email", "indexes": [] },
-    { "collectionGroup": "feedback", "fieldPath": "message", "indexes": [] }
+    { "collectionGroup": "feedback", "fieldPath": "message", "indexes": [] },
+    { "collectionGroup": "gallery", "fieldPath": "caption", "indexes": [] },
+    { "collectionGroup": "gallery", "fieldPath": "storagePath", "indexes": [] },
+    { "collectionGroup": "gallery", "fieldPath": "thumbnailStoragePath", "indexes": [] }
   ]
 }
