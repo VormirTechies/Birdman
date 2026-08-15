@@ -1,6 +1,6 @@
 {
   "name": "birdman-app",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -18,6 +18,7 @@
     "seed:gallery:emulator": "tsx scripts/seed-gallery-firebase.ts --emulator",
     "seed:gallery:production": "tsx scripts/seed-gallery-firebase.ts --production",
     "seed:auth:emulator": "tsx scripts/seed-auth-users-emulator.ts",
+    "seed:auth:production": "tsx scripts/seed-auth-users-production.ts",
     "migrate:bookings": "tsx scripts/migrate-bookings-to-firestore.ts",
     "migrate:visitors": "tsx scripts/migrate-visitors-to-firestore.ts",
     "migrate:calendar-settings": "tsx scripts/migrate-calendar-settings-to-firestore.ts",

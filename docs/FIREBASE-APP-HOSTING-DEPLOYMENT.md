@@ -1,8 +1,46 @@
-# Firebase App Hosting Pre-Deployment Guide
+# Firebase Migration v1.0 Production Release Playbook
 
-This checklist covers deployment of the Birdman Next.js application to Firebase
-App Hosting after the Firestore feedback/authentication work and Firebase
-gallery migration.
+This runbook releases the first production Firebase migration for the Birdman
+Next.js application on Firebase App Hosting.
+
+**Release version:** `1.0.0`
+
+**Release status:** Release candidate — do not mark production-ready until every
+required gate and smoke test in this document has passed.
+
+**Firebase scope:** Authentication, Feedback, and Gallery.
+
+## v1.0 scope and acceptance
+
+| Slice | Production system | Included in v1.0 |
+| --- | --- | --- |
+| Administrator identity | Firebase Authentication | Sign-in, sign-out, forgot/reset password, in-session password change, user creation, and user listing |
+| Administrator authorization | `birdman-db/adminUsers/{uid}` | Server-side `role: "admin"` lookup for every protected API |
+| Feedback | `birdman-db/feedback` | Public submission/listing, moderation, cursor pagination, recommendation limit, and homepage Visitor Reviews |
+| Gallery metadata | `birdman-db/gallery` | Public/admin cursor listing and metadata management |
+| Gallery media | Firebase Storage `gallery/public/**` | Optimized display WebP, thumbnail WebP, upload, public read, and deletion |
+
+The following are deliberately outside this Firebase v1.0 cutover:
+
+- Bookings, visitors, calendar, email, cron, and push-notification migrations.
+- Historical Supabase gallery import while the source quota issue remains.
+- Meiyazhagan and Story video migration.
+- A Firebase-hosted gallery hero video; the local fallback remains active.
+- Removal of Supabase/Postgres dependencies still used by non-v1.0 features.
+
+### Release approval record
+
+Complete this immediately before the live rollout:
+
+```text
+Release commit: ______________________________
+Release operator: ____________________________
+Rules/indexes deployed at: ___________________
+Production gallery seeded at: _______________
+App Hosting rollout ID: ______________________
+Smoke tests completed at: ____________________
+Rollback owner: ______________________________
+```
 
 ## Production targets
 
@@ -15,9 +53,8 @@ gallery migration.
 
 ## 1. Review and commit the working tree
 
-Review all intended changes before committing. In particular, verify that any
-changes outside the gallery migration, such as authentication seed scripts, are
-intentional.
+Review all intended changes before committing. The v1.0 commit must contain the
+Authentication, Feedback, and Gallery Firebase migrations together.
 
 ```powershell
 git status
@@ -29,7 +66,7 @@ When everything is correct:
 
 ```powershell
 git add .
-git commit -m "Migrate gallery to Firestore and Firebase Storage"
+git commit -m "Release Firebase migration v1.0"
 ```
 
 Do not push to the App Hosting live branch yet if automatic rollouts are
@@ -57,8 +94,15 @@ until the production seed or migration is run.
 ## 3. Configure App Hosting environment variables
 
 The repository currently contains `apphosting.emulator.yaml`, which is only for
-local emulation. Local `.env.production` is ignored by Git and must not be
-treated as the production App Hosting configuration.
+local emulation. Never copy its emulator hosts or `(default)` database ID into
+production. Local `.env.production` is ignored by Git and is not the production
+App Hosting configuration.
+
+The root production `apphosting.yaml`, when introduced, is the source-controlled
+source of truth for the backend. Until every existing application variable and
+secret has been mapped into that file, preserve and verify the current App
+Hosting backend settings in the Firebase Console. Adding a partial production
+file that drops legacy variables can break non-v1.0 features.
 
 Open:
 
@@ -111,6 +155,12 @@ CRON_SECRET
 VAPID_PRIVATE_KEY
 ```
 
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are required for the
+production feedback submission limit of three requests per IP per hour. The
+application deliberately fails open if Upstash is unavailable, so a successful
+feedback submission alone does not prove that rate limiting is active. Verify
+the Upstash analytics/prefix `birdman:feedback` after the smoke test.
+
 Preserve applicable public or non-secret configuration:
 
 ```text
@@ -143,6 +193,14 @@ npx firebase-tools firestore:indexes --database=birdman-db --project birdman-7e7
 ```
 
 Wait until required indexes are ready before rolling out the application.
+
+Confirm both composite indexes are present and ready:
+
+- `feedback`: `status ASC`, `createdAt DESC`, `__name__ DESC`.
+- `gallery`: `uploadedAt DESC`, `__name__ DESC`.
+
+Also confirm the configured single-field exemptions for private/large fields,
+including feedback `email` and `message`, and gallery caption/Storage paths.
 
 The deployed rules should provide these behaviors:
 
@@ -212,7 +270,85 @@ For every administrator:
 A Firebase user without this role document can authenticate but will receive
 `403 Forbidden` from protected administrator APIs.
 
-## 8. Seed the production gallery
+Custom claims such as `{ "role": "admin" }` do not grant access in v1.0. The
+Firestore `adminUsers/{uid}` document is the only administrator allowlist used
+by the server.
+
+### Seed production administrators from a local file
+
+For several administrators, create this ignored local file:
+`.firebase/production-admin-users.json`.
+
+```json
+[
+  {
+    "email": "admin.one@example.com",
+    "displayName": "First Administrator",
+    "password": "ReplaceWithAStrongPassword1"
+  },
+  {
+    "email": "existing.admin@example.com",
+    "displayName": "Existing Administrator"
+  }
+]
+```
+
+The password is required only when the Firebase Authentication user does not
+already exist. Existing users are found by email and their password is never
+changed. The seed file is under `.firebase/`, which is excluded by `.gitignore`;
+never commit it.
+
+Authenticate Application Default Credentials if needed:
+
+```powershell
+gcloud auth application-default login
+```
+
+Remove emulator variables and run the guarded production seed:
+
+```powershell
+Remove-Item Env:FIREBASE_AUTH_EMULATOR_HOST -ErrorAction SilentlyContinue
+Remove-Item Env:FIRESTORE_EMULATOR_HOST -ErrorAction SilentlyContinue
+Remove-Item Env:FIREBASE_STORAGE_EMULATOR_HOST -ErrorAction SilentlyContinue
+Remove-Item Env:STORAGE_EMULATOR_HOST -ErrorAction SilentlyContinue
+npm run seed:auth:production -- --confirm-production
+```
+
+To use a different ignored JSON file:
+
+```powershell
+npm run seed:auth:production -- --confirm-production --users-file C:\secure\production-admin-users.json
+```
+
+The command is idempotent, targets project `birdman-7e745` and database
+`birdman-db`, creates missing Auth users, and writes `adminUsers/{uid}` with
+`role: "admin"`. It refuses emulator hosts and conflicting project/database
+environment variables.
+
+## 8. Verify the production feedback cutover
+
+Feedback does not require a production seed. The `feedback` collection is
+created by the first successful public submission.
+
+Before rollout, confirm these implementation contracts:
+
+- `POST /api/feedback` validates name, email, and a 20–500 character message.
+- New submissions always write `status: "pending"` and server-owned timestamps.
+- The honeypot receives a generic success response without writing a document.
+- `GET /api/feedback` returns only approved records with cursor pagination.
+- Public responses contain `id`, `name`, `message`, and `createdAt`; email is
+  never returned.
+- Admin pending and approved tabs use ten-record cursor pages.
+- Approve changes pending feedback to approved; reject/delete removes it.
+- Only approved feedback can be recommended, and at most five can be
+  recommended at once.
+- Homepage Visitor Reviews contain only recommended approved feedback.
+
+Do not create an empty collection manually. Use one production smoke-test
+submission after the application rollout, moderate it through `/admin/feedback`,
+and delete it when verification is complete.
+
+## 9. Seed the production gallery
 
 If Application Default Credentials are not configured locally:
 
@@ -247,7 +383,7 @@ Verify the result in Firebase Console:
 Do not run the deferred Supabase migration until the source quota problem has
 been resolved.
 
-## 9. Clean the production source
+## 10. Clean the production source
 
 App Hosting builds from the Git repository. Files ignored by Git remain local,
 but tracked files are included in the source checkout used for the build even
@@ -427,7 +563,7 @@ Finally, review the unrelated uncommitted modification to
 `scripts/seed-auth-users-emulator.ts` and confirm it is intentional before
 including it in the deployment commit.
 
-## 10. Run final validation
+## 11. Run final validation
 
 Run the complete local checks after all configuration and code changes:
 
@@ -436,6 +572,10 @@ npm run lint
 npm run test:ci
 npm run build
 ```
+
+All three commands must exit successfully. Do not waive failures as
+"unrelated" in the v1.0 release record; either fix them or explicitly remove
+invalid tests from the release suite in a reviewed commit.
 
 Then validate the emulator workflow:
 
@@ -446,18 +586,34 @@ npm run emulators:start
 In a second terminal:
 
 ```powershell
+npm run seed:auth:emulator
+npm run seed:feedback:emulator
 npm run seed:gallery:emulator
 ```
 
 Check:
 
 ```text
+http://127.0.0.1:7001/admin/login
+http://127.0.0.1:7001/admin/profile
+http://127.0.0.1:7001/admin/feedback
+http://127.0.0.1:7001/feedback
+http://127.0.0.1:7001/api/feedback?limit=10
 http://127.0.0.1:7001/gallery
 http://127.0.0.1:7001/api/gallery?limit=15
 http://127.0.0.1:7001/admin/gallery
 ```
 
-## 11. Trigger the App Hosting rollout
+In the emulator, complete one full workflow for each slice:
+
+1. Sign in as a seeded administrator and verify `/api/admin/session` succeeds.
+2. Submit feedback, approve it, recommend it, confirm it appears publicly and
+   on the homepage, then delete it.
+3. Upload, edit, list, view, and delete one gallery image.
+4. Sign in as a seeded non-admin and verify protected APIs return `403`.
+5. Verify direct Firestore reads/writes and direct Storage writes are denied.
+
+## 12. Trigger the App Hosting rollout
 
 If the backend uses GitHub automatic rollouts, push the reviewed commit to the
 configured live branch:
@@ -475,9 +631,41 @@ Console and deploy the exact reviewed commit.
 
 Reference: [Manage App Hosting rollouts](https://firebase.google.com/docs/app-hosting/rollouts)
 
-## 12. Production smoke tests
+## 13. Production smoke tests
 
 After the rollout completes, verify all of the following:
+
+### Authentication
+
+- Administrator sign-in works and `/api/admin/session` returns only `uid`,
+  `email`, `displayName`, and `role`.
+- Wrong credentials fail without revealing whether an account exists.
+- A valid Firebase user without `adminUsers/{uid}` is signed out and receives
+  the permission message.
+- A non-administrator receives `403` from protected APIs.
+- The Profile page lists Firebase Authentication users.
+- An administrator can create a normal user and an administrator; only the
+  administrator receives an `adminUsers/{uid}` role document.
+- Forgot-password email uses the production domain and a valid link completes
+  at `/admin/reset-password`.
+- In-session password change requires reauthentication.
+
+### Feedback
+
+- Submit one uniquely named test feedback and receive `201` with `pending`.
+- Confirm the Firestore document exists in `birdman-db`, with normalized email,
+  server timestamps, and no client-controlled status.
+- Confirm pending feedback is absent from `/feedback` and `GET /api/feedback`.
+- Approve it in `/admin/feedback` and confirm it appears publicly.
+- Verify the public API response does not contain `email`, `approvedBy`, or
+  other moderation metadata.
+- Toggle Recommended and confirm it appears under homepage Visitor Reviews.
+- Confirm a sixth recommendation is rejected while five are active.
+- Verify pending/approved ten-record pagination and scroll restoration.
+- Delete the smoke-test feedback and verify Firestore/public/homepage removal.
+- Confirm Upstash recorded the `birdman:feedback` rate-limit request.
+
+### Gallery
 
 - `/gallery` displays production images.
 - Gallery cards use thumbnails.
@@ -486,27 +674,66 @@ After the rollout completes, verify all of the following:
 - `GET /api/gallery?limit=15` returns cursor pagination.
 - Public gallery responses do not expose Storage paths, uploader IDs,
   categories, order, checksums, or other administrative metadata.
-- Administrator sign-in works.
-- A non-administrator receives `403` from protected APIs.
 - The admin gallery loads 15 records per page.
 - Admin upload, edit, pagination, scroll-to-top, and delete work.
 - New uploads create two WebP objects and one Firestore document.
+
+### Security and privacy
+
 - Direct client Firestore operations remain denied.
 - Direct client Storage writes remain denied.
-- Password-reset links return to `/admin/reset-password` on the production
-  domain.
+- Anonymous Storage reads succeed only for `gallery/public/**`.
+- Protected Auth, Feedback, and Gallery administrator APIs return `401` for a
+  missing/invalid token and `403` for an authenticated non-admin.
+- Feedback email, gallery Storage paths/checksums/uploader details, and
+  `adminUsers` documents are not exposed by public APIs.
 
 Keep `GALLERY_HERO_VIDEO_URL` unset until the fixed hero video has been copied
 to Firebase Storage. The public gallery will use its local fallback image in the
 meantime.
 
-## 13. Post-deployment monitoring
+## 14. Rollback plan
+
+If a critical v1.0 smoke test fails:
+
+1. Stop further administrator mutations and gallery uploads.
+2. Roll App Hosting back to the last known-good rollout from Firebase Console.
+3. Do not delete Firebase Auth users, `adminUsers`, feedback, gallery documents,
+   or Storage objects created during the rollout; preserve them for diagnosis.
+4. Keep Supabase/Postgres data and media unchanged until v1.0 acceptance.
+5. Record the failed rollout ID, UTC time, endpoint, response code, and relevant
+   Cloud Run log correlation data.
+6. Fix and validate locally, deploy rules/indexes first if they changed, and
+   create a new rollout from a reviewed commit.
+
+An App Hosting rollback changes application code but does not roll back
+Firestore, Authentication, or Storage data. Any data correction must therefore
+be reviewed and executed separately.
+
+## 15. Release acceptance and tag
+
+The release is accepted only after every Authentication, Feedback, Gallery,
+Security, and Privacy smoke test passes. Complete the release approval record at
+the top of this document, then tag the exact deployed commit:
+
+```powershell
+git tag -a v1.0.0 -m "Firebase migration v1.0 production release"
+git push origin v1.0.0
+```
+
+Do not create or push the tag before the deployed commit has passed production
+smoke tests.
+
+## 16. Post-deployment monitoring
 
 - Review the App Hosting rollout and Cloud Build logs.
 - Review Cloud Run errors for server-side API failures.
 - Monitor Firestore and Storage usage.
 - Confirm Upstash rate limiting is operational.
 - Test email delivery and password-reset email links.
+- Review feedback submission rate-limit analytics and moderation errors.
+- Review gallery image-processing failures, Storage egress, and orphaned object
+  warnings.
 - Configure budget alerts and review Firebase usage regularly.
 - Retain Supabase media and Postgres gallery records until the deferred
   migration has been verified and formally accepted.
