@@ -21,6 +21,13 @@ const GALLERY_IMAGES = Array.from(
 
 const PERMISSION_MESSAGE =
   "You don't have permission to enter this page. Please contact your admin.";
+const CREDENTIAL_MESSAGE =
+  'Unable to sign in. Check your email and password and try again.';
+
+function getFirebaseErrorCode(error: unknown) {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
+  return typeof error.code === 'string' ? error.code : null;
+}
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -39,17 +46,33 @@ export default function AdminLoginPage() {
     if (reset === 'success') setError('Password reset complete. Sign in with your new password.');
   }, []);
 
-  async function handleLogin(event: React.FormEvent) {
+  async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
-      if (firebaseConfigError) throw new Error(firebaseConfigError);
+      if (firebaseConfigError) {
+        console.error('[Admin login] Firebase client initialization failed:', firebaseConfigError);
+        setError('Administrator sign-in is temporarily unavailable because Firebase is not configured correctly.');
+        return;
+      }
+
+      // Read the submitted DOM values instead of relying only on controlled
+      // state. Some browser password managers populate visible fields without
+      // reliably emitting the React change event before form submission.
+      const formData = new FormData(event.currentTarget);
+      const submittedEmail = String(formData.get('email') ?? '').trim().toLowerCase();
+      const submittedPassword = String(formData.get('password') ?? '');
+      if (!submittedEmail || !submittedPassword) {
+        setError('Enter your email address and password.');
+        return;
+      }
+
       const credential = await signInWithEmailAndPassword(
         auth,
-        email.trim().toLowerCase(),
-        password
+        submittedEmail,
+        submittedPassword
       );
       const token = await credential.user.getIdToken();
       const response = await fetch('/api/admin/session', {
@@ -65,8 +88,19 @@ export default function AdminLoginPage() {
 
       router.replace('/admin');
       router.refresh();
-    } catch {
-      setError('Unable to sign in. Check your email and password and try again.');
+    } catch (caughtError: unknown) {
+      const code = getFirebaseErrorCode(caughtError);
+      console.error('[Admin login] Firebase sign-in failed:', code ?? 'unknown-error');
+
+      if (code === 'auth/network-request-failed') {
+        setError('Unable to reach Firebase Authentication. Check your connection or browser privacy settings and try again.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many sign-in attempts. Please wait a few minutes and try again.');
+      } else {
+        // Keep credential failures generic so the form does not disclose
+        // whether an administrator email exists.
+        setError(CREDENTIAL_MESSAGE);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -152,10 +186,10 @@ export default function AdminLoginPage() {
                 {view === 'login' && (
                   <form onSubmit={handleLogin} className="space-y-4">
                     <Field id="email" label="Email Address" icon={<Mail className="h-4 w-4" />}>
-                      <input id="email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
+                      <input id="email" name="email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
                     </Field>
                     <Field id="password" label="Password" icon={<Lock className="h-4 w-4" />} action={<button type="button" onClick={() => { setError(''); setForgotEmail(email); setView('forgot'); }} className="text-xs font-medium text-[#2E7D32]">Forgot password?</button>}>
-                      <input id="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
+                      <input id="password" name="password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-11 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
                       <button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#616161]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
                     </Field>
                     <Submit loading={isLoading} label="Log In" loadingLabel="Signing in..." />

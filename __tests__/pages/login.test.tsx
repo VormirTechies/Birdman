@@ -52,6 +52,19 @@ describe('Firebase admin login', () => {
     expect(replace).not.toHaveBeenCalledWith('/admin');
   });
 
+  it('distinguishes a blocked Firebase request from invalid credentials', async () => {
+    signIn.mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+    const user = userEvent.setup();
+    render(<AdminLoginPage />);
+    await user.type(screen.getByLabelText('Email Address'), 'admin@example.com');
+    await user.type(screen.getByLabelText('Password'), 'Secret123');
+    await user.click(screen.getByRole('button', { name: 'Log In' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to reach Firebase Authentication'
+    );
+  });
+
   it('uses Firebase reset email and always shows a generic recovery result', async () => {
     sendReset.mockRejectedValueOnce(new Error('user not found'));
     const user = userEvent.setup();
