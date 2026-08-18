@@ -1,36 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { z } from 'zod';
-import { getAdminDb } from '@/lib/firebase/admin';
+import { ZodError } from 'zod';
+import {
+  BookingCapacityExceededError,
+  BookingCounterIntegrityError,
+  BookingCutoffError,
+  BookingDateClosedError,
+  BookingNotEditableError,
+  BookingNotFoundError,
+} from '@/lib/firebase/booking-capacity';
+import {
+  deleteFirestoreBooking,
+  updateFirestoreBooking,
+} from '@/lib/firebase/bookings';
 import { requireAdmin } from '@/lib/require-admin';
+import { bookingMutationSchema } from '@/models/firestore/booking';
 
-const patchSchema = z.object({
-  status: z.enum(['confirmed', 'cancelled', 'completed']).optional(),
-  visited: z.boolean().optional(),
-  visitorName: z.string().min(2).max(255).optional(),
-  phone: z.string().min(5).max(20).optional(),
-  email: z.union([z.string().email(), z.literal(''), z.null()]).optional(),
-  adults: z.number().int().min(0).max(10).optional(),
-  children: z.number().int().min(0).max(10).optional(),
-  numberOfGuests: z.number().int().min(1).max(10).optional(),
-  bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  bookingTime: z.string().min(1).optional(),
-  isVip: z.boolean().optional(),
-  vipNotes: z.string().max(500).optional(),
-}).refine((data) => Object.keys(data).length > 0, {
-  message: 'At least one field must be provided',
-});
-
-function serializeValue(value: unknown): unknown {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(serializeValue);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nestedValue]) => [key, serializeValue(nestedValue)])
+function mutationError(error: unknown) {
+  if (error instanceof BookingCapacityExceededError) {
+    return NextResponse.json(
+      {
+        success: false,
+        code: error.code,
+        error: `Only ${error.availableGuests} seats are available for this date.`,
+        available: error.availableGuests,
+      },
+      { status: 409 }
     );
   }
-  return value;
+  if (
+    error instanceof BookingDateClosedError ||
+    error instanceof BookingCutoffError ||
+    error instanceof BookingNotEditableError
+  ) {
+    return NextResponse.json(
+      { success: false, code: error.code, error: error.message },
+      { status: 409 }
+    );
+  }
+  if (error instanceof BookingNotFoundError) {
+    return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+  }
+  if (error instanceof BookingCounterIntegrityError) {
+    return NextResponse.json(
+      { success: false, code: error.code, error: error.message },
+      { status: 400 }
+    );
+  }
+  return null;
 }
 
 export async function PATCH(
@@ -42,20 +58,10 @@ export async function PATCH(
     if (!authResult.user) return authResult.response;
 
     const { id } = await params;
-    const bookingRef = getAdminDb().collection('bookings').doc(id);
-    const snapshot = await bookingRef.get();
-
-    if (!snapshot.exists) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
-    }
-
     const body = await request.json();
     const normalizedBody: Record<string, unknown> = { ...body };
     if (normalizedBody.visitorName === undefined && body.visitor_name !== undefined) {
       normalizedBody.visitorName = body.visitor_name;
-    }
-    if (normalizedBody.numberOfGuests === undefined && body.number_of_guests !== undefined) {
-      normalizedBody.numberOfGuests = body.number_of_guests;
     }
     if (normalizedBody.bookingDate === undefined && body.booking_date !== undefined) {
       normalizedBody.bookingDate = body.booking_date;
@@ -63,48 +69,36 @@ export async function PATCH(
     if (normalizedBody.bookingTime === undefined && body.booking_time !== undefined) {
       normalizedBody.bookingTime = body.booking_time;
     }
-    const parsed = patchSchema.safeParse(normalizedBody);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: parsed.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const existing = snapshot.data() ?? {};
-    const updateData: Record<string, unknown> = {
-      ...parsed.data,
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    if (
-      parsed.data.numberOfGuests === undefined &&
-      (parsed.data.adults !== undefined || parsed.data.children !== undefined)
-    ) {
-      const adults = parsed.data.adults ?? Number(existing.adults ?? 0);
-      const children = parsed.data.children ?? Number(existing.children ?? 0);
-      updateData.numberOfGuests = adults + children;
-    }
-
-    await bookingRef.update(updateData);
-    const updatedSnapshot = await bookingRef.get();
-    const booking = serializeValue({
-      id: updatedSnapshot.id,
-      ...updatedSnapshot.data(),
+    delete normalizedBody.visitor_name;
+    delete normalizedBody.numberOfGuests;
+    delete normalizedBody.number_of_guests;
+    delete normalizedBody.booking_date;
+    delete normalizedBody.booking_time;
+    const parsed = bookingMutationSchema.parse(normalizedBody);
+    const booking = await updateFirestoreBooking(id, parsed, {
+      actorUid: authResult.user.uid,
+      enforceCutoff: false,
+      requireNonPastTarget: parsed.bookingDate !== undefined,
     });
-    const bookingData = updatedSnapshot.data() ?? {};
 
     return NextResponse.json({
       success: true,
       booking,
       visitor: {
-        id: bookingData.visitorId ?? updatedSnapshot.id,
-        isVip: bookingData.isVip === true,
-        vipNotes: bookingData.vipNotes ?? null,
+        id: booking.visitorId ?? booking.id,
+        isVip: booking.isVip === true,
+        vipNotes: booking.vipNotes ?? null,
       },
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: error.issues },
+        { status: 400 }
+      );
+    }
+    const response = mutationError(error);
+    if (response) return response;
     console.error('[API] PATCH /admin/bookings/[id] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -119,14 +113,7 @@ export async function DELETE(
     if (!authResult.user) return authResult.response;
 
     const { id } = await params;
-    const bookingRef = getAdminDb().collection('bookings').doc(id);
-    const snapshot = await bookingRef.get();
-
-    if (!snapshot.exists) {
-      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
-    }
-
-    await bookingRef.delete();
+    await deleteFirestoreBooking(id, { actorUid: authResult.user.uid });
 
     return NextResponse.json({
       success: true,
@@ -134,6 +121,8 @@ export async function DELETE(
       booking: { id },
     });
   } catch (error) {
+    const response = mutationError(error);
+    if (response) return response;
     console.error('[API] DELETE /admin/bookings/[id] failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

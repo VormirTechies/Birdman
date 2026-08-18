@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
+import { cancelFirestoreBooking } from '@/lib/firebase/bookings';
 
 interface CancellationBooking {
   id: string;
@@ -54,7 +54,8 @@ export async function getConfirmedBookingCounts(dates: Set<string>) {
 
 export async function cancelFirestoreBookingsForDates(
   startDate: string,
-  endDate: string
+  endDate: string,
+  actorUid: string
 ): Promise<CancellationBooking[]> {
   const database = getAdminDb();
   // Replaced full bookings scan with a confirmed-bookings date range query.
@@ -67,15 +68,13 @@ export async function cancelFirestoreBookingsForDates(
   console.log('[FIRESTORE READ]', 'cancelFirestoreBookingsForDates', 'docs:', snapshot.size);
   const matches = snapshot.docs;
 
-  for (let offset = 0; offset < matches.length; offset += 500) {
-    const batch = database.batch();
-    for (const document of matches.slice(offset, offset + 500)) {
-      batch.update(document.ref, {
-        status: 'cancelled',
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
+  // Run sequentially because bookings on the same date intentionally contend
+  // on one bookingDays document. Each transaction releases its own capacity.
+  for (const document of matches) {
+    await cancelFirestoreBooking(document.id, {
+      actorUid,
+      requireConfirmed: true,
+    });
   }
 
   return matches.map((document) => {

@@ -19,6 +19,8 @@ config({ path: path.join(PROJECT_ROOT, '.env.local') });
 
 const CSV_PATH = path.join(PROJECT_ROOT, 'supabase-export', 'bookings-final.csv');
 const COLLECTION_NAME = 'bookings';
+const PRODUCTION_PROJECT_ID = 'birdman-7e745';
+const PRODUCTION_DATABASE_ID = 'birdman-db';
 const dryRun = process.argv.includes('--dry-run');
 
 type CsvRow = Record<string, string>;
@@ -32,16 +34,39 @@ interface Summary {
 }
 
 function getAdminDb() {
+  const projectId = requiredEnv('FIREBASE_PROJECT_ID');
+  const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST?.trim();
+  const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim() ||
+    (emulatorHost ? '(default)' : PRODUCTION_DATABASE_ID);
+
+  if (emulatorHost) {
+    if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(emulatorHost)) {
+      throw new Error(`Refusing non-local Firestore emulator host: ${emulatorHost}`);
+    }
+    if (databaseId !== '(default)') {
+      throw new Error('Local booking migration must target the (default) database');
+    }
+  } else if (
+    projectId !== PRODUCTION_PROJECT_ID ||
+    databaseId !== PRODUCTION_DATABASE_ID
+  ) {
+    throw new Error(
+      `Production booking migration is pinned to ${PRODUCTION_PROJECT_ID}/${PRODUCTION_DATABASE_ID}`
+    );
+  }
+
   const existingApp = getApps()[0];
   const app = existingApp ?? initializeApp({
     credential: cert({
-      projectId: requiredEnv('FIREBASE_PROJECT_ID'),
+      projectId,
       clientEmail: requiredEnv('FIREBASE_CLIENT_EMAIL'),
       privateKey: requiredEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
     }),
   });
 
-  return getFirestore(app);
+  return databaseId === '(default)'
+    ? getFirestore(app)
+    : getFirestore(app, databaseId);
 }
 
 function requiredEnv(name: string): string {
@@ -212,9 +237,13 @@ function normalizeRow(row: CsvRow): BookingData {
   }
 
   const data: BookingData = {
+    visitorId: null,
     visitorName,
+    visitorNameLowercase: visitorName.toLowerCase(),
     phone,
+    phoneNormalized: normalizePhone(phone),
     email: email || null,
+    emailLowercase: email || null,
     adults,
     children,
     numberOfGuests: Math.max(0, numberOfGuests),
@@ -222,12 +251,26 @@ function normalizeRow(row: CsvRow): BookingData {
     bookingTime,
     status: firstValue(row, 'status') || 'confirmed',
     visited: parseBoolean(firstValue(row, 'visited')),
+    source: 'migration',
+    confirmationSent: parseBoolean(firstValue(row, 'confirmationSent', 'confirmation_sent')),
+    reminderSent: parseBoolean(firstValue(row, 'reminderSent', 'reminder_sent')),
+    reminderSentAt: null,
+    reminderClaimedAt: null,
     createdAt: parseTimestamp(firstValue(row, 'createdAt', 'created_at'), now),
     updatedAt: parseTimestamp(firstValue(row, 'updatedAt', 'updated_at'), now),
+    createdBy: null,
+    updatedBy: null,
+    cancelledAt: null,
+    cancelledBy: null,
+    isVip: false,
+    vipNotes: null,
+    schemaVersion: 2,
   };
 
   if (bookingNumber !== null) {
-    data.bookingNumber = Number.parseInt(bookingNumber, 10);
+    const numericBookingNumber = Number.parseInt(bookingNumber, 10);
+    data.bookingNumber = numericBookingNumber;
+    data.bookingCode = `#${String(numericBookingNumber).padStart(6, '0')}`;
   }
 
   return data;
@@ -257,6 +300,13 @@ async function updateBookingCounter(maxBookingNumber: number) {
 }
 
 async function run() {
+  if (
+    !dryRun &&
+    !process.env.FIRESTORE_EMULATOR_HOST &&
+    !process.argv.includes('--confirm-production')
+  ) {
+    throw new Error('Production booking migration requires --confirm-production');
+  }
   try {
     await access(CSV_PATH);
   } catch {
@@ -335,6 +385,7 @@ async function run() {
   console.log(`Inserted count: ${summary.inserted}`);
   console.log(`Skipped count: ${summary.skipped}`);
   console.log(`Failed count: ${summary.failed}`);
+  console.log('Run the booking reconciliation command after migration to rebuild bookingDays.');
 
   if (summary.failed > 0) {
     process.exitCode = 1;

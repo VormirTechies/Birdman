@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getConfirmedBookingCounts } from '@/lib/firebase/calendar-admin';
+import { indiaCalendarDate } from '@/lib/firebase/booking-capacity';
 import { getFirestoreCalendarSettings } from '@/lib/firebase/calendar-settings';
 import { requireAdmin } from '@/lib/require-admin';
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = indiaCalendarDate(new Date());
     let affectedDates: string[];
 
     switch (applyMode) {

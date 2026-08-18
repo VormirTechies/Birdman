@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendCancellationEmails } from '@/lib/email';
 import { cancelFirestoreBookingsForDates } from '@/lib/firebase/calendar-admin';
+import { indiaCalendarDate } from '@/lib/firebase/booking-capacity';
 import {
   getFirestoreCalendarSettings,
   getFutureCalendarSettingReferences,
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = indiaCalendarDate(new Date());
     const updatedBy = authResult.user.uid;
     let affectedCount = 0;
     let cancellationStart: string | null = null;
@@ -109,7 +110,11 @@ export async function POST(request: NextRequest) {
     }
 
     const cancelledBookings = cancellationStart && cancellationEnd
-      ? await cancelFirestoreBookingsForDates(cancellationStart, cancellationEnd)
+      ? await cancelFirestoreBookingsForDates(
+          cancellationStart,
+          cancellationEnd,
+          updatedBy
+        )
       : [];
     const bookingsWithEmail = cancelledBookings.filter(
       (booking) => booking.email !== null

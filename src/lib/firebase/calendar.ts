@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import {
   DEFAULT_CALENDAR_CAPACITY,
@@ -73,20 +73,18 @@ function normalizeBooking(id: string, data: FirestoreBooking) {
   }) as Record<string, unknown>;
 }
 
-async function getConfirmedBookingsForMonth(firstDay: string, lastDay: string) {
-  // Replaced full bookings scan with a date-filtered query for monthly availability.
+async function getBookingDayCounters(firstDay: string, lastDay: string) {
   const snapshot = await getAdminDb()
-    .collection('bookings')
-    .where('status', '==', 'confirmed')
-    .where('bookingDate', '>=', firstDay)
-    .where('bookingDate', '<=', lastDay)
+    .collection('bookingDays')
+    .where(FieldPath.documentId(), '>=', firstDay)
+    .where(FieldPath.documentId(), '<=', lastDay)
     .get();
-  console.log('[FIRESTORE READ]', 'getConfirmedBookingsForMonth', 'docs:', snapshot.size);
+  console.log('[FIRESTORE READ]', 'getBookingDayCounters', 'docs:', snapshot.size);
 
-  return snapshot.docs.map((document) => ({
-    id: document.id,
-    data: document.data() as FirestoreBooking,
-  }));
+  return new Map(snapshot.docs.map((document) => [
+    document.id,
+    Math.max(0, numberValue(document.data().confirmedGuests) ?? 0),
+  ]));
 }
 
 async function getConfirmedBookingsForDay(date: string) {
@@ -109,17 +107,10 @@ export async function getFirestoreMonthlyBookingStats(year: number, month: numbe
   const lastDate = new Date(year, month, 0).getDate();
   const lastDay = `${year}-${String(month).padStart(2, '0')}-${String(lastDate).padStart(2, '0')}`;
 
-  const [bookings, settings] = await Promise.all([
-    getConfirmedBookingsForMonth(firstDay, lastDay),
+  const [guestsByDate, settings] = await Promise.all([
+    getBookingDayCounters(firstDay, lastDay),
     getFirestoreCalendarSettings(firstDay, lastDay),
   ]);
-
-  const guestsByDate = new Map<string, number>();
-  for (const booking of bookings) {
-    const date = String(field(booking.data, 'bookingDate', 'booking_date') ?? '');
-
-    guestsByDate.set(date, (guestsByDate.get(date) ?? 0) + guestCount(booking.data));
-  }
 
   const settingsByDate = new Map(settings.map((setting) => [setting.date, setting]));
 
@@ -143,9 +134,10 @@ export async function getFirestoreMonthlyBookingStats(year: number, month: numbe
 }
 
 export async function getFirestoreDayDetails(date: string) {
-  const [bookings, settings] = await Promise.all([
+  const [bookings, settings, dayCounter] = await Promise.all([
     getConfirmedBookingsForDay(date),
     getFirestoreCalendarSetting(date),
+    getAdminDb().collection('bookingDays').doc(date).get(),
   ]);
 
   const dayBookings = bookings
@@ -155,10 +147,13 @@ export async function getFirestoreDayDetails(date: string) {
     );
 
   const maxCapacity = settings.maxCapacity ?? DEFAULT_CAPACITY;
-  const totalBooked = dayBookings.reduce(
+  const fallbackTotal = dayBookings.reduce(
     (total, booking) => total + (numberValue(booking.numberOfGuests) ?? 0),
     0
   );
+  const totalBooked = dayCounter.exists
+    ? Math.max(0, numberValue(dayCounter.data()?.confirmedGuests) ?? 0)
+    : fallbackTotal;
 
   return {
     date,

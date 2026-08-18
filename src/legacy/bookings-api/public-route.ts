@@ -2,16 +2,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { FieldValue, type Query } from 'firebase-admin/firestore';
-import {
-  BookingCapacityExceededError,
-  BookingCutoffError,
-  BookingDateClosedError,
-  indiaCalendarDate,
-} from '@/lib/firebase/booking-capacity';
-import { getAdminDb } from '@/lib/firebase/admin';
-import { createFirestoreBooking } from '@/lib/firebase/bookings';
-import { publicBookingSubmissionSchema } from '@/models/firestore/booking';
+import type { Query } from 'firebase-admin/firestore';
 
 console.log('[api/bookings] module loaded');
 
@@ -105,42 +96,76 @@ export async function POST(request: NextRequest) {
   try {
     console.log('[api/bookings] parsing request body');
     const body = await request.json();
-    const normalizedBody: Record<string, unknown> = {
+    const normalizedBody = {
       ...body,
       visitorName: body.visitorName ?? body.visitor_name,
+      numberOfGuests: body.numberOfGuests ?? body.number_of_guests,
       bookingDate: body.bookingDate ?? body.booking_date,
       bookingTime: body.bookingTime ?? body.booking_time,
     };
-    delete normalizedBody.visitor_name;
-    delete normalizedBody.booking_date;
-    delete normalizedBody.booking_time;
-    // Retain backward compatibility while computing the total exclusively
-    // from adults + children on the server.
-    delete normalizedBody.numberOfGuests;
-    delete normalizedBody.number_of_guests;
-    const validatedData = publicBookingSubmissionSchema.parse(normalizedBody);
+
+    console.log('[api/bookings] loading validation schema');
+    const { createBookingSchema } = await import('@/lib/validations');
+    const validatedData = createBookingSchema.parse(normalizedBody);
+
+    console.log('[api/bookings] loading Firebase Admin modules');
+    const [{ FieldValue }, { getAdminDb }] = await Promise.all([
+      import('firebase-admin/firestore'),
+      import('@/lib/firebase/admin'),
+    ]);
 
     console.log('[api/bookings] creating Firestore booking');
+    const adminDb = getAdminDb();
     const now = new Date();
-    const created = await createFirestoreBooking(validatedData, {
-      source: 'public',
-      enforceCutoff: true,
-      now,
+    const bookingRef = adminDb.collection('bookings').doc();
+    const counterRef = adminDb.collection('_counters').doc('bookings');
+    const numberOfGuests =
+      validatedData.numberOfGuests || validatedData.adults + validatedData.children;
+
+    const bookingNumber = await adminDb.runTransaction(async (transaction) => {
+      const counterSnapshot = await transaction.get(counterRef);
+      const currentNumber = counterSnapshot.exists
+        ? Number(counterSnapshot.data()?.value ?? 0)
+        : 0;
+      const nextNumber = currentNumber + 1;
+
+      transaction.set(counterRef, { value: nextNumber }, { merge: true });
+      transaction.set(bookingRef, {
+        bookingNumber: nextNumber,
+        visitorName: validatedData.visitorName,
+        phone: validatedData.phone,
+        email: validatedData.email ?? null,
+        adults: validatedData.adults,
+        children: validatedData.children,
+        numberOfGuests,
+        bookingDate: validatedData.bookingDate,
+        bookingTime: validatedData.bookingTime,
+        status: 'confirmed',
+        visited: false,
+        confirmationSent: false,
+        reminderSent: false,
+        reminderSentAt: null,
+        visitorId: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return nextNumber;
     });
 
     console.log('[api/bookings] Firestore booking created');
     const booking: BookingForEmail = {
-      id: created.id,
-      bookingNumber: created.bookingNumber,
+      id: bookingRef.id,
+      bookingNumber,
       visitorId: null,
-      visitorName: created.visitorName,
-      phone: created.phone,
-      email: created.email,
-      adults: created.adults,
-      children: created.children,
-      numberOfGuests: created.numberOfGuests,
-      bookingDate: created.bookingDate,
-      bookingTime: created.bookingTime,
+      visitorName: validatedData.visitorName,
+      phone: validatedData.phone,
+      email: validatedData.email ?? null,
+      adults: validatedData.adults,
+      children: validatedData.children,
+      numberOfGuests,
+      bookingDate: validatedData.bookingDate,
+      bookingTime: validatedData.bookingTime,
       confirmationSent: false,
       reminderSent: false,
       reminderSentAt: null,
@@ -178,7 +203,7 @@ export async function POST(request: NextRequest) {
         emailSent = emailResult.success;
 
         if (emailResult.success) {
-          await getAdminDb().collection('bookings').doc(booking.id).update({
+          await bookingRef.update({
             confirmationSent: true,
             updatedAt: FieldValue.serverTimestamp(),
           });
@@ -199,7 +224,6 @@ export async function POST(request: NextRequest) {
         booking: {
           id: booking.id,
           bookingNumber: booking.bookingNumber,
-          bookingCode: created.bookingCode,
           visitorName: booking.visitorName,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
@@ -214,28 +238,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logSafeError('[api/bookings] POST failed', error);
-
-    if (error instanceof BookingCapacityExceededError) {
-      const available = error.availableGuests;
-      return NextResponse.json(
-        {
-          success: false,
-          code: error.code,
-          error: `Only ${available} ${available === 1 ? 'seat is' : 'seats are'} available for this date.`,
-          available,
-          requested: error.requestedGuests,
-          maxCapacity: error.maxCapacity,
-        },
-        { status: 409 }
-      );
-    }
-
-    if (error instanceof BookingDateClosedError || error instanceof BookingCutoffError) {
-      return NextResponse.json(
-        { success: false, code: error.code, error: error.message },
-        { status: 409 }
-      );
-    }
 
     if (isValidationError(error)) {
       const details = (error as { issues: Array<{ path: Array<string | number>; message: string }> })
@@ -331,7 +333,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Visited must be true or false' }, { status: 400 });
     }
 
-    const today = indiaCalendarDate(new Date());
+    const today = new Date().toISOString().split('T')[0];
     const searchLower = search?.trim().toLowerCase();
     const database = getAdminDb();
     let query: Query = database.collection('bookings');
