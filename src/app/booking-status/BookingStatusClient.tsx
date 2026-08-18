@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarDays, CheckCircle2, Loader2, Search, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { availablePartySizeForSelfService } from '@/lib/booking-self-service';
 
 type BookingStatus = {
   bookingCode: string;
@@ -83,9 +84,30 @@ export function BookingStatusClient() {
   const [childrenDraft, setChildrenDraft] = useState(0);
   const [calendarDay, setCalendarDay] = useState<CalendarDay | null>(null);
   const [checkingDate, setCheckingDate] = useState(false);
+  const [actionMode, setActionMode] = useState<'none' | 'reschedule' | 'cancel'>('none');
 
-  const editable = booking?.status === 'confirmed' && booking.bookingDate >= todayString();
+  const editable = Boolean(
+    booking?.status === 'confirmed' && booking.bookingDate >= todayString()
+  );
+  const unavailableReason = booking?.status === 'cancelled'
+    ? 'This booking has already been cancelled.'
+    : booking?.status === 'completed'
+      ? 'This visit has already been completed.'
+      : booking && booking.bookingDate < todayString()
+        ? 'This visit date has passed, so online changes are unavailable.'
+        : 'This booking can no longer be changed online.';
   const totalDraftGuests = adultsDraft + childrenDraft;
+  const availableForDraft = calendarDay
+    ? availablePartySizeForSelfService({
+        calendarRemaining: calendarDay.remaining,
+        currentBookingDate: booking?.bookingDate ?? '',
+        draftDate: dateDraft,
+        currentGuests: booking?.numberOfGuests ?? 0,
+        status: booking?.status ?? '',
+      })
+    : null;
+  const exceedsAvailableCapacity = availableForDraft !== null &&
+    totalDraftGuests > availableForDraft;
 
   const normalizedCode = useMemo(
     () => bookingCode.replace(/^#/, '').trim().toUpperCase(),
@@ -115,6 +137,7 @@ export function BookingStatusClient() {
       );
       const nextBooking = data.booking as BookingStatus;
       setBooking(nextBooking);
+      setActionMode('none');
       setDateDraft(nextBooking.bookingDate);
       setAdultsDraft(nextBooking.adults);
       setChildrenDraft(nextBooking.children);
@@ -166,6 +189,7 @@ export function BookingStatusClient() {
         })
       );
       setBooking(data.booking);
+      setActionMode('none');
       setMessage('Booking updated successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update booking.');
@@ -175,9 +199,6 @@ export function BookingStatusClient() {
   };
 
   const cancelBooking = async () => {
-    const confirmed = window.confirm('Cancel this booking? This cannot be undone.');
-    if (!confirmed) return;
-
     resetNotice();
     setSaving(true);
     try {
@@ -189,6 +210,7 @@ export function BookingStatusClient() {
         })
       );
       setBooking(data.booking);
+      setActionMode('none');
       setMessage('Booking cancelled successfully.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to cancel booking.');
@@ -209,7 +231,7 @@ export function BookingStatusClient() {
             Manage Your Visit
           </h1>
           <p className="text-canopy-dark/65 mt-3 max-w-2xl">
-            Enter the booking ID from your confirmation and the phone number or email used for booking.
+            Enter the booking reference from your confirmation and the phone number or email used for booking.
           </p>
         </section>
 
@@ -217,11 +239,11 @@ export function BookingStatusClient() {
           <div className="bg-white rounded-2xl shadow-card border border-sanctuary-green/10 p-6">
             <div className="space-y-4">
               <label className="block">
-                <span className="text-sm font-semibold text-canopy-dark">Booking ID</span>
+                <span className="text-sm font-semibold text-canopy-dark">Booking Reference</span>
                 <input
                   value={bookingCode}
                   onChange={(event) => setBookingCode(event.target.value)}
-                  placeholder="Example: #002001"
+                  placeholder="Example: #000023"
                   className="mt-2 w-full rounded-xl border border-canopy-dark/10 px-4 py-3 text-sm outline-none focus:border-sanctuary-green"
                 />
               </label>
@@ -313,8 +335,61 @@ export function BookingStatusClient() {
                   </div>
                 </div>
 
-                {editable ? (
+                <div className="border-t border-canopy-dark/5 p-6">
+                  <h3 className="font-display text-xl font-bold text-canopy-dark">
+                    Manage booking
+                  </h3>
+                  <p className="mt-1 text-sm text-canopy-dark/55">
+                    Change your visit date or guest count, or cancel this booking.
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        resetNotice();
+                        setActionMode((current) =>
+                          current === 'reschedule' ? 'none' : 'reschedule'
+                        );
+                      }}
+                      disabled={!editable || saving}
+                      aria-expanded={actionMode === 'reschedule'}
+                      className="rounded-full bg-sanctuary-green hover:bg-sanctuary-green-light text-white gap-2"
+                    >
+                      <CalendarDays className="w-4 h-4" />
+                      Reschedule Booking
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        resetNotice();
+                        setActionMode((current) =>
+                          current === 'cancel' ? 'none' : 'cancel'
+                        );
+                      }}
+                      disabled={!editable || saving}
+                      aria-expanded={actionMode === 'cancel'}
+                      variant="outline"
+                      className="rounded-full border-red-200 text-red-600 hover:bg-red-50 gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Cancel Booking
+                    </Button>
+                  </div>
+                  {!editable && (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      {unavailableReason}
+                    </div>
+                  )}
+                </div>
+
+                {editable && actionMode === 'reschedule' && (
                   <div className="p-6 pt-0 space-y-5">
+                    <div className="rounded-xl border border-sanctuary-green/15 bg-sanctuary-green/5 px-4 py-3">
+                      <h4 className="font-semibold text-canopy-dark">Reschedule your visit</h4>
+                      <p className="mt-1 text-sm text-canopy-dark/60">
+                        Select a new date or update the number of visitors.
+                      </p>
+                    </div>
                     <div className="grid sm:grid-cols-3 gap-4">
                       <label className="sm:col-span-1">
                         <span className="text-sm font-semibold text-canopy-dark">New Date</span>
@@ -357,39 +432,87 @@ export function BookingStatusClient() {
                         ? 'Checking date availability...'
                         : calendarDay
                           ? calendarDay.isOpen
-                            ? `${calendarDay.remaining} slot(s) currently available on ${formatDate(dateDraft)}.`
+                            ? `${availableForDraft} visitor slot(s) available for this booking on ${formatDate(dateDraft)}.`
                             : 'This date is currently closed for bookings.'
                           : 'Choose a date to check availability.'}
                       <span className="block mt-1 font-medium text-canopy-dark">
                         Selected total: {totalDraftGuests} visitor{totalDraftGuests !== 1 ? 's' : ''}
                       </span>
+                      {exceedsAvailableCapacity && (
+                        <span className="block mt-1 font-semibold text-red-600">
+                          Only {availableForDraft} visitor slot(s) are available for this booking.
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
                       <Button
                         type="button"
                         onClick={updateBooking}
-                        disabled={saving || totalDraftGuests < 1 || totalDraftGuests > 10}
+                        disabled={
+                          saving ||
+                          totalDraftGuests < 1 ||
+                          totalDraftGuests > 10 ||
+                          exceedsAvailableCapacity ||
+                          calendarDay?.isOpen === false
+                        }
                         className="rounded-full bg-sanctuary-green hover:bg-sanctuary-green-light text-white gap-2"
                       >
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                        Save Changes
+                        Confirm Reschedule
                       </Button>
                       <Button
                         type="button"
-                        onClick={cancelBooking}
+                        onClick={() => setActionMode('none')}
                         disabled={saving}
                         variant="outline"
-                        className="rounded-full border-red-200 text-red-600 hover:bg-red-50 gap-2"
+                        className="rounded-full border-canopy-dark/15 text-canopy-dark hover:bg-morning-mist"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Cancel Booking
+                        Close
                       </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-6 pt-0 text-sm text-canopy-dark/60">
-                    This booking can no longer be changed online.
+                )}
+
+                {editable && actionMode === 'cancel' && (
+                  <div className="p-6 pt-0">
+                    <div
+                      role="region"
+                      aria-labelledby="cancel-booking-title"
+                      aria-describedby="cancel-booking-description"
+                      className="rounded-2xl border border-red-200 bg-red-50 p-5"
+                    >
+                      <h4 id="cancel-booking-title" className="font-display text-xl font-bold text-red-800">
+                        Cancel this booking?
+                      </h4>
+                      <p id="cancel-booking-description" className="mt-2 text-sm text-red-700">
+                        This will release your reserved seats and cannot be undone.
+                      </p>
+                      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <Button
+                          type="button"
+                          onClick={cancelBooking}
+                          disabled={saving}
+                          className="rounded-full bg-red-600 text-white hover:bg-red-700 gap-2"
+                        >
+                          {saving ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                          Yes, Cancel Booking
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setActionMode('none')}
+                          disabled={saving}
+                          variant="outline"
+                          className="rounded-full border-canopy-dark/15 text-canopy-dark hover:bg-white"
+                        >
+                          Keep Booking
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

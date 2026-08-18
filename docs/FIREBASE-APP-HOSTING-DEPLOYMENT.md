@@ -8,7 +8,7 @@ Next.js application on Firebase App Hosting.
 **Release status:** Release candidate — do not mark production-ready until every
 required gate and smoke test in this document has passed.
 
-**Firebase scope:** Authentication, Feedback, and Gallery.
+**Firebase scope:** Authentication, Feedback, Gallery, Bookings, and Calendar.
 
 ## v1.0 scope and acceptance
 
@@ -19,10 +19,14 @@ required gate and smoke test in this document has passed.
 | Feedback | `birdman-db/feedback` | Public submission/listing, moderation, cursor pagination, recommendation limit, and homepage Visitor Reviews |
 | Gallery metadata | `birdman-db/gallery` | Public/admin cursor listing and metadata management |
 | Gallery media | Firebase Storage `gallery/public/**` | Optimized display WebP, thumbnail WebP, upload, public read, and deletion |
+| Bookings | `birdman-db/bookings` | Public/admin creation, self-service changes, cancellation, listing, and status management |
+| Booking capacity | `birdman-db/bookingDays/{yyyy-mm-dd}` | Transactional confirmed-guest totals used to prevent overbooking |
+| Booking numbers | `birdman-db/_counters/bookings` | Monotonic server-owned booking-number allocation |
+| Calendar | `birdman-db/calendar_settings` | Availability settings, monthly capacity totals, day details, and bulk closures |
 
 The following are deliberately outside this Firebase v1.0 cutover:
 
-- Bookings, visitors, calendar, email, cron, and push-notification migrations.
+- Visitors, email transport, cron, and push-notification migrations.
 - Historical Supabase gallery import while the source quota issue remains.
 - Meiyazhagan and Story video migration.
 - A Firebase-hosted gallery hero video; the local fallback remains active.
@@ -54,7 +58,8 @@ Rollback owner: ______________________________
 ## 1. Review and commit the working tree
 
 Review all intended changes before committing. The v1.0 commit must contain the
-Authentication, Feedback, and Gallery Firebase migrations together.
+Authentication, Feedback, Gallery, Bookings, and Calendar Firebase migrations
+together.
 
 ```powershell
 git status
@@ -194,10 +199,14 @@ npx firebase-tools firestore:indexes --database=birdman-db --project birdman-7e7
 
 Wait until required indexes are ready before rolling out the application.
 
-Confirm both composite indexes are present and ready:
+Confirm the required composite indexes are present and ready:
 
 - `feedback`: `status ASC`, `createdAt DESC`, `__name__ DESC`.
 - `gallery`: `uploadedAt DESC`, `__name__ DESC`.
+- `bookings`: `status ASC`, `bookingDate ASC`.
+- `bookings`: `status ASC`, `createdAt DESC`.
+- `bookings`: `visited ASC`, `bookingDate ASC`.
+- `bookings`: `bookingDate ASC`, `bookingTime ASC`.
 
 Also confirm the configured single-field exemptions for private/large fields,
 including feedback `email` and `message`, and gallery caption/Storage paths.
@@ -383,7 +392,55 @@ Verify the result in Firebase Console:
 Do not run the deferred Supabase migration until the source quota problem has
 been resolved.
 
-## 10. Clean the production source
+## 10. Reconcile booking capacity before cutover
+
+The booking APIs reserve and release seats transactionally through
+`bookingDays/{date}`. Existing booking documents must therefore be reconciled
+before the Firebase-backed application is deployed. This step is mandatory even
+when the migration/import command reports success.
+
+If legacy bookings still need to be imported, run the guarded migration first.
+Use its dry-run mode and review its report before allowing production writes.
+After import, audit the derived counters without writing:
+
+```powershell
+Remove-Item Env:FIRESTORE_EMULATOR_HOST -ErrorAction SilentlyContinue
+npm run reconcile:bookings:production -- --dry-run
+```
+
+Review every reported date and the proposed booking-number counter. Then apply
+the repair explicitly:
+
+```powershell
+npm run reconcile:bookings:production -- --confirm-production
+```
+
+The production command is pinned to project `birdman-7e745` and database
+`birdman-db`, refuses an emulator host, and will not write without
+`--confirm-production`. It derives capacity only from `status: "confirmed"`
+bookings, never decreases `_counters/bookings.value`, and backfills the
+server-owned six-digit public `bookingCode` (for example, `#000023`) from each
+numeric `bookingNumber`.
+
+Use this order for the live cutover:
+
+1. Deploy Firestore rules and indexes, and wait for all indexes to become ready.
+2. Import legacy booking documents if required.
+3. Run the production reconciliation and confirm no unexpected differences.
+4. Deploy the App Hosting application.
+5. Immediately run the dry-run audit again; it should report zero differences.
+
+For local verification, start the emulator and run:
+
+```powershell
+npm run reconcile:bookings:emulator -- --dry-run
+npm run reconcile:bookings:emulator
+```
+
+Do not commit booking CSV exports, reconciliation output containing visitor
+details, or generated emulator persistence data.
+
+## 11. Clean the production source
 
 App Hosting builds from the Git repository. Files ignored by Git remain local,
 but tracked files are included in the source checkout used for the build even
@@ -563,7 +620,7 @@ Finally, review the unrelated uncommitted modification to
 `scripts/seed-auth-users-emulator.ts` and confirm it is intentional before
 including it in the deployment commit.
 
-## 11. Run final validation
+## 12. Run final validation
 
 Run the complete local checks after all configuration and code changes:
 
@@ -589,6 +646,7 @@ In a second terminal:
 npm run seed:auth:emulator
 npm run seed:feedback:emulator
 npm run seed:gallery:emulator
+npm run reconcile:bookings:emulator
 ```
 
 Check:
@@ -602,6 +660,10 @@ http://127.0.0.1:7001/api/feedback?limit=10
 http://127.0.0.1:7001/gallery
 http://127.0.0.1:7001/api/gallery?limit=15
 http://127.0.0.1:7001/admin/gallery
+http://127.0.0.1:7001/booking
+http://127.0.0.1:7001/booking-status
+http://127.0.0.1:7001/admin/bookings
+http://127.0.0.1:7001/admin/calendar
 ```
 
 In the emulator, complete one full workflow for each slice:
@@ -612,8 +674,12 @@ In the emulator, complete one full workflow for each slice:
 3. Upload, edit, list, view, and delete one gallery image.
 4. Sign in as a seeded non-admin and verify protected APIs return `403`.
 5. Verify direct Firestore reads/writes and direct Storage writes are denied.
+6. With a date at 97/100 seats, request ten guests and verify the API/UI reports
+   exactly three available seats without creating a booking.
+7. Create, move, and cancel a booking; verify both affected `bookingDays`
+   counters and the admin calendar totals after every mutation.
 
-## 12. Trigger the App Hosting rollout
+## 13. Trigger the App Hosting rollout
 
 If the backend uses GitHub automatic rollouts, push the reviewed commit to the
 configured live branch:
@@ -631,7 +697,7 @@ Console and deploy the exact reviewed commit.
 
 Reference: [Manage App Hosting rollouts](https://firebase.google.com/docs/app-hosting/rollouts)
 
-## 13. Production smoke tests
+## 14. Production smoke tests
 
 After the rollout completes, verify all of the following:
 
@@ -678,13 +744,35 @@ After the rollout completes, verify all of the following:
 - Admin upload, edit, pagination, scroll-to-top, and delete work.
 - New uploads create two WebP objects and one Firestore document.
 
+### Bookings and calendar
+
+- A public booking creates one `bookings` document, increments the matching
+  `bookingDays/{date}.confirmedGuests`, and allocates a unique booking number.
+- The API, confirmation page, email, and booking-status flow show the same
+  six-digit reference, such as `#000023`; Firestore retains the numeric counter
+  alongside the formatted `bookingCode`.
+- A request larger than the remaining capacity receives `409` and returns the
+  exact number of available seats; no partial or oversized booking is created.
+- Concurrent requests cannot push a date beyond its configured capacity.
+- Self-service rescheduling releases the old date and reserves the new date in
+  the same transaction.
+- Self-service and administrator cancellation release capacity exactly once;
+  repeated cancellation cannot make a counter negative.
+- Administrator create, edit, status change, and delete keep counters aligned.
+- A calendar bulk closure cancels affected confirmed bookings through the same
+  transactional capacity path.
+- Monthly calendar totals and day availability match `bookingDays`, while day
+  booking lists contain only the corresponding confirmed bookings.
+- A post-smoke-test production reconciliation dry run reports zero differences.
+
 ### Security and privacy
 
 - Direct client Firestore operations remain denied.
 - Direct client Storage writes remain denied.
 - Anonymous Storage reads succeed only for `gallery/public/**`.
-- Protected Auth, Feedback, and Gallery administrator APIs return `401` for a
-  missing/invalid token and `403` for an authenticated non-admin.
+- Protected Auth, Feedback, Gallery, Booking, and Calendar administrator APIs
+  return `401` for a missing/invalid token and `403` for an authenticated
+  non-admin.
 - Feedback email, gallery Storage paths/checksums/uploader details, and
   `adminUsers` documents are not exposed by public APIs.
 
@@ -692,7 +780,7 @@ Keep `GALLERY_HERO_VIDEO_URL` unset until the fixed hero video has been copied
 to Firebase Storage. The public gallery will use its local fallback image in the
 meantime.
 
-## 14. Rollback plan
+## 15. Rollback plan
 
 If a critical v1.0 smoke test fails:
 
@@ -710,11 +798,11 @@ An App Hosting rollback changes application code but does not roll back
 Firestore, Authentication, or Storage data. Any data correction must therefore
 be reviewed and executed separately.
 
-## 15. Release acceptance and tag
+## 16. Release acceptance and tag
 
 The release is accepted only after every Authentication, Feedback, Gallery,
-Security, and Privacy smoke test passes. Complete the release approval record at
-the top of this document, then tag the exact deployed commit:
+Booking, Calendar, Security, and Privacy smoke test passes. Complete the release
+approval record at the top of this document, then tag the exact deployed commit:
 
 ```powershell
 git tag -a v1.0.0 -m "Firebase migration v1.0 production release"
@@ -724,7 +812,7 @@ git push origin v1.0.0
 Do not create or push the tag before the deployed commit has passed production
 smoke tests.
 
-## 16. Post-deployment monitoring
+## 17. Post-deployment monitoring
 
 - Review the App Hosting rollout and Cloud Build logs.
 - Review Cloud Run errors for server-side API failures.
@@ -734,6 +822,8 @@ smoke tests.
 - Review feedback submission rate-limit analytics and moderation errors.
 - Review gallery image-processing failures, Storage egress, and orphaned object
   warnings.
+- Run the booking reconciliation in dry-run mode after rollout and after any
+  manual production data repair; investigate any counter drift immediately.
 - Configure budget alerts and review Firebase usage regularly.
 - Retain Supabase media and Postgres gallery records until the deferred
   migration has been verified and formally accepted.

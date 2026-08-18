@@ -1,29 +1,18 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { z, ZodError } from 'zod';
 import type { Booking } from '@/lib/db/schema';
 import { getAdminDb } from '@/lib/firebase/admin';
-import {
-  BookingCapacityExceededError,
-  BookingCounterIntegrityError,
-  BookingCutoffError,
-  BookingDateClosedError,
-  BookingNotEditableError,
-  BookingNotFoundError,
-} from '@/lib/firebase/booking-capacity';
-import {
-  cancelFirestoreBooking,
-  updateFirestoreBooking,
-} from '@/lib/firebase/bookings';
+import { getFirestoreDayDetails } from '@/lib/firebase/calendar';
 import { sendBookingCancellation, sendRescheduleNotification } from '@/lib/email';
 import { getPublicBookingCode, parsePublicBookingNumber } from '@/lib/booking-number';
 
 const lookupSchema = z.object({
   bookingCode: z.string().trim().min(1).max(12),
   contact: z.string().trim().min(5).max(255),
-}).strict();
+});
 
 const patchSchema = lookupSchema.extend({
   bookingDate: z
@@ -32,7 +21,7 @@ const patchSchema = lookupSchema.extend({
     .optional(),
   adults: z.number().int().min(1).max(10).optional(),
   children: z.number().int().min(0).max(10).optional(),
-}).strict();
+});
 
 type FirestoreBookingData = Record<string, unknown>;
 
@@ -119,6 +108,38 @@ function sanitizeBooking(booking: Booking) {
   };
 }
 
+function isPastVisit(booking: Booking) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const visitDate = new Date(`${booking.bookingDate}T00:00:00`);
+  return visitDate < today;
+}
+
+function assertEditable(booking: Booking) {
+  if (booking.status !== 'confirmed') {
+    return 'Only confirmed bookings can be changed.';
+  }
+  if (isPastVisit(booking)) {
+    return 'Past bookings cannot be changed.';
+  }
+  return null;
+}
+
+function isAllowedDate(date: string, startTime: string) {
+  const bookingDate = new Date(`${date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (bookingDate < today) return false;
+  if (bookingDate > today) return true;
+
+  const [hour, minute] = startTime.split(':').map(Number);
+  const sessionStart = new Date();
+  sessionStart.setHours(hour || 16, minute || 30, 0, 0);
+  const oneHourBefore = new Date(sessionStart.getTime() - 60 * 60 * 1000);
+  return new Date() < oneHourBefore;
+}
+
 async function findVerifiedBooking(bookingCode: string, contact: string) {
   const code = normalizeBookingCode(bookingCode);
   const bookingNumber = parsePublicBookingNumber(code);
@@ -144,6 +165,53 @@ async function findVerifiedBooking(bookingCode: string, contact: string) {
   return verified ? booking : null;
 }
 
+async function validateCapacity(
+  booking: Booking,
+  targetDate: string,
+  adults: number,
+  children: number
+) {
+  const details = await getFirestoreDayDetails(targetDate);
+  const settings = details.settings as { isOpen?: boolean; startTime?: string; maxCapacity?: number };
+  const startTime = settings.startTime ?? '16:30:00';
+  const maxCapacity = settings.maxCapacity ?? 100;
+
+  if (settings.isOpen === false) {
+    return { ok: false as const, error: 'Selected date is not open for bookings.' };
+  }
+
+  if (!isAllowedDate(targetDate, startTime)) {
+    return {
+      ok: false as const,
+      error: 'Selected date is no longer available for visitor changes.',
+    };
+  }
+
+  const requestedGuests = adults + children;
+  if (requestedGuests > 10) {
+    return { ok: false as const, error: 'Total guests cannot exceed 10.' };
+  }
+
+  const dayBookings = details.bookings as Array<{ id?: string; adults?: number; children?: number; numberOfGuests?: number }>;
+  const bookedExcludingCurrent = dayBookings
+    .filter((dayBooking) => dayBooking.id !== booking.id)
+    .reduce(
+      (sum, dayBooking) =>
+        sum + numberValue(dayBooking.numberOfGuests, numberValue(dayBooking.adults) + numberValue(dayBooking.children)),
+      0
+    );
+
+  const available = maxCapacity - bookedExcludingCurrent;
+  if (requestedGuests > available) {
+    return {
+      ok: false as const,
+      error: `Only ${Math.max(0, available)} visitor slot(s) are available on this date.`,
+    };
+  }
+
+  return { ok: true as const, startTime };
+}
+
 function validationError(error: ZodError) {
   return NextResponse.json(
     {
@@ -153,59 +221,6 @@ function validationError(error: ZodError) {
     },
     { status: 400 }
   );
-}
-
-interface CapacityErrorContext {
-  currentDate: string;
-  currentGuests: number;
-  targetDate: string;
-  requestedGuests: number;
-}
-
-function mutationError(error: unknown, context?: CapacityErrorContext) {
-  if (error instanceof BookingCapacityExceededError) {
-    const available = error.availableGuests + (
-      context && context.targetDate === context.currentDate
-        ? context.currentGuests
-        : 0
-    );
-    return NextResponse.json(
-      {
-        success: false,
-        code: error.code,
-        error: `Only ${available} ${available === 1 ? 'seat is' : 'seats are'} available for this date.`,
-        available,
-        requested: context?.requestedGuests ?? error.requestedGuests,
-        maxCapacity: error.maxCapacity,
-      },
-      { status: 409 }
-    );
-  }
-  if (error instanceof BookingDateClosedError || error instanceof BookingCutoffError) {
-    return NextResponse.json(
-      { success: false, code: error.code, error: error.message },
-      { status: 409 }
-    );
-  }
-  if (error instanceof BookingNotEditableError) {
-    return NextResponse.json(
-      { success: false, code: error.code, error: error.message },
-      { status: 409 }
-    );
-  }
-  if (error instanceof BookingNotFoundError) {
-    return NextResponse.json(
-      { success: false, code: error.code, error: 'No matching booking found.' },
-      { status: 404 }
-    );
-  }
-  if (error instanceof BookingCounterIntegrityError) {
-    return NextResponse.json(
-      { success: false, code: error.code, error: error.message },
-      { status: 400 }
-    );
-  }
-  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -229,7 +244,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  let capacityContext: CapacityErrorContext | undefined;
   try {
     const body = patchSchema.parse(await request.json());
     const booking = await findVerifiedBooking(body.bookingCode, body.contact);
@@ -241,48 +255,45 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const editError = assertEditable(booking);
+    if (editError) {
+      return NextResponse.json({ success: false, error: editError }, { status: 400 });
+    }
+
     const nextDate = body.bookingDate ?? booking.bookingDate;
     const nextAdults = body.adults ?? booking.adults;
     const nextChildren = body.children ?? booking.children;
-    if (nextAdults + nextChildren > 10) {
-      return NextResponse.json(
-        { success: false, error: 'Total guests cannot exceed 10.' },
-        { status: 400 }
-      );
+    const capacity = await validateCapacity(booking, nextDate, nextAdults, nextChildren);
+
+    if (!capacity.ok) {
+      return NextResponse.json({ success: false, error: capacity.error }, { status: 400 });
     }
-    capacityContext = {
-      currentDate: booking.bookingDate,
-      currentGuests: booking.numberOfGuests,
-      targetDate: nextDate,
-      requestedGuests: nextAdults + nextChildren,
-    };
 
     const oldBooking = {
       bookingDate: booking.bookingDate,
       bookingTime: booking.bookingTime,
     };
-    const mutation = {
-      adults: nextAdults,
-      children: nextChildren,
-      ...(nextDate !== booking.bookingDate ? { bookingDate: nextDate } : {}),
-    };
-    const transactionResult = await updateFirestoreBooking(
-      booking.id,
-      mutation,
-      {
-        enforceCutoff: true,
-        requireConfirmed: true,
-        requireEditableVisit: true,
-      }
-    );
+    const nextBookingTime = body.bookingDate ? capacity.startTime : booking.bookingTime;
+
+    await getAdminDb()
+      .collection('bookings')
+      .doc(booking.id)
+      .update({
+        bookingDate: nextDate,
+        bookingTime: nextBookingTime,
+        adults: nextAdults,
+        children: nextChildren,
+        numberOfGuests: nextAdults + nextChildren,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
     const updated: Booking = {
       ...booking,
-      bookingDate: transactionResult.bookingDate,
-      bookingTime: transactionResult.bookingTime,
-      adults: transactionResult.adults,
-      children: transactionResult.children,
-      numberOfGuests: transactionResult.numberOfGuests,
+      bookingDate: nextDate,
+      bookingTime: nextBookingTime,
+      adults: nextAdults,
+      children: nextChildren,
+      numberOfGuests: nextAdults + nextChildren,
       updatedAt: new Date(),
     };
 
@@ -299,8 +310,6 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof ZodError) return validationError(error);
-    const response = mutationError(error, capacityContext);
-    if (response) return response;
     console.error('[Self Service Booking] Update failed:', error);
     return NextResponse.json({ success: false, error: 'Failed to update booking.' }, { status: 500 });
   }
@@ -318,10 +327,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await cancelFirestoreBooking(booking.id, {
-      requireConfirmed: true,
-      requireNonPastVisit: true,
-    });
+    const editError = assertEditable(booking);
+    if (editError) {
+      return NextResponse.json({ success: false, error: editError }, { status: 400 });
+    }
+
+    await getAdminDb()
+      .collection('bookings')
+      .doc(booking.id)
+      .update({
+        status: 'cancelled',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
 
     const cancelled: Booking = {
       ...booking,
@@ -340,8 +357,6 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof ZodError) return validationError(error);
-    const response = mutationError(error);
-    if (response) return response;
     console.error('[Self Service Booking] Cancellation failed:', error);
     return NextResponse.json({ success: false, error: 'Failed to cancel booking.' }, { status: 500 });
   }

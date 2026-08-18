@@ -7,15 +7,7 @@ import {
 } from 'firebase-admin/firestore';
 import type { Booking } from '@/lib/db/schema';
 import { getAdminDb } from '@/lib/firebase/admin';
-import {
-  BookingCapacityExceededError,
-  BookingCutoffError,
-  BookingDateClosedError,
-  BookingNotEditableError,
-  indiaCalendarDate,
-} from '@/lib/firebase/booking-capacity';
-import { createFirestoreBooking } from '@/lib/firebase/bookings';
-import { adminBookingCreationSchema } from '@/models/firestore/booking';
+import { createAdminBookingSchema } from '@/lib/validations';
 import { sendBookingConfirmation } from '@/lib/email';
 import { sendPushToAllAdmins } from '@/lib/push';
 import { requireAdmin } from '@/lib/require-admin';
@@ -60,7 +52,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Visited must be true or false' }, { status: 400 });
     }
 
-    const today = indiaCalendarDate(new Date());
+    const today = new Date().toISOString().split('T')[0];
     const effectiveDate = isToday ? today : date;
     const effectiveMinDate = effectiveDate || showPast ? minDate : (minDate ?? today);
 
@@ -255,29 +247,60 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAdmin(request);
     if (!authResult.user) return authResult.response;
 
+    // Parse and validate request body with admin schema (relaxed rules)
     const body = await request.json();
-    const validatedData = adminBookingCreationSchema.parse(body);
+    const validatedData = createAdminBookingSchema.parse(body);
+    const adminDb = getAdminDb();
+    const bookingRef = adminDb.collection('bookings').doc();
+    const counterRef = adminDb.collection('_counters').doc('bookings');
     const now = new Date();
-    const created = await createFirestoreBooking(validatedData, {
-      source: 'admin',
-      actorUid: authResult.user.uid,
-      enforceCutoff: false,
-      requireNonPastVisit: true,
-      now,
+    const numberOfGuests = validatedData.adults + validatedData.children;
+
+    const bookingNumber = await adminDb.runTransaction(async (transaction) => {
+      const counterSnapshot = await transaction.get(counterRef);
+      const currentNumber = counterSnapshot.exists
+        ? Number(counterSnapshot.data()?.value ?? 0)
+        : 0;
+      const nextNumber = currentNumber + 1;
+
+      transaction.set(counterRef, { value: nextNumber }, { merge: true });
+      transaction.set(bookingRef, {
+        bookingNumber: nextNumber,
+        visitorName: validatedData.visitorName,
+        phone: validatedData.phone,
+        email: validatedData.email || null,
+        adults: validatedData.adults,
+        children: validatedData.children,
+        numberOfGuests,
+        bookingDate: validatedData.bookingDate,
+        bookingTime: validatedData.bookingTime,
+        status: 'confirmed',
+        visited: false,
+        confirmationSent: false,
+        reminderSent: false,
+        reminderSentAt: null,
+        visitorId: null,
+        isVip: false,
+        vipNotes: null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return nextNumber;
     });
 
     const booking: Booking = {
-      id: created.id,
-      bookingNumber: created.bookingNumber,
+      id: bookingRef.id,
+      bookingNumber,
       visitorId: null,
-      visitorName: created.visitorName,
-      phone: created.phone,
-      email: created.email,
-      adults: created.adults,
-      children: created.children,
-      numberOfGuests: created.numberOfGuests,
-      bookingDate: created.bookingDate,
-      bookingTime: created.bookingTime,
+      visitorName: validatedData.visitorName,
+      phone: validatedData.phone,
+      email: validatedData.email || null,
+      adults: validatedData.adults,
+      children: validatedData.children,
+      numberOfGuests,
+      bookingDate: validatedData.bookingDate,
+      bookingTime: validatedData.bookingTime,
       confirmationSent: false,
       reminderSent: false,
       reminderSentAt: null,
@@ -293,17 +316,13 @@ export async function POST(request: NextRequest) {
       : `${booking.adults} guest(s)`;
 
     // Notify All Admins
-    try {
-      await sendPushToAllAdmins({
-        title: 'Walk-in Visitor Registered',
-        body: `${booking.visitorName} (${guestCount}) checked in for ${booking.bookingDate}.`,
-        url: '/admin',
-        visitorName: booking.visitorName,
-        bookingDate: booking.bookingDate,
-      });
-    } catch (pushError) {
-      console.error('[Admin API] Push notification failed, but booking created:', pushError);
-    }
+    await sendPushToAllAdmins({
+      title: 'Walk-in Visitor Registered',
+      body: `${booking.visitorName} (${guestCount}) checked in for ${booking.bookingDate}.`,
+      url: '/admin',
+      visitorName: booking.visitorName,
+      bookingDate: booking.bookingDate,
+    });
 
     // Send confirmation email only if email is provided (non-blocking)
     let emailSent = false;
@@ -313,7 +332,7 @@ export async function POST(request: NextRequest) {
         emailSent = emailResult.success;
 
         if (emailResult.success) {
-          await getAdminDb().collection('bookings').doc(booking.id).update({
+          await bookingRef.update({
             confirmationSent: true,
             updatedAt: FieldValue.serverTimestamp(),
           });
@@ -331,7 +350,6 @@ export async function POST(request: NextRequest) {
         booking: {
           id: booking.id,
           bookingNumber: booking.bookingNumber,
-          bookingCode: created.bookingCode,
           visitorName: booking.visitorName,
           phone: booking.phone,
           email: booking.email,
@@ -362,32 +380,6 @@ export async function POST(request: NextRequest) {
           })),
         },
         { status: 400 }
-      );
-    }
-
-    if (error instanceof BookingCapacityExceededError) {
-      const available = error.availableGuests;
-      return NextResponse.json(
-        {
-          success: false,
-          code: error.code,
-          error: `Only ${available} ${available === 1 ? 'seat is' : 'seats are'} available for this date.`,
-          available,
-          requested: error.requestedGuests,
-          maxCapacity: error.maxCapacity,
-        },
-        { status: 409 }
-      );
-    }
-
-    if (
-      error instanceof BookingDateClosedError ||
-      error instanceof BookingCutoffError ||
-      error instanceof BookingNotEditableError
-    ) {
-      return NextResponse.json(
-        { success: false, code: error.code, error: error.message },
-        { status: 409 }
       );
     }
 

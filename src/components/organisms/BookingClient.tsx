@@ -145,6 +145,7 @@ export function BookingClient() {
   const [bookingResult, setBookingResult] = useState<{
     id: string;
     bookingNumber?: number;
+    bookingCode?: string;
     date: string;
     adults: number;
     children: number;
@@ -287,6 +288,9 @@ export function BookingClient() {
     if (formData.adults < 1) errs.adults = 'At least 1 adult is required';
     if (formData.children < 0) errs.children = 'Number of children cannot be negative';
     if ((formData.adults + formData.children) > 10) errs.adults = 'Total guests cannot exceed 10';
+    if (formData.date && selectedDateData && formData.guests > remaining) {
+      errs.adults = `Only ${remaining} ${remaining === 1 ? 'seat is' : 'seats are'} available for this date`;
+    }
     return errs;
   };
 
@@ -324,20 +328,55 @@ export function BookingClient() {
       });
       const result = await readApiJson<{
         success?: boolean;
+        code?: string;
         error?: string;
+        available?: number;
         details?: Array<{ message?: string }>;
         booking?: {
           id?: string;
           bookingNumber?: number;
+          bookingCode?: string;
         };
         id?: string;
       }>(response);
       if (!response.ok) {
+        if (
+          result.code === 'BOOKING_CAPACITY_EXCEEDED' &&
+          typeof result.available === 'number' &&
+          selectedDateStr
+        ) {
+          setCalendarData((previous) => {
+            const selected = previous[selectedDateStr];
+            if (!selected) return previous;
+            const bookingCount = Math.max(0, selected.maxCapacity - result.available!);
+            return {
+              ...previous,
+              [selectedDateStr]: {
+                ...selected,
+                bookingCount,
+                remaining: result.available!,
+                percentage: selected.maxCapacity > 0
+                  ? Math.round((bookingCount / selected.maxCapacity) * 100)
+                  : 100,
+              },
+            };
+          });
+          setErrors((previous) => ({
+            ...previous,
+            adults: result.error ?? `Only ${result.available} seats are available`,
+          }));
+          setStep(1);
+          void fetchCalendar(calendarMonth);
+          requestAnimationFrame(() => {
+            stepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
         throw new Error(result.error || result.details?.[0]?.message || 'Failed to confirm booking');
       }
       setBookingResult({
         id: result.booking?.id ?? result.id ?? '',
         bookingNumber: result.booking?.bookingNumber,
+        bookingCode: result.booking?.bookingCode,
         date: formData.date ? format(formData.date, 'PPP') : '',
         adults: formData.adults,
         children: formData.children,
@@ -989,9 +1028,10 @@ export function BookingClient() {
                       Booking ID
                     </div>
                     <div className="font-mono font-bold text-lg text-sanctuary-green tracking-wider">
-                      {bookingResult.bookingNumber
-                        ? formatBookingNumber(bookingResult.bookingNumber)
-                        : `#${bookingResult.id.slice(-8).toUpperCase()}`}
+                      {bookingResult.bookingCode ??
+                        (bookingResult.bookingNumber
+                          ? formatBookingNumber(bookingResult.bookingNumber)
+                          : `#${bookingResult.id.slice(-8).toUpperCase()}`)}
                     </div>
                   </div>
                   <div className="bg-morning-mist rounded-xl p-5 text-center">

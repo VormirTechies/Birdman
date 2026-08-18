@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { AggregateField, type Query, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
-import { indiaCalendarDate } from '@/lib/firebase/booking-capacity';
 import { requireAdmin } from '@/lib/require-admin';
 
 // GET /api/bookings/stats - Get aggregated booking statistics.
@@ -48,12 +47,6 @@ function sumBookingDocuments(documents: QueryDocumentSnapshot[]) {
   }, 0);
 }
 
-function addCalendarDays(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-
 async function sumTotalVisitors(bookings: Query) {
   try {
     const [confirmedVisitors, completedVisitors] = await Promise.all([
@@ -90,9 +83,13 @@ export async function GET(request: NextRequest) {
     const authResult = await requireAdmin(request);
     if (!authResult.user) return authResult.response;
 
-    const today = indiaCalendarDate(new Date());
-    const next30Str = addCalendarDays(today, 30);
-    const last30Str = addCalendarDays(today, -30);
+    const today = new Date().toISOString().split('T')[0];
+    const next30 = new Date();
+    next30.setDate(next30.getDate() + 30);
+    const next30Str = next30.toISOString().split('T')[0];
+    const last30 = new Date();
+    last30.setDate(last30.getDate() - 30);
+    const last30Str = last30.toISOString().split('T')[0];
 
     const bookings = getAdminDb().collection('bookings');
 
