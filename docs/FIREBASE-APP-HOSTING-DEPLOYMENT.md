@@ -26,7 +26,9 @@ required gate and smoke test in this document has passed.
 
 The following are deliberately outside this Firebase v1.0 cutover:
 
-- Visitors, email transport, cron, and push-notification migrations.
+- Email delivery hardening, Firestore reminder scheduling, and push-notification
+  migration. These are tracked as Phase 2 in
+  [FIREBASE-NOTIFICATIONS-ROADMAP.md](./FIREBASE-NOTIFICATIONS-ROADMAP.md).
 - Historical Supabase gallery import while the source quota issue remains.
 - Meiyazhagan and Story video migration.
 - A Firebase-hosted gallery hero video; the local fallback remains active.
