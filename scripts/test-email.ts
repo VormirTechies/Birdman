@@ -7,7 +7,7 @@ async function main() {
   // Load lib after env config is fully applied
   const { sendBookingConfirmation } = await import("../src/lib/email");
   
-  const testEmail = "vigneshwaran7797@gmail.com";
+  const testEmail = " @gmail.com";
   
   console.log(`Preparing test emerald-flight confirmation for: ${testEmail}...`);
 

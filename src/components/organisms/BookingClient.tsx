@@ -1079,14 +1079,12 @@ export function BookingClient() {
 
                 {/* Google Map */}
                 <div className="rounded-2xl overflow-hidden shadow-card mb-6">
-                  <iframe
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3886.1364560756776!2d80.26628887588147!3d13.076882212351234!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a52661ab209a803%3A0x6fd7d455d3f23a7e!2s2%2F3%2C%20Iyya%20Mudali%20St%2C%20Adikesavarpuram%2C%20Chintadripet%2C%20Chennai%2C%20Tamil%20Nadu%20600002!5e0!3m2!1sen!2sin!4v1711674374321!5m2!1sen!2sin"
+                  <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d3193.0622329167613!2d80.2679461!3d13.0785049!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a52670004e61deb%3A0xb1a085abdc4fe601!2sParrot%20sudarson!5e1!3m2!1sen!2sin!4v1787771217059!5m2!1sen!2sin" 
                     className="w-full h-52 border-0"
                     allowFullScreen={true}
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    title="Birdman of Chennai location map"
-                  />
+                    loading="lazy" 
+                    referrerPolicy ="no-referrer-when-downgrade" 
+                    title="Birdman of Chennai location map"/>
                 </div>
 
                 {/* Action buttons */}
