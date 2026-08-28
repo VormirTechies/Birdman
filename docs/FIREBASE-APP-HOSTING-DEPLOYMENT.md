@@ -647,6 +647,7 @@ In a second terminal:
 ```powershell
 npm run seed:auth:emulator
 npm run seed:feedback:emulator
+npm run seed:calendar:emulator
 npm run seed:gallery:emulator
 npm run reconcile:bookings:emulator
 ```

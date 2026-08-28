@@ -15,6 +15,7 @@
     "db:seed": "tsx src/lib/db/seed.ts",
     "seed:bookings": "tsx scripts/seed-bookings.ts",
     "seed:feedback:emulator": "tsx scripts/seed-feedback-emulator.ts",
+    "seed:calendar:emulator": "tsx scripts/seed-calendar-emulator.ts",
     "seed:gallery:emulator": "tsx scripts/seed-gallery-firebase.ts --emulator",
     "seed:gallery:production": "tsx scripts/seed-gallery-firebase.ts --production",
     "seed:auth:emulator": "tsx scripts/seed-auth-users-emulator.ts",

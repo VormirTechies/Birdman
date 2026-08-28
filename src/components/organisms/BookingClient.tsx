@@ -48,7 +48,7 @@ import { formatBookingNumber } from '@/lib/booking-number';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type DayStatus = 'available' | 'partial' | 'full' | 'blocked' | 'past';
+type DayStatus = 'available' | 'partial' | 'full' | 'blocked' | 'past' | 'unknown';
 
 interface CalendarDay {
   date: string;
@@ -129,6 +129,7 @@ export function BookingClient() {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [calendarData, setCalendarData] = useState<Record<string, CalendarDay>>({});
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState('');
   const [formData, setFormData] = useState<FormData>({
     date: null,
     name: '',
@@ -164,18 +165,24 @@ export function BookingClient() {
   // ── Fetch calendar data ────────────────────────────────────────────────────
   const fetchCalendar = useCallback(async (month: Date) => {
     setCalendarLoading(true);
+    setCalendarError('');
     try {
       const monthStr = format(month, 'yyyy-MM');
-      const res = await fetch(`/api/calendar?month=${monthStr}`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/calendar?month=${monthStr}`, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error('Availability request failed');
+      }
       const data = await readApiJson<CalendarDay[]>(res);
+      if (!Array.isArray(data)) {
+        throw new Error('Availability response was invalid');
+      }
       const map: Record<string, CalendarDay> = {};
       data.forEach((d) => {
         map[d.date] = d;
       });
       setCalendarData((prev) => ({ ...prev, ...map }));
     } catch {
-      // Silently degrade — calendar shows all dates as available
+      setCalendarError('Live availability could not be loaded. Please retry before selecting a date.');
     } finally {
       setCalendarLoading(false);
     }
@@ -188,8 +195,15 @@ export function BookingClient() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const selectedDateStr = formData.date ? format(formData.date, 'yyyy-MM-dd') : null;
   const selectedDateData = selectedDateStr ? calendarData[selectedDateStr] : null;
-  const remaining = selectedDateData?.remaining ?? 100;
+  const remaining = selectedDateData?.remaining ?? 0;
   const sessionTime = selectedDateData?.startTime ?? '16:30:00';
+  const totalGuests = formData.adults + formData.children;
+  const seatsAfterBooking = selectedDateData
+    ? Math.max(0, selectedDateData.remaining - totalGuests)
+    : null;
+  const isLowAvailability = selectedDateData
+    ? selectedDateData.remaining <= Math.max(10, Math.ceil(selectedDateData.maxCapacity * 0.2))
+    : false;
 
   const availabilityWarning =
     formData.date && selectedDateData && formData.guests > remaining
@@ -233,7 +247,7 @@ export function BookingClient() {
     }
     
     const data = calendarData[dateStr];
-    if (!data) return 'available';
+    if (!data) return 'unknown';
     if (!data.isOpen) return 'blocked';
     if (data.percentage >= 100) return 'full';
     if (data.percentage >= 50) return 'partial';
@@ -552,8 +566,22 @@ export function BookingClient() {
                         {days.map((day) => {
                           const status = getDayStatus(day);
                           const isSelected = formData.date ? isSameDay(day, formData.date) : false;
+                          const dayData = calendarData[format(day, 'yyyy-MM-dd')];
                           const isDisabled =
-                            status === 'past' || status === 'blocked' || status === 'full';
+                            status === 'past' ||
+                            status === 'blocked' ||
+                            status === 'full' ||
+                            status === 'unknown';
+                          const availabilityLabel =
+                            status === 'past'
+                              ? 'past date'
+                              : status === 'blocked'
+                                ? 'booking closed'
+                                : status === 'full'
+                                  ? 'no seats available'
+                                  : status === 'unknown' || !dayData
+                                    ? 'availability unavailable'
+                                    : `${dayData.remaining} ${dayData.remaining === 1 ? 'seat' : 'seats'} available`;
 
                           return (
                             <button
@@ -561,7 +589,7 @@ export function BookingClient() {
                               onClick={() => handleDateSelect(day)}
                               disabled={isDisabled}
                               suppressHydrationWarning
-                              aria-label={`${format(day, 'd MMMM')}, ${status}`}
+                              aria-label={`${format(day, 'EEEE, d MMMM')}, ${availabilityLabel}`}
                               aria-pressed={isSelected}
                               className={cn(
                                 'aspect-square flex flex-col items-center justify-center rounded-lg text-[13px] font-medium transition-all',
@@ -571,9 +599,11 @@ export function BookingClient() {
                                     ? 'text-canopy-dark/20 cursor-not-allowed'
                                     : status === 'blocked'
                                       ? 'text-red-300 line-through cursor-not-allowed bg-red-50/60'
-                                      : status === 'full'
-                                        ? 'text-canopy-dark/25 cursor-not-allowed bg-canopy-dark/5'
-                                        : status === 'partial'
+                                    : status === 'full'
+                                      ? 'text-canopy-dark/25 cursor-not-allowed bg-canopy-dark/5'
+                                      : status === 'unknown'
+                                        ? 'text-canopy-dark/20 cursor-not-allowed bg-canopy-dark/5'
+                                      : status === 'partial'
                                           ? 'text-amber-700 bg-amber-50 hover:bg-amber-100 cursor-pointer'
                                           : 'text-canopy-dark hover:bg-morning-mist cursor-pointer'
                               )}
@@ -607,24 +637,129 @@ export function BookingClient() {
                         </span>
                       </div>
 
-                      {/* Session time badge — appears after date selection */}
+                      {calendarError && (
+                        <div
+                          role="alert"
+                          className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+                        >
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <div className="flex-1">
+                              <p>{calendarError}</p>
+                              <button
+                                type="button"
+                                onClick={() => void fetchCalendar(calendarMonth)}
+                                className="mt-2 font-semibold text-sanctuary-green underline underline-offset-2"
+                              >
+                                Retry availability
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Selected date availability — appears after date selection */}
                       <AnimatePresence>
-                        {formData.date && (
+                        {formData.date && selectedDateData && (
                           <motion.div
+                            key={selectedDateStr}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 4 }}
-                            className="mt-5 p-3 bg-sanctuary-green/5 border border-sanctuary-green/20 rounded-xl flex items-center gap-3"
+                            role="status"
+                            aria-live="polite"
+                            className={cn(
+                              'mt-5 overflow-hidden rounded-2xl border p-4',
+                              isLowAvailability
+                                ? 'border-amber-200 bg-amber-50/80'
+                                : 'border-sanctuary-green/20 bg-sanctuary-green/5'
+                            )}
                           >
-                            <span className="text-xl">🌇</span>
-                            <div>
-                              <div className="text-[10px] text-canopy-dark/40 uppercase tracking-wider font-semibold">
-                                Session Time
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-canopy-dark/40">
+                                  Selected visit
+                                </div>
+                                <div className="mt-0.5 text-sm font-semibold text-canopy-dark">
+                                  {format(formData.date, 'EEEE, d MMMM')}
+                                </div>
                               </div>
-                              <div className="text-sm font-semibold text-canopy-dark">
-                                {formatSessionTime(sessionTime)}
+                              <span
+                                className={cn(
+                                  'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider',
+                                  isLowAvailability
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-sanctuary-green/10 text-sanctuary-green'
+                                )}
+                              >
+                                Live availability
+                              </span>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                              <div className="rounded-xl bg-white/80 p-3 shadow-sm">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-canopy-dark/40">
+                                  <Users className="h-3.5 w-3.5" /> Availability
+                                </div>
+                                <div
+                                  className={cn(
+                                    'mt-1 text-xl font-bold',
+                                    isLowAvailability ? 'text-amber-700' : 'text-sanctuary-green'
+                                  )}
+                                >
+                                  {selectedDateData.remaining}
+                                  {' '}
+                                  <span className="ml-1 text-xs font-semibold text-canopy-dark/55">
+                                    {selectedDateData.remaining === 1 ? 'seat' : 'seats'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="rounded-xl bg-white/80 p-3 shadow-sm">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-canopy-dark/40">
+                                  <Clock className="h-3.5 w-3.5" /> Session
+                                </div>
+                                <div className="mt-1 md:text-sm text-[10px] font-semibold leading-6 text-canopy-dark">
+                                  {formatSessionTime(sessionTime)}
+                                </div>
                               </div>
                             </div>
+
+                            <div className="mt-3">
+                              <div className="mb-1.5 flex justify-between text-[10px] font-medium text-canopy-dark/45">
+                                <span>{selectedDateData.bookingCount} reserved</span>
+                                <span>{selectedDateData.maxCapacity} total seats</span>
+                              </div>
+                              <div
+                                role="progressbar"
+                                aria-label={`${selectedDateData.bookingCount} of ${selectedDateData.maxCapacity} seats reserved`}
+                                aria-valuemin={0}
+                                aria-valuemax={selectedDateData.maxCapacity}
+                                aria-valuenow={selectedDateData.bookingCount}
+                                className="h-1.5 overflow-hidden rounded-full bg-canopy-dark/10"
+                              >
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all',
+                                    isLowAvailability ? 'bg-amber-500' : 'bg-sanctuary-green'
+                                  )}
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, selectedDateData.percentage))}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <p className="mt-3 text-xs text-canopy-dark/60">
+                              Your group needs <strong>{totalGuests}</strong>{' '}
+                              {totalGuests === 1 ? 'seat' : 'seats'}.
+                              {seatsAfterBooking !== null && totalGuests <= selectedDateData.remaining && (
+                                <>
+                                  {' '}
+                                  <strong>{seatsAfterBooking}</strong>{' '}
+                                  {seatsAfterBooking === 1 ? 'seat would' : 'seats would'} remain after your booking.
+                                </>
+                              )}
+                            </p>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -727,6 +862,7 @@ export function BookingClient() {
                               <button
                                 type="button"
                                 suppressHydrationWarning
+                                aria-label="Decrease adult count"
                                 onClick={() =>
                                   updateField('adults', Math.max(1, formData.adults - 1))
                                 }
@@ -740,14 +876,22 @@ export function BookingClient() {
                               <button
                                 type="button"
                                 suppressHydrationWarning
+                                aria-label="Increase adult count"
+                                disabled={
+                                  totalGuests >= 10 ||
+                                  (!!selectedDateData && totalGuests >= selectedDateData.remaining)
+                                }
                                 onClick={() => {
                                   const newAdults = formData.adults + 1;
                                   const newTotal = newAdults + formData.children;
-                                  if (newTotal <= 10 && newTotal <= remaining) {
+                                  if (
+                                    newTotal <= 10 &&
+                                    (!selectedDateData || newTotal <= selectedDateData.remaining)
+                                  ) {
                                     updateField('adults', newAdults);
                                   }
                                 }}
-                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
                               >
                                 +
                               </button>
@@ -763,6 +907,7 @@ export function BookingClient() {
                               <button
                                 type="button"
                                 suppressHydrationWarning
+                                aria-label="Decrease child count"
                                 onClick={() =>
                                   updateField('children', Math.max(0, formData.children - 1))
                                 }
@@ -776,14 +921,22 @@ export function BookingClient() {
                               <button
                                 type="button"
                                 suppressHydrationWarning
+                                aria-label="Increase child count"
+                                disabled={
+                                  totalGuests >= 10 ||
+                                  (!!selectedDateData && totalGuests >= selectedDateData.remaining)
+                                }
                                 onClick={() => {
                                   const newChildren = formData.children + 1;
                                   const newTotal = formData.adults + newChildren;
-                                  if (newTotal <= 10 && newTotal <= remaining) {
+                                  if (
+                                    newTotal <= 10 &&
+                                    (!selectedDateData || newTotal <= selectedDateData.remaining)
+                                  ) {
                                     updateField('children', newChildren);
                                   }
                                 }}
-                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light"
+                                className="w-10 h-10 rounded-xl border border-canopy-dark/10 flex items-center justify-center hover:bg-morning-mist transition-colors text-lg text-canopy-dark font-light disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
                               >
                                 +
                               </button>
