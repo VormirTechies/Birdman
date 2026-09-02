@@ -117,11 +117,11 @@ function Calendar({
           defaultClassNames.range_end
         ),
         today: cn(
-          "rounded-(--cell-radius) bg-muted text-foreground data-[selected=true]:rounded-none",
+          "rounded-(--cell-radius) [&>button]:font-semibold [&>button]:text-sanctuary-green [&>button]:ring-1 [&>button]:ring-inset [&>button]:ring-sanctuary-green data-[selected=true]:rounded-none data-[selected=true]:[&>button]:text-white",
           defaultClassNames.today
         ),
         outside: cn(
-          "text-muted-foreground aria-selected:text-muted-foreground",
+          "text-muted-foreground opacity-40 aria-selected:text-muted-foreground data-[selected=true]:opacity-70",
           defaultClassNames.outside
         ),
         disabled: cn(

@@ -1282,7 +1282,7 @@ export function BookingClient() {
 
           </AnimatePresence>
         </div>
-      </main>
+      </main> 
       <Footer />
     </>
   );

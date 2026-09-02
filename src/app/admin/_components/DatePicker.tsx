@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -31,14 +31,6 @@ export function DatePicker({
       onChange(date);
       setIsOpen(false);
     }
-  };
-
-  // Default: Disable dates outside the current month (today's month)
-  const defaultDisabledDates = (date: Date) => {
-    const today = new Date();
-    const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
-    return date < monthStart || date > monthEnd;
   };
 
   return (
@@ -77,7 +69,7 @@ export function DatePicker({
           mode="single"
           selected={value}
           onSelect={handleSelect}
-          disabled={disabled || defaultDisabledDates}
+          disabled={disabled}
           initialFocus
         />
       </PopoverContent>
