@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === 'production') {
 // The Admin SDK only redirects to the Firestore emulator when this environment
 // variable is present. Firebase sets it for some managed emulator processes,
 // but not when Next.js is started directly with `npm run dev`.
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && process.env.FIREBASE_USE_LIVE !== 'true') {
   process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:7003';
   process.env.FIREBASE_STORAGE_EMULATOR_HOST ??= '127.0.0.1:7004';
   process.env.GCLOUD_PROJECT ??= FIREBASE_PROJECT_ID;

@@ -20,6 +20,7 @@ playwright/.cache
 
 # next.js
 /.next/
+/.next-live/
 /out/
 
 # production

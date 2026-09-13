@@ -53,7 +53,7 @@ export default function BookingImportPage() {
       <h2 className="text-xl font-semibold">{report.dryRun ? 'Migration preview' : 'Import completed'}</h2>
       <p>{report.inserts} {report.dryRun ? 'to insert' : 'inserted'} · {report.duplicates} duplicates skipped · Booking counter: {report.counter}</p>
       <table className="w-full text-left"><thead><tr><th>Date</th><th>Confirmed guests after import</th></tr></thead><tbody>{report.dayTotals.map(day => <tr key={day.date}><td className="py-2">{day.date}</td><td>{day.confirmedGuests}</td></tr>)}</tbody></table>
-      {report.dryRun && <><label className="block">Type {target === 'production' ? 'IMPORT LIVE' : 'IMPORT'} to confirm<input disabled={busy} className={inputClass} value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" /></label><button disabled={busy || confirmation !== (target === 'production' ? 'IMPORT LIVE' : 'IMPORT')} className="rounded-lg bg-green-800 px-5 py-3 text-white disabled:opacity-50" onClick={() => submit(false)}>{busy ? 'Importing…' : 'Import bookings'}</button></>}
+      {report.dryRun && <><label className="block">Type <b>{target === 'production' ? 'IMPORT LIVE' : 'IMPORT'}</b> to confirm<input disabled={busy} className={inputClass} value={confirmation} onChange={e => setConfirmation(e.target.value)} autoComplete="off" /></label><button disabled={busy || confirmation !== (target === 'production' ? 'IMPORT LIVE' : 'IMPORT')} className="rounded-lg bg-green-800 px-5 py-3 text-white disabled:opacity-50" onClick={() => submit(false)}>{busy ? 'Importing…' : 'Import bookings'}</button></>}
     </div>}
   </section>;
 }

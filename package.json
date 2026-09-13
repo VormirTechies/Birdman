@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:live": "node scripts/start-live.mjs",
     "build": "next build",
     "start": "next start",
     "emulators:start": "tsx scripts/start-emulators.ts",

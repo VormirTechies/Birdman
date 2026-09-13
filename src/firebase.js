@@ -44,6 +44,7 @@ if (!firebaseConfigError) {
     authInstance = getAuth(app);
     if (
       process.env.NODE_ENV !== "production" &&
+      process.env.NEXT_PUBLIC_FIREBASE_USE_LIVE !== "true" &&
       typeof window !== "undefined" &&
       !globalThis.__birdmanAuthEmulatorConnected
     ) {
