@@ -337,6 +337,12 @@ The locale is set via URL prefix (`/en/...`, `/ta/...`) and detected automatical
 
 ---
 
+## Homepage maintenance
+
+The homepage (`/`) currently displays the maintenance page through a rewrite in `src/proxy.ts`. The page is also available at `/maintenance`. Other routes remain accessible.
+
+To restore the original homepage, set `MAINTENANCE_MODE=false` in the server environment and restart or redeploy the app. Maintenance is enabled when this variable is unset.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE)

@@ -21,6 +21,16 @@ function getRatelimit(): Ratelimit | null {
 }
 
 export async function proxy(request: NextRequest) {
+  // Set MAINTENANCE_MODE=false to restore the original homepage.
+  if (request.nextUrl.pathname === '/' && process.env.MAINTENANCE_MODE !== 'false') {
+    const maintenanceUrl = request.nextUrl.clone()
+    maintenanceUrl.pathname = '/maintenance'
+    const response = NextResponse.rewrite(maintenanceUrl)
+    response.headers.set('Cache-Control', 'no-store')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+    return response
+  }
+
   // ─── Rate limit: POST /api/bookings — 5 requests per IP per minute ───────────
   if (request.method === 'POST' && request.nextUrl.pathname === '/api/bookings') {
     const limiter = getRatelimit()
