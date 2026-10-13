@@ -22,8 +22,6 @@ import {
 import { listRecommendedFirestoreFeedback } from "@/lib/firebase/feedback";
 import type { PublicFeedback } from "@/models/firestore/feedback";
 import { unstable_cache } from "next/cache";
-import { MaintenancePage } from "@/components/organisms/MaintenancePage";
-import { isMaintenanceActive, MAINTENANCE_ENDS_AT } from "@/lib/maintenance";
 
 export const dynamic = 'force-dynamic';
 
@@ -75,17 +73,6 @@ const galleryPreview = [
 ];
 
 export default async function HomePage() {
-  // eslint-disable-next-line react-hooks/purity -- This dynamic Server Component checks the deadline once per request.
-  const now = Date.now();
-  if (isMaintenanceActive(now)) {
-    return (
-      <MaintenancePage
-        endsAt={MAINTENANCE_ENDS_AT}
-        initialSecondsRemaining={Math.max(0, Math.ceil((Date.parse(MAINTENANCE_ENDS_AT) - now) / 1000))}
-      />
-    );
-  }
-
   let testimonials: PublicFeedback[] = [];
   try {
     testimonials = await getRecommendedFeedback();
