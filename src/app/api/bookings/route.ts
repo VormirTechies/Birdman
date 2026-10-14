@@ -4,12 +4,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createBookingSchema } from '@/lib/validations';
 import { createBooking, getBookings, markConfirmationSent } from '@/lib/db/queries';
 import { ZodError } from 'zod';
+import { isBookingMaintenanceEnabled, BOOKING_MAINTENANCE_MESSAGE } from '@/lib/booking-maintenance';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // POST /api/bookings — Create New Booking
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function POST(request: NextRequest) {
+  if (isBookingMaintenanceEnabled()) {
+    return NextResponse.json(
+      { success: false, code: 'BOOKING_MAINTENANCE', error: BOOKING_MAINTENANCE_MESSAGE },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '3600' } }
+    );
+  }
   try {
     // Parse and validate request body
     const body = await request.json();

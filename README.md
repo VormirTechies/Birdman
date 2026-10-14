@@ -337,11 +337,11 @@ The locale is set via URL prefix (`/en/...`, `/ta/...`) and detected automatical
 
 ---
 
-## Homepage maintenance
+## Booking maintenance
 
-The homepage (`/`) currently displays the maintenance page through a rewrite in `src/proxy.ts`. The page is also available at `/maintenance`. Other routes remain accessible.
+The booking page (`/book`) displays the maintenance page while the booking migration is in progress. The homepage and other public pages remain accessible. Public `POST /api/bookings` requests return HTTP 503 during maintenance, including direct API calls.
 
-To restore the original homepage, set `MAINTENANCE_MODE=false` in the server environment and restart or redeploy the app. Maintenance is enabled when this variable is unset.
+To reopen bookings after migration, set `MAINTENANCE_MODE=false` in the server environment and restart or redeploy the app. Booking maintenance is enabled when this variable is unset or any value other than `false`. See [booking maintenance instructions](docs/BOOKING-MAINTENANCE.md).
 
 ## License
 

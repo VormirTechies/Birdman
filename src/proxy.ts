@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { isBookingMaintenanceEnabled, BOOKING_MAINTENANCE_MESSAGE } from '@/lib/booking-maintenance'
 
 // ─── Rate Limiter (lazy — only initialised when env vars are present) ─────────
 let ratelimit: Ratelimit | null = null
@@ -21,14 +22,21 @@ function getRatelimit(): Ratelimit | null {
 }
 
 export async function proxy(request: NextRequest) {
-  // Set MAINTENANCE_MODE=false to restore the original homepage.
-  if (request.nextUrl.pathname === '/' && process.env.MAINTENANCE_MODE !== 'false') {
+  // Home and other public pages stay available during booking migration.
+  if (request.nextUrl.pathname === '/book' && isBookingMaintenanceEnabled()) {
     const maintenanceUrl = request.nextUrl.clone()
     maintenanceUrl.pathname = '/maintenance'
     const response = NextResponse.rewrite(maintenanceUrl)
     response.headers.set('Cache-Control', 'no-store')
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
     return response
+  }
+
+  if (request.method === 'POST' && request.nextUrl.pathname === '/api/bookings' && isBookingMaintenanceEnabled()) {
+    return NextResponse.json(
+      { success: false, code: 'BOOKING_MAINTENANCE', error: BOOKING_MAINTENANCE_MESSAGE },
+      { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '3600' } }
+    )
   }
 
   // ─── Rate limit: POST /api/bookings — 5 requests per IP per minute ───────────

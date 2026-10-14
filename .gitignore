@@ -20,6 +20,7 @@ playwright/.cache
 
 # next.js
 /.next/
+/.next-live/
 /out/
 
 # production
@@ -52,6 +53,12 @@ serviceAccount*.json
 google-credentials.json
 gcloud-service-account.json
 firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+storage-debug.log
+database-debug.log
+pubsub-debug.log
 .firebase/
 # Google Android / iOS config (may contain identifiers)
 google-services.json
@@ -74,3 +81,8 @@ supabase-export/
 credentials.json
 secret*.json
 secrets.json
+vercel-env-template.env
+
+# Local assistant tooling
+/.agents/
+/.claude/
