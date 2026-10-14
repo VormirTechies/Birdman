@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { authenticatedFetch } from '@/lib/firebase/authenticated-fetch';
+import { BOOKING_CSV_MAX_BYTES } from '@/lib/booking-import-limits';
 
 type Report = { inserts: number; duplicates: number; counter: number; dryRun: boolean; dayTotals: { date: string; confirmedGuests: number }[] };
 
@@ -26,7 +27,7 @@ export default function BookingImportPage() {
     if (!file || locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      if (file.size > 500_000) throw new Error('Select a CSV smaller than 500 KB.');
+      if (file.size > BOOKING_CSV_MAX_BYTES) throw new Error('Select a CSV of 2 MB or smaller.');
       const response = await authenticatedFetch('/api/admin/booking-import', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv: await file.text(), target, offset, dryRun, confirmation }),
@@ -45,7 +46,14 @@ export default function BookingImportPage() {
       <label className="block">Database<select className={inputClass} value={target} onChange={e => setTarget(e.target.value)}><option value="emulator">Local emulator — (default)</option><option value="production">Live database — birdman-db</option></select></label>
       {target === 'production' && <p className="rounded-lg bg-amber-50 p-3 text-amber-900">Live imports affect production bookings. Use your production administrator session.</p>}
       <label className="block">Source timestamp timezone<select className={inputClass} value={offset} onChange={e => { setOffset(e.target.value); setReport(null); }}><option value="+05:30">India time (UTC+05:30)</option><option value="Z">UTC</option></select></label>
-      <label className="block">Booking CSV<input className={inputClass} type="file" accept=".csv,text/csv" onChange={e => { setFile(e.target.files?.[0] || null); setReport(null); setConfirmation(''); }} /></label>
+      <label className="block">Booking CSV (maximum 2 MB)<input className={inputClass} type="file" accept=".csv,text/csv" onChange={e => {
+        const selected = e.target.files?.[0] || null;
+        setReport(null); setConfirmation('');
+        if (selected && selected.size > BOOKING_CSV_MAX_BYTES) {
+          setFile(null); setError('Select a CSV of 2 MB or smaller.'); e.target.value = ''; return;
+        }
+        setFile(selected); setError('');
+      }} /></label>
       <button type="button" className="rounded-lg bg-green-800 px-5 py-3 text-white disabled:opacity-50" disabled={!file} onClick={() => submit(true)}>{busy ? 'Processing…' : 'Preview migration'}</button>
     </fieldset>
     {error && <p role="alert" className="whitespace-pre-wrap rounded-lg bg-red-50 p-4 text-red-800">{error}</p>}

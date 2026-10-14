@@ -5,6 +5,19 @@ vi.mock('@/lib/require-admin', () => ({ requireAdmin: mocks.auth }));
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: {}, firestoreDatabaseId: 'birdman-db' }));
 vi.mock('@/lib/firebase/booking-csv-import', () => ({ importBookingCsv: mocks.migrate }));
 import { POST } from './route';
+import { BOOKING_CSV_MAX_BYTES } from '@/lib/booking-import-limits';
+it('accepts exactly 2 MB', async () => {
+  mocks.migrate.mockResolvedValue({ inserts: 1 });
+  expect((await POST(request({ csv: 'a'.repeat(BOOKING_CSV_MAX_BYTES) }))).status).toBe(200);
+});
+it('rejects CSV over 2 MB without a content-length header', async () => {
+  expect((await POST(request({ csv: 'a'.repeat(BOOKING_CSV_MAX_BYTES + 1) }))).status).toBe(413);
+  expect(mocks.migrate).not.toHaveBeenCalled();
+});
+it('measures UTF-8 bytes rather than character count', async () => {
+  expect((await POST(request({ csv: 'é'.repeat(1_000_001) }))).status).toBe(413);
+  expect(mocks.migrate).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('FIRESTORE_EMULATOR_HOST', '');

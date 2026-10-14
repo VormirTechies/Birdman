@@ -2,7 +2,7 @@
 
 ## Temporary admin page
 
-Open `/admin/booking-import`, select the database and CSV, then preview. India time is selected by default. Type `IMPORT` for local or `IMPORT LIVE` for production to enable import. Changing the file, timezone or target clears the preview. Files are limited to 500 KB.
+Open `/admin/booking-import`, select the database and CSV, then preview. India time is selected by default. Type `IMPORT` for local or `IMPORT LIVE` for production to enable import. Changing the file, timezone or target clears the preview. Files are limited to 2 MB (2,000,000 bytes), checked on selection and by the API using UTF-8 byte size. The separate atomic write limit still applies.
 
 Targets are restricted to the server's configured environment. Use the local application for emulator imports and the production admin application for live imports. A deployed server cannot reach an emulator on your laptop, and an Auth emulator identity cannot authorize production writes. The page reports unavailable targets. The tool uses existing admin authorization and exposes no public import endpoint.
 

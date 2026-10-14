@@ -4,11 +4,12 @@ import { requireAdmin } from '@/lib/require-admin';
 import { adminDb, firestoreDatabaseId } from '@/lib/firebase/admin';
 import { importBookingCsv } from '@/lib/firebase/booking-csv-import';
 import { z } from 'zod';
+import { BOOKING_CSV_MAX_BYTES, BOOKING_IMPORT_MAX_REQUEST_BYTES } from '@/lib/booking-import-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const schema = z.object({
-  csv: z.string().min(1).max(500_000),
+  csv: z.string().min(1),
   target: z.enum(['emulator', 'production']),
   offset: z.enum(['+05:30', 'Z']),
   dryRun: z.boolean(),
@@ -52,10 +53,25 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireAdmin(request);
   if (!auth.user) return auth.response;
-  if (Number(request.headers.get('content-length') || 0) > 600_000) return NextResponse.json({ error: 'CSV must be under 500 KB' }, { status: 413 });
+  const tooLarge = () => NextResponse.json({ error: 'CSV must be 2 MB or smaller.' }, { status: 413 });
+  if (Number(request.headers.get('content-length') || 0) > BOOKING_IMPORT_MAX_REQUEST_BYTES) return tooLarge();
   let input: z.infer<typeof schema>;
-  try { input = schema.parse(await request.json()); }
-  catch { return NextResponse.json({ error: 'Invalid upload. Select a CSV under 500 KB.' }, { status: 400 }); }
+  try {
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error('Missing body');
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > BOOKING_IMPORT_MAX_REQUEST_BYTES) { await reader.cancel(); return tooLarge(); }
+      chunks.push(value);
+    }
+    input = schema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+    if (Buffer.byteLength(input.csv, 'utf8') > BOOKING_CSV_MAX_BYTES) return tooLarge();
+  }
+  catch { return NextResponse.json({ error: 'Invalid upload. Select a valid CSV of 2 MB or smaller.' }, { status: 400 }); }
   try { await checkTarget(input.target); }
   catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Target unavailable' }, { status: 503 }); }
   if (!input.dryRun && input.confirmation !== (input.target === 'production' ? 'IMPORT LIVE' : 'IMPORT')) {
