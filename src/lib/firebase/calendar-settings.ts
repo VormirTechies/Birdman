@@ -145,11 +145,7 @@ export async function upsertFirestoreCalendarSetting(
   const existing = existingDocument?.setting ?? null;
   const data = {
     date,
-    maxCapacity: settings.maxCapacity ?? existing?.maxCapacity ??
-      DEFAULT_CALENDAR_CAPACITY,
-    startTime: settings.startTime ?? existing?.startTime ??
-      DEFAULT_CALENDAR_START_TIME,
-    isOpen: settings.isOpen ?? existing?.isOpen ?? true,
+    ...settings,
     updatedBy,
     updatedAt: FieldValue.serverTimestamp(),
     ...(!existing ? { createdAt: FieldValue.serverTimestamp() } : {}),
@@ -193,11 +189,10 @@ export async function upsertFirestoreCalendarSettings(
         reference,
         {
           date,
-          maxCapacity: settings.maxCapacity ?? existing?.maxCapacity ??
-            DEFAULT_CALENDAR_CAPACITY,
-          startTime: settings.startTime ?? existing?.startTime ??
-            DEFAULT_CALENDAR_START_TIME,
-          isOpen: settings.isOpen ?? existing?.isOpen ?? true,
+          // Merge only selected fields, including on newly created dates.
+          // Readers supply defaults for omitted fields; never write a stale copy
+          // of unselected values over another administrator's changes.
+          ...settings,
           updatedBy,
           updatedAt: FieldValue.serverTimestamp(),
           ...(!existing ? { createdAt: FieldValue.serverTimestamp() } : {}),

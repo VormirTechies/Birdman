@@ -108,6 +108,7 @@ export const bookingMutationSchema = z
 export type BookingMutation = z.infer<typeof bookingMutationSchema>;
 
 export interface BookingDocument {
+  notificationRevision?: number;
   bookingNumber: number;
   bookingCode: string;
   visitorId: string | null;
@@ -142,6 +143,7 @@ export interface BookingDocument {
 }
 
 export interface BookingDayDocument {
+  notificationFullRevision?: number;
   confirmedGuests: number;
   updatedAt: Timestamp;
 }

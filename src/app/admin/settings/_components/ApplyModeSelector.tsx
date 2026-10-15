@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Calendar as CalendarIcon, Info } from 'lucide-react';
+import { CalendarDays, CalendarRange, CalendarCheck2, Check, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { DatePicker } from '../../_components/DatePicker';
 import type { ApplyMode } from '../page';
@@ -83,49 +83,28 @@ export function ApplyModeSelector({
   };
 
   return (
-    <div className="bg-white rounded-lg border border-[#E0E0E0] p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <CalendarIcon className="w-5 h-5 text-[#2E7D32]" />
-        <h2 className="text-lg font-semibold text-[#212121]">Select Date Range</h2>
+    <section className="space-y-5 rounded-2xl border border-[#e2e8e1] bg-white p-5 sm:p-6" aria-labelledby="settings-dates-title">
+      <div className="flex items-start gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#edf3ec] text-xs font-semibold text-[#48714e]">01</span>
+        <div><h2 id="settings-dates-title" className="text-base font-semibold text-[#294134]" style={{ fontFamily: 'inherit' }}>Select Date Range</h2>
+          <p className="mt-1 text-xs leading-5 text-[#849086]">Choose where your changes should apply.</p>
+        </div>
       </div>
 
       {/* Mode Selection */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <button
-          onClick={() => setApplyMode('all_days')}
-          className={`p-4 rounded-lg border-2 transition-all ${
-            applyMode === 'all_days'
-              ? 'border-[#2E7D32] bg-[#E8F5E9]'
-              : 'border-[#E0E0E0] hover:border-[#BDBDBD]'
-          }`}
-        >
-          <div className="font-medium text-[#212121]">All Days</div>
-          <div className="text-sm text-[#616161] mt-1">Apply to all future dates</div>
-        </button>
-
-        <button
-          onClick={() => setApplyMode('one_day')}
-          className={`p-4 rounded-lg border-2 transition-all ${
-            applyMode === 'one_day'
-              ? 'border-[#2E7D32] bg-[#E8F5E9]'
-              : 'border-[#E0E0E0] hover:border-[#BDBDBD]'
-          }`}
-        >
-          <div className="font-medium text-[#212121]">One Day</div>
-          <div className="text-sm text-[#616161] mt-1">Apply to a specific date</div>
-        </button>
-
-        <button
-          onClick={() => setApplyMode('date_range')}
-          className={`p-4 rounded-lg border-2 transition-all ${
-            applyMode === 'date_range'
-              ? 'border-[#2E7D32] bg-[#E8F5E9]'
-              : 'border-[#E0E0E0] hover:border-[#BDBDBD]'
-          }`}
-        >
-          <div className="font-medium text-[#212121]">Date Range</div>
-          <div className="text-sm text-[#616161] mt-1">Apply to a range of dates</div>
-        </button>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {([
+          { mode: 'all_days', title: 'All Days', subtitle: 'The full booking window', icon: CalendarDays },
+          { mode: 'one_day', title: 'One Day', subtitle: 'One specific date', icon: CalendarCheck2 },
+          { mode: 'date_range', title: 'Date Range', subtitle: 'A custom date window', icon: CalendarRange },
+        ] as const).map(({ mode, title, subtitle, icon: Icon }) => (
+          <button key={mode} type="button" aria-pressed={applyMode === mode} onClick={() => setApplyMode(mode)}
+            className={`relative flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors sm:block sm:p-4 ${applyMode === mode ? 'border-[#81a384] bg-[#f0f6ee] text-[#2b5536]' : 'border-[#e7ece6] text-[#738076] hover:border-[#b6c9b5] hover:bg-[#fafcf9]'}`}>
+            <Icon className="size-5 shrink-0 sm:mb-4" aria-hidden="true" />
+            <span className="block text-sm font-medium">{title}<span className="mt-1 block text-[11px] font-normal leading-4 text-[#849086]">{subtitle}</span></span>
+            {applyMode === mode && <Check className="absolute right-3 top-3 size-3.5 text-[#48794c]" aria-hidden="true" />}
+          </button>
+        ))}
       </div>
 
       {/* Date Inputs Based on Mode */}
@@ -192,13 +171,13 @@ export function ApplyModeSelector({
       )}
 
       {applyMode === 'all_days' && (
-        <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-blue-900">
-            Changes will be applied to all dates in the calendar (today to next 180 days)
+        <div className="flex gap-2.5 rounded-xl bg-[#f6f8f4] p-3.5">
+          <Info className="mt-0.5 size-3.5 shrink-0 text-[#7c947b]" aria-hidden="true" />
+          <p className="text-xs leading-5 text-[#7b897a]">
+            Changes apply to today through 180 days ahead (181 dates, inclusive), using India time. Dates outside this window stay unchanged.
           </p>
         </div>
       )}
-    </div>
+    </section>
   );
 }

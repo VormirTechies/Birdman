@@ -46,4 +46,14 @@ describe('Firebase administrator authorization', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, user: session });
   });
+
+  it.each(['auth/id-token-revoked', 'auth/user-disabled', 'auth/id-token-expired'])(
+    'rejects %s when notification APIs request revocation checks', async code => {
+      verifyIdToken.mockRejectedValueOnce(Object.assign(new Error('Rejected'), { code }));
+      const result = await requireAdmin(request('rejected-token'), { checkRevoked: true });
+      expect(result.response?.status).toBe(401);
+      expect(verifyIdToken).toHaveBeenLastCalledWith('rejected-token', true);
+      expect(authorizeAdminToken).not.toHaveBeenCalled();
+    },
+  );
 });

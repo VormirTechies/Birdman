@@ -18,6 +18,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HistoryPage from '@/app/admin/history/page';
+import type { ComponentProps } from 'react';
+import type { HistoryToolbar } from '@/app/admin/history/_components/HistoryToolbar';
+import type { HistoryTable } from '@/app/admin/history/_components/HistoryTable';
+import type { HistoryCard } from '@/app/admin/history/_components/HistoryCard';
+
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
 
 // ─── Mock child components ────────────────────────────────────────────────────
 
@@ -32,7 +40,7 @@ vi.mock('@/app/admin/history/_components/HistoryToolbar', () => ({
     sortBy,
     sortDir,
     onSortChange,
-  }: any) => (
+  }: ComponentProps<typeof HistoryToolbar>) => (
     <div data-testid="history-toolbar">
       <input
         data-testid="search-input"
@@ -54,7 +62,7 @@ vi.mock('@/app/admin/history/_components/HistoryToolbar', () => ({
       <select
         data-testid="visited-filter"
         value={visitedFilter}
-        onChange={(e) => onVisitedFilterChange(e.target.value)}
+        onChange={(e) => onVisitedFilterChange(e.target.value as ComponentProps<typeof HistoryToolbar>['visitedFilter'])}
       >
         <option value="all">All</option>
         <option value="visited">Visited</option>
@@ -79,10 +87,10 @@ vi.mock('@/app/admin/history/_components/HistoryToolbar', () => ({
 }));
 
 vi.mock('@/app/admin/history/_components/HistoryTable', () => ({
-  HistoryTable: ({ bookings, total, page, pageSize, onPageChange, onPageSizeChange, loading }: any) => (
+  HistoryTable: ({ bookings, total, page, pageSize, onPageChange, onPageSizeChange, loading }: ComponentProps<typeof HistoryTable>) => (
     <div data-testid="history-table">
       {loading && <div data-testid="table-loading">Loading…</div>}
-      {!loading && bookings.map((b: any) => (
+      {!loading && bookings.map((b) => (
         <div key={b.id} data-testid={`booking-row-${b.id}`}>
           {b.visitorName} — {b.bookingDate}
         </div>
@@ -101,7 +109,7 @@ vi.mock('@/app/admin/history/_components/HistoryTable', () => ({
 }));
 
 vi.mock('@/app/admin/history/_components/HistoryCard', () => ({
-  HistoryCard: ({ booking }: any) => (
+  HistoryCard: ({ booking }: ComponentProps<typeof HistoryCard>) => (
     <div data-testid={`booking-card-${booking.id}`}>
       {booking.visitorName}
     </div>
@@ -109,7 +117,7 @@ vi.mock('@/app/admin/history/_components/HistoryCard', () => ({
 }));
 
 vi.mock('date-fns', () => ({
-  format: (_date: Date, _fmt: string) => '2026-04-20',
+  format: () => '2026-04-20',
 }));
 
 // ─── Mock IntersectionObserver ────────────────────────────────────────────────
@@ -140,7 +148,7 @@ const makeBooking = (id: string, overrides = {}) => ({
   ...overrides,
 });
 
-const makeApiResponse = (bookings: ReturnType<typeof makeBooking>[], total = bookings.length) => ({
+const makeApiResponse = <T,>(bookings: T[], total = bookings.length) => ({
   success: true,
   bookings,
   total,
@@ -242,7 +250,7 @@ describe('History Page', () => {
 
   describe('Loading state', () => {
     it('shows loading indicator while fetching', async () => {
-      let resolve: (v: any) => void;
+      let resolve: (v: { json: () => Promise<ReturnType<typeof makeApiResponse>> }) => void;
       global.fetch = vi.fn().mockReturnValue(
         new Promise((r) => { resolve = r; })
       );

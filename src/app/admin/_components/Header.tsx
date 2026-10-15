@@ -1,74 +1,22 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Bell, Menu, UserCircle, LogOut, Bird, MessageSquare, CheckCheck } from 'lucide-react';
+import { Bell, Menu, UserCircle, LogOut } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { signOutAdmin } from '@/lib/firebase/notification-client';
+import { toast } from 'sonner';
 import { auth, firebaseConfigError } from '@/firebase';
 import { ActionsMenu } from './ActionsMenu';
-import { useNotifications, AppNotification } from '@/components/providers/NotificationProvider';
+import { useNotifications } from '@/components/providers/NotificationProvider';
+import { NotificationInbox } from './NotificationInbox';
 
 // ─── Avatar helpers (matches profile page palette) ─────────────────────────
 
-const AVATAR_PALETTE = [
-  { bg: '#C8E6C9', text: '#2E7D32' },
-  { bg: '#FFE0B2', text: '#E65100' },
-  { bg: '#F8BBD0', text: '#C2185B' },
-  { bg: '#BBDEFB', text: '#1976D2' },
-  { bg: '#E1BEE7', text: '#7B1FA2' },
-];
-
-function avatarColor(identifier: string) {
-  let hash = 0;
-  for (let i = 0; i < identifier.length; i++) {
-    hash = (hash * 31 + identifier.charCodeAt(i)) & 0xffff;
-  }
-  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
-}
-
-function getInitials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return parts.length >= 2
-    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-}
 
 // ─── Notification item ──────────────────────────────────────────────────────
 
-function NotificationItem({ n }: { n: AppNotification }) {
-  const { bg, text } = avatarColor(n.visitorName);
-  return (
-    <div className={`px-4 py-3 flex gap-3 items-start transition-colors ${n.read ? '' : 'bg-[#F9FCF9]'}`}>
-      {/* Avatar */}
-      <div
-        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5"
-        style={{ backgroundColor: bg, color: text }}
-      >
-        {getInitials(n.visitorName)}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          {n.type === 'booking' ? (
-            <Bird className="w-3 h-3 text-[#2E7D32] shrink-0" />
-          ) : (
-            <MessageSquare className="w-3 h-3 text-[#1976D2] shrink-0" />
-          )}
-          <span className="text-sm font-semibold text-[#212121] truncate">{n.visitorName}</span>
-          {!n.read && (
-            <span className="ml-auto w-2 h-2 rounded-full bg-[#2E7D32] shrink-0" />
-          )}
-        </div>
-        <p className="text-xs text-[#616161] mt-0.5 leading-relaxed">{n.body}</p>
-        <p className="text-xs text-[#9E9E9E] mt-1">
-          {formatDistanceToNow(n.createdAt, { addSuffix: true })}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 // ─── Header ─────────────────────────────────────────────────────────────────
 interface HeaderProps {
@@ -78,11 +26,13 @@ interface HeaderProps {
 export function AdminHeader({ onMenuClick }: HeaderProps) {
   const avatarRef = useRef<HTMLButtonElement>(null);
   const bellWrapperRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const [userInitial, setUserInitial] = useState('A');
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  const { notifications, unreadCount, clearAll } = useNotifications();
+  const { unreadCount, refresh } = useNotifications();
 
   useEffect(() => {
     if (firebaseConfigError) {
@@ -108,7 +58,10 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
       }
     };
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsPopoverOpen(false);
+      if (e.key === 'Escape') {
+        setIsPopoverOpen(false);
+        bellRef.current?.focus();
+      }
     };
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('keydown', handleEscape);
@@ -121,14 +74,16 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   const handleBellClick = () => {
     const next = !isPopoverOpen;
     setIsPopoverOpen(next);
-    if (next && unreadCount > 0) clearAll();
+    if (next) refresh();
   };
 
   const handleSignOut = async () => {
-    if (!firebaseConfigError) {
-      await signOut(auth);
+    try {
+      if (!firebaseConfigError) await signOutAdmin();
+      router.replace('/admin/login');
+    } catch {
+      toast.error('Unable to disable notifications safely. Check your connection and try signing out again.');
     }
-    router.replace('/admin/login');
   };
 
   const profileMenuGroups = [
@@ -176,9 +131,12 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
         {/* Bell — notifications popover */}
         <div ref={bellWrapperRef} className="relative">
           <button
+            ref={bellRef}
             onClick={handleBellClick}
             className="relative p-2 rounded-lg hover:bg-[#F5F5F5] text-[#616161] transition-colors min-h-11 min-w-11 flex items-center justify-center"
             aria-label="Notifications"
+            aria-expanded={isPopoverOpen}
+            aria-controls={isPopoverOpen ? 'admin-notification-popover' : undefined}
             suppressHydrationWarning
           >
             <Bell className="w-5 h-5" />
@@ -190,41 +148,21 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
           </button>
 
           {/* Popover */}
-          {isPopoverOpen && (
-            <div
-              className="absolute top-[calc(100%+8px)] right-0 w-80 bg-white rounded-2xl shadow-xl border border-[#F0F0F0] z-30 overflow-hidden"
-              style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
-            >
-              {/* Popover header */}
-              <div className="px-4 py-3 border-b border-[#F0F0F0] flex items-center justify-between">
-                <span className="text-sm font-semibold text-[#212121]">Notifications</span>
-                {notifications.some(n => n.read === false || true) && notifications.length > 0 && (
-                  <button
-                    onClick={clearAll}
-                    className="flex items-center gap-1 text-xs text-[#2E7D32] font-medium hover:text-[#1B5E20] transition-colors"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    Mark all read
-                  </button>
-                )}
-              </div>
-
-              {/* List */}
-              {notifications.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#9E9E9E]">
-                  <Bell className="w-8 h-8 opacity-30" />
-                  <p className="text-sm font-medium">No new notifications</p>
-                  <p className="text-xs">New bookings will appear here</p>
-                </div>
-              ) : (
-                <div className="max-h-100 overflow-y-auto divide-y divide-[#F0F0F0]">
-                  {notifications.map(n => (
-                    <NotificationItem key={n.id} n={n} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <AnimatePresence>
+            {isPopoverOpen && (
+              <motion.div
+                id="admin-notification-popover"
+                initial={{ opacity: 0, y: reduceMotion ? 0 : -6, scale: reduceMotion ? 1 : 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: reduceMotion ? 0 : -6, scale: reduceMotion ? 1 : 0.97 }}
+                transition={{ duration: reduceMotion ? 0 : 0.15, ease: 'easeOut' }}
+                className="fixed top-20 left-4 right-4 sm:absolute sm:top-[calc(100%+8px)] sm:left-auto sm:right-0 sm:w-96 bg-white rounded-2xl shadow-xl border border-[#E0E0E0] z-50 overflow-hidden origin-top-right"
+                style={{ fontFamily: 'var(--font-work-sans, Work Sans, sans-serif)' }}
+              >
+                <NotificationInbox onNavigate={() => setIsPopoverOpen(false)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Avatar — triggers profile context menu */}

@@ -11,9 +11,10 @@ export const runtime = 'nodejs';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
+    const secret = process.env.CRON_SECRET;
     if (
-      process.env.CRON_SECRET
-      && authHeader !== `Bearer ${process.env.CRON_SECRET}`
+      !secret?.trim()
+      || authHeader !== `Bearer ${secret}`
     ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

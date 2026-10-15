@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingCapacityExceededError } from '@/lib/firebase/booking-capacity';
+import { BookingContactLimitError } from '@/lib/booking-policy';
 
 const mocks = vi.hoisted(() => ({
+  limitBookingAttempts: vi.fn(),
   createFirestoreBooking: vi.fn(),
   updateBooking: vi.fn(),
   sendPushToAllAdmins: vi.fn(),
   sendBookingConfirmation: vi.fn(),
 }));
+vi.mock('@/lib/firebase/booking-attempt-limit', () => ({ limitBookingAttempts: mocks.limitBookingAttempts }));
 
 vi.mock('@/lib/firebase/bookings', () => ({
   createFirestoreBooking: mocks.createFirestoreBooking,
@@ -73,6 +76,7 @@ function request(body: unknown) {
 
 describe('POST /api/bookings', () => {
   beforeEach(() => {
+    mocks.limitBookingAttempts.mockResolvedValue(null);
     vi.clearAllMocks();
     mocks.createFirestoreBooking.mockResolvedValue(createdBooking);
     mocks.sendPushToAllAdmins.mockResolvedValue(undefined);
@@ -153,6 +157,18 @@ describe('POST /api/bookings', () => {
     }) as never);
 
     expect(response.status).toBe(400);
+    expect(mocks.createFirestoreBooking).not.toHaveBeenCalled();
+  });
+  it('rejects a contact total above 25 before notifications are sent', async () => {
+    mocks.createFirestoreBooking.mockRejectedValue(new BookingContactLimitError(20, 6));
+    const response = await POST(request(validRequest) as never);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'BOOKING_CONTACT_LIMIT', contactRemaining: 5 });
+    expect(mocks.sendBookingConfirmation).not.toHaveBeenCalled();
+  });
+  it('stops repeated submissions before creating a booking', async () => {
+    mocks.limitBookingAttempts.mockResolvedValue(new Response('{}', { status: 429 }));
+    expect((await POST(request(validRequest) as never)).status).toBe(429);
     expect(mocks.createFirestoreBooking).not.toHaveBeenCalled();
   });
 });

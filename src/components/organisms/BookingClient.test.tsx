@@ -51,7 +51,8 @@ describe('BookingClient availability calendar', () => {
 
     const availability = screen.getByRole('status');
     expect(availability).toHaveTextContent(format(targetDate, 'EEEE, d MMMM'));
-    expect(availability).toHaveTextContent('7 seats available');
+    expect(availability).toHaveTextContent('Availability7 seats');
+    expect(screen.getByText(/Across bookings, you may book up to 25 guests per date/)).toBeInTheDocument();
     expect(availability).toHaveTextContent('93 reserved');
     expect(availability).toHaveTextContent('100 total seats');
     expect(availability).toHaveTextContent('Your group needs 1 seat');

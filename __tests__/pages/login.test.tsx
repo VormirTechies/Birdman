@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import AdminLoginPage from '@/app/admin/login/page';
 
 const replace = vi.fn();
@@ -19,6 +20,12 @@ vi.mock('firebase/auth', () => ({
 vi.mock('@/app/admin/_components/Carousel', () => ({ default: () => <div data-testid="carousel" /> }));
 
 describe('Firebase admin login', () => {
+  it('uses POST and disables native submit before hydration so credentials cannot enter a URL', () => {
+    const html = renderToStaticMarkup(<AdminLoginPage />);
+    const template = document.createElement('template'); template.innerHTML = html;
+    expect(template.content.querySelector('form')?.getAttribute('method')).toBe('post');
+    expect(template.content.querySelector('button[type="submit"]')?.hasAttribute('disabled')).toBe(true);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));

@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingCapacityExceededError } from '@/lib/firebase/booking-capacity';
 
 const mocks = vi.hoisted(() => ({
+  limitBookingAttempts: vi.fn(),
   get: vi.fn(),
   updateFirestoreBooking: vi.fn(),
   cancelFirestoreBooking: vi.fn(),
   sendRescheduleNotification: vi.fn(),
   sendBookingCancellation: vi.fn(),
 }));
+vi.mock('@/lib/firebase/booking-attempt-limit', () => ({ limitBookingAttempts: mocks.limitBookingAttempts }));
 
 vi.mock('@/lib/firebase/admin', () => ({
   getAdminDb: () => ({
@@ -85,6 +87,7 @@ function verifiedLookup() {
 
 describe('/api/bookings/self-service', () => {
   beforeEach(() => {
+    mocks.limitBookingAttempts.mockResolvedValue(null);
     vi.clearAllMocks();
     verifiedLookup();
     mocks.updateFirestoreBooking.mockResolvedValue(repositoryBooking);
@@ -122,6 +125,25 @@ describe('/api/bookings/self-service', () => {
     expect(response.status).toBe(404);
     expect(mocks.updateFirestoreBooking).not.toHaveBeenCalled();
   });
+  it('rejects a mismatched booking number even if the contact matches', async () => {
+    const response = await POST(request('POST', { bookingCode: '#000102', contact: 'visitor@example.com' }) as never);
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toContain('do not match');
+  });
+  it.each(['POST', 'PATCH', 'DELETE'])('rejects mismatched contact on %s without changing data', async method => {
+    const handlers = { POST, PATCH, DELETE };
+    const response = await handlers[method as keyof typeof handlers](request(method, { bookingCode: '#000101', contact: 'wrong@example.com' }) as never);
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toContain('do not match');
+    expect(mocks.updateFirestoreBooking).not.toHaveBeenCalled();
+    expect(mocks.cancelFirestoreBooking).not.toHaveBeenCalled();
+  });
+  it.each(['POST', 'PATCH', 'DELETE'])('limits repeated attempts on %s before lookup', async method => {
+    mocks.limitBookingAttempts.mockResolvedValue(new Response('{}', { status: 429 }));
+    const handlers = { POST, PATCH, DELETE };
+    expect((await handlers[method as keyof typeof handlers](request(method, {}) as never)).status).toBe(429);
+    expect(mocks.get).not.toHaveBeenCalled();
+  });
 
   it('reschedules and changes guests through the atomic repository', async () => {
     const response = await PATCH(request('PATCH', {
@@ -140,6 +162,9 @@ describe('/api/bookings/self-service', () => {
         enforceCutoff: true,
         requireConfirmed: true,
         requireEditableVisit: true,
+        enforceContactLimit: true,
+        verifiedContact: '9876543210',
+        verifiedBookingNumber: 101,
       }
     );
     expect(mocks.sendRescheduleNotification).toHaveBeenCalledOnce();
@@ -177,6 +202,8 @@ describe('/api/bookings/self-service', () => {
     expect(mocks.cancelFirestoreBooking).toHaveBeenCalledWith('booking-1', {
       requireConfirmed: true,
       requireNonPastVisit: true,
+      verifiedContact: '9876543210',
+      verifiedBookingNumber: 101,
     });
     expect(mocks.sendBookingCancellation).toHaveBeenCalledOnce();
   });

@@ -1,175 +1,66 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NextRequest } from 'next/server';
+// @vitest-environment node
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest, NextResponse } from 'next/server';
+import { BookingNotFoundError } from '@/lib/firebase/booking-capacity';
+import { makeAdminBooking } from '../fixtures/booking';
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), collection: vi.fn(), doc: vi.fn(), get: vi.fn(),
+  update: vi.fn<typeof import('@/lib/firebase/bookings').updateFirestoreBooking>(), email: vi.fn() }));
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/require-admin', () => ({ requireAdmin: mocks.auth }));
+vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: () => ({ collection: mocks.collection }) }));
+vi.mock('@/lib/firebase/bookings', () => ({ updateFirestoreBooking: mocks.update, deleteFirestoreBooking: vi.fn() }));
+vi.mock('@/lib/email', () => ({ sendRescheduleNotification: mocks.email }));
 import { PATCH } from '@/app/api/bookings/[id]/route';
-
-// ── Mocks ────────────────────────────────────────────────────────────────────
-
-vi.mock('@/lib/db/queries', () => ({
-  getBookingById: vi.fn(),
-  toggleVisited: vi.fn(),
-  updateBooking: vi.fn(),
-}));
-
-vi.mock('@/lib/email', () => ({
-  sendRescheduleNotification: vi.fn(),
-}));
-
-import { getBookingById, toggleVisited } from '@/lib/db/queries';
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const VALID_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-
-function makeBooking(overrides = {}) {
-  return {
-    id: VALID_UUID,
-    visitorName: 'Meiyazhagan Sudarson',
-    phone: '+919876543210',
-    email: 'meiya@example.com',
-    numberOfGuests: 3,
-    bookingDate: '2026-04-28',
-    bookingTime: '10:00',
-    status: 'confirmed',
-    visited: false,
-    createdAt: new Date('2026-04-01'),
-    updatedAt: new Date('2026-04-01'),
-    ...overrides,
-  };
+function patch(body: unknown, id = 'booking-1') {
+  return PATCH(new NextRequest(`http://localhost/api/bookings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }), { params: Promise.resolve({ id }) });
 }
-
-function patch(id: string, body: unknown) {
-  const url = new URL(`http://localhost/api/bookings/${id}`);
-  return PATCH(new NextRequest(url, { method: 'PATCH', body: JSON.stringify(body) }), {
-    params: Promise.resolve({ id }),
+beforeEach(() => {
+  vi.resetAllMocks(); mocks.auth.mockResolvedValue({ user: { uid: 'admin-1' } });
+  mocks.collection.mockReturnValue({ doc: mocks.doc }); mocks.doc.mockReturnValue({ get: mocks.get });
+  mocks.get.mockResolvedValue({ exists: true, data: () => makeAdminBooking() });
+  mocks.update.mockResolvedValue(makeAdminBooking({ visited: true })); mocks.email.mockResolvedValue({ success: true });
+});
+describe('PATCH /api/bookings/[id] — Firestore checklist', () => {
+  it.each([true, false])('sets visited=%s through the atomic repository', async visited => {
+    mocks.update.mockResolvedValue(makeAdminBooking({ visited }));
+    const response = await patch({ visited }); expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, booking: { visited, adults: 2, children: 0 }, emailSent: false });
+    expect(mocks.doc).toHaveBeenCalledWith('booking-1');
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith('booking-1', { visited }, { actorUid: 'admin-1', enforceCutoff: false, requireNonPastTarget: false });
+    expect(mocks.email).not.toHaveBeenCalled();
   });
-}
-
-// ── PATCH /api/bookings/[id] — Visited Toggle ─────────────────────────────
-
-describe('PATCH /api/bookings/[id] – visited toggle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('accepts Firestore-generated IDs rather than requiring legacy UUIDs', async () => {
+    expect((await patch({ visited: true }, 'RLk1RoAWI5ORc8GT4WX8')).status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith('RLk1RoAWI5ORc8GT4WX8', { visited: true }, expect.anything());
   });
-
-  describe('successful toggle', () => {
-    it('marks visited as true and returns updated booking', async () => {
-      const existing = makeBooking({ visited: false });
-      const updated = makeBooking({ visited: true });
-
-      vi.mocked(getBookingById).mockResolvedValue(existing);
-      vi.mocked(toggleVisited).mockResolvedValue(updated);
-
-      const res = await patch(VALID_UUID, { visited: true });
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.booking.visited).toBe(true);
-    });
-
-    it('marks visited as false and returns updated booking', async () => {
-      const existing = makeBooking({ visited: true });
-      const updated = makeBooking({ visited: false });
-
-      vi.mocked(getBookingById).mockResolvedValue(existing);
-      vi.mocked(toggleVisited).mockResolvedValue(updated);
-
-      const res = await patch(VALID_UUID, { visited: false });
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.success).toBe(true);
-      expect(data.booking.visited).toBe(false);
-    });
-
-    it('calls toggleVisited with the correct id and value', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(makeBooking());
-      vi.mocked(toggleVisited).mockResolvedValue(makeBooking({ visited: true }));
-
-      await patch(VALID_UUID, { visited: true });
-
-      expect(toggleVisited).toHaveBeenCalledOnce();
-      expect(toggleVisited).toHaveBeenCalledWith(VALID_UUID, true);
-    });
-
-    it('calls getBookingById to verify booking exists before toggling', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(makeBooking());
-      vi.mocked(toggleVisited).mockResolvedValue(makeBooking({ visited: true }));
-
-      await patch(VALID_UUID, { visited: true });
-
-      expect(getBookingById).toHaveBeenCalledWith(VALID_UUID);
-    });
+  it.each([{}, { visited: 'true' }, { visited: true, unexpected: 1 }])('rejects invalid mutations %j', async body => {
+    expect((await patch(body)).status).toBe(400); expect(mocks.update).not.toHaveBeenCalled();
   });
-
-  describe('validation errors', () => {
-    it('returns 400 for an invalid UUID format', async () => {
-      const res = await patch('not-a-uuid', { visited: true });
-      expect(res.status).toBe(400);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toMatch(/invalid booking id/i);
-    });
-
-    it('does not call getBookingById for invalid UUID', async () => {
-      await patch('bad-id', { visited: true });
-      expect(getBookingById).not.toHaveBeenCalled();
-    });
-
-    it('does not call toggleVisited for invalid UUID', async () => {
-      await patch('bad-id', { visited: true });
-      expect(toggleVisited).not.toHaveBeenCalled();
-    });
+  it('returns 404 without updating a missing snapshot', async () => {
+    mocks.get.mockResolvedValue({ exists: false, data: () => undefined });
+    const response = await patch({ visited: true }); expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ success: false, error: 'Booking not found' }); expect(mocks.update).not.toHaveBeenCalled();
   });
-
-  describe('not found', () => {
-    it('returns 404 when booking does not exist', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(null);
-
-      const res = await patch(VALID_UUID, { visited: true });
-      expect(res.status).toBe(404);
-      const data = await res.json();
-      expect(data.success).toBe(false);
-      expect(data.error).toMatch(/not found/i);
-    });
-
-    it('does not call toggleVisited when booking is not found', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(null);
-      await patch(VALID_UUID, { visited: true });
-      expect(toggleVisited).not.toHaveBeenCalled();
-    });
+  it('handles a booking deleted between lookup and the transaction', async () => {
+    mocks.update.mockRejectedValue(new BookingNotFoundError('booking-1')); expect((await patch({ visited: true })).status).toBe(404);
   });
-
-  describe('routing to visited-toggle path', () => {
-    it('does NOT route to toggleVisited when body has extra keys', async () => {
-      // Body with extra keys should fall through to reschedule path (not toggleVisited)
-      vi.mocked(getBookingById).mockResolvedValue(makeBooking());
-      // toggleVisited should not be called
-      await patch(VALID_UUID, { visited: true, bookingDate: '2026-05-01' });
-      expect(toggleVisited).not.toHaveBeenCalled();
-    });
-
-    it('routes to toggleVisited when body has exactly one key: visited', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(makeBooking());
-      vi.mocked(toggleVisited).mockResolvedValue(makeBooking({ visited: true }));
-
-      await patch(VALID_UUID, { visited: true });
-      expect(toggleVisited).toHaveBeenCalled();
-    });
+  it('passes mixed updates to the repository and emails only when rescheduling', async () => {
+    mocks.update.mockResolvedValue(makeAdminBooking({ visited: true, bookingDate: '2099-05-01' }));
+    const response = await patch({ visited: true, bookingDate: '2099-05-01' });
+    expect(await response.json()).toMatchObject({ success: true, emailSent: true });
+    expect(mocks.update).toHaveBeenCalledWith('booking-1', { visited: true, bookingDate: '2099-05-01' },
+      { actorUid: 'admin-1', enforceCutoff: false, requireNonPastTarget: true });
+    expect(mocks.email).toHaveBeenCalledWith(expect.objectContaining({ visited: true, bookingDate: '2099-05-01' }),
+      { bookingDate: '2099-04-28', bookingTime: '16:30:00' });
   });
-
-  describe('error handling', () => {
-    it('returns 500 when getBookingById throws', async () => {
-      vi.mocked(getBookingById).mockRejectedValue(new Error('DB error'));
-      const res = await patch(VALID_UUID, { visited: true });
-      expect(res.status).toBe(500);
-    });
-
-    it('returns 500 when toggleVisited throws', async () => {
-      vi.mocked(getBookingById).mockResolvedValue(makeBooking());
-      vi.mocked(toggleVisited).mockRejectedValue(new Error('DB write error'));
-      const res = await patch(VALID_UUID, { visited: true });
-      expect(res.status).toBe(500);
-    });
+  it.each([401, 403])('denies unauthorized changes (%i) before reading Firestore', async status => {
+    mocks.auth.mockResolvedValue({ user: null, response: NextResponse.json({ success: false }, { status }) });
+    expect((await patch({ visited: true })).status).toBe(status); expect(mocks.collection).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it.each(['lookup', 'update'])('returns 500 when the %s fails', async stage => {
+    if (stage === 'lookup') mocks.get.mockRejectedValue(new Error('Database read failed'));
+    else mocks.update.mockRejectedValue(new Error('Database write failed'));
+    const response = await patch({ visited: true }); expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ success: false, error: 'Failed to update booking', code: 'BOOKING_UPDATE_ERROR' });
   });
 });

@@ -5,6 +5,31 @@
 
 // ─── Cache Configuration ─────────────────────────────────────────────────────
 
+// Share the existing PWA worker with Firebase Messaging; never request permission here.
+// Register before Firebase's handler; push payloads cannot choose a navigation URL.
+self.addEventListener('notificationclick', function(event) {
+  event.stopImmediatePropagation();
+  event.notification.close();
+  if (event.action === 'close') return;
+  const payload = event.notification.data && event.notification.data.FCM_MSG;
+  const id = payload && payload.data && payload.data.notificationId;
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windows) {
+    for (const client of windows) {
+      const url = new URL(client.url);
+      if (url.origin === self.location.origin && (url.pathname === '/admin' || url.pathname.startsWith('/admin/'))) {
+        if (typeof id === 'string' && /^[a-f0-9]{64}$/.test(id)) client.postMessage({ type: 'BIRDMAN_NOTIFICATION', notificationId: id });
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow('/admin');
+  }));
+});
+try { importScripts('/api/notifications/worker'); } catch (_) { /* PWA remains usable without FCM. */ }
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'BIRDMAN_FCM_STATUS' && event.ports[0]) {
+    event.ports[0].postMessage({ ready: self.__birdmanFcmReady === true });
+  }
+});
 const CACHE_STATIC = 'birdman-static-v3';
 const CACHE_PAGES  = 'birdman-pages-v3';
 
@@ -113,6 +138,8 @@ self.addEventListener('fetch', function(event) {
 // ─── Push Notifications ──────────────────────────────────────────────────────
 
 self.addEventListener('push', function(event) {
+  // Firebase Messaging owns FCM payloads; avoid a second legacy notification.
+  try { if (event.data && event.data.json().from) return; } catch (_) {}
   if (event.data) {
     let data = {};
     try {
@@ -168,35 +195,4 @@ self.addEventListener('push', function(event) {
       })
     );
   }
-});
-
-self.addEventListener('notificationclick', function(event) {
-  const notification = event.notification;
-  const action = event.action;
-
-  notification.close();
-
-  if (action === 'close') return;
-
-  // 🦅 Intelligent Window Routing with Data Refresh
-  // If a window is already open at the sanctuary dashboard, focus it and refresh data.
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i];
-        if (client.url.includes('/admin') && 'focus' in client) {
-          // Focus the window and trigger data refresh
-          client.postMessage({
-            type: 'REFRESH_DATA',
-            timestamp: Date.now()
-          });
-          return client.focus();
-        }
-      }
-      // No existing admin window, open a new one
-      if (clients.openWindow) {
-        return clients.openWindow(notification.data.url);
-      }
-    })
-  );
 });

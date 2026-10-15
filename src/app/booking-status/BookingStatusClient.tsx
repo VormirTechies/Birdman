@@ -54,7 +54,7 @@ function formatTime(time: string) {
   return `${displayHour}:${minute} ${period}`;
 }
 
-async function readJson(response: Response) {
+async function readJson(response: Response, onGroupLimit?: (phone: string | null) => void) {
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) {
     const text = await response.text().catch(() => '');
@@ -66,6 +66,7 @@ async function readJson(response: Response) {
 
   const data = await response.json();
   if (!response.ok) {
+    if (data.code === 'BOOKING_CONTACT_LIMIT') onGroupLimit?.(data.contactPhone ?? null);
     throw new Error(data.error || 'Something went wrong. Please try again.');
   }
   return data;
@@ -77,6 +78,7 @@ export function BookingStatusClient() {
   const [booking, setBooking] = useState<BookingStatus | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [groupContactPhone, setGroupContactPhone] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dateDraft, setDateDraft] = useState('');
@@ -121,6 +123,7 @@ export function BookingStatusClient() {
 
   const resetNotice = () => {
     setError('');
+    setGroupContactPhone(null);
     setMessage('');
   };
 
@@ -186,7 +189,7 @@ export function BookingStatusClient() {
             adults: adultsDraft,
             children: childrenDraft,
           }),
-        })
+        }), setGroupContactPhone
       );
       setBooking(data.booking);
       setActionMode('none');
@@ -275,6 +278,7 @@ export function BookingStatusClient() {
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 {error}
+                {groupContactPhone && <a className="underline" href={`tel:${groupContactPhone.replace(/[^+\d]/g, '')}`}>Call Vithya mam</a>}
               </div>
             )}
 

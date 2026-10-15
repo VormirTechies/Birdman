@@ -12,6 +12,9 @@ import {
 import { getAdminDb } from '@/lib/firebase/admin';
 import { createFirestoreBooking } from '@/lib/firebase/bookings';
 import { publicBookingSubmissionSchema } from '@/models/firestore/booking';
+import { BookingContactLimitError } from '@/lib/booking-policy';
+import { bookingContactLimitResponse } from '@/lib/booking-limit-response';
+import { limitBookingAttempts } from '@/lib/firebase/booking-attempt-limit';
 
 console.log('[api/bookings] module loaded');
 
@@ -99,6 +102,8 @@ function serializeValue(value: unknown): unknown {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await limitBookingAttempts(request, 'create');
+  if (rateLimit) return rateLimit;
   console.log('[api/bookings] POST started');
   console.log('[api/bookings] Firebase env presence', firebaseEnvPresence());
 
@@ -150,25 +155,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     };
 
-    const guestCount =
-      booking.children > 0
-        ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
-        : `${booking.adults} guest(s)`;
-
-    try {
-      console.log('[api/bookings] loading push sender');
-      const { sendPushToAllAdmins } = await import('@/lib/push');
-      await sendPushToAllAdmins({
-        title: 'New Parakeet Visit Booked!',
-        body: `${booking.visitorName} scheduled ${guestCount} for ${booking.bookingDate}.`,
-        url: '/admin',
-        visitorName: booking.visitorName,
-        bookingDate: booking.bookingDate,
-      });
-    } catch (pushError) {
-      logSafeError('[api/bookings] Push notification failed, but booking created', pushError);
-    }
-
+    // Admin alerts are queued atomically by createFirestoreBooking.
     let emailSent = false;
     if (booking.email) {
       try {
@@ -213,6 +200,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof BookingContactLimitError) return bookingContactLimitResponse(error);
     logSafeError('[api/bookings] POST failed', error);
 
     if (error instanceof BookingCapacityExceededError) {

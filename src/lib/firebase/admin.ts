@@ -2,6 +2,8 @@ import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { getMessaging } from 'firebase-admin/messaging';
+import { resolveNotificationConfig } from './notification-config';
 import {
   LOCAL_FIRESTORE_DATABASE_ID,
   resolveFirestoreDatabaseId,
@@ -59,6 +61,18 @@ export function getAdminAuth() {
 
 export function getAdminDb() {
   return adminDb;
+}
+
+// Lazy initialization only; this does not send messages or configure live FCM.
+export function getAdminMessaging() {
+  const config = resolveNotificationConfig();
+  if (config.mode !== 'fcm' || !config.configured) {
+    throw new Error('Firebase notification delivery is not configured for FCM');
+  }
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    throw new Error('FCM has no local emulator; use mock notification delivery');
+  }
+  return getMessaging(app);
 }
 
 export default app;

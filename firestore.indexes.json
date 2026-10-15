@@ -1,6 +1,30 @@
 {
   "indexes": [
     {
+      "collectionGroup": "adminNotificationStates", "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notificationDeliveryJobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "nextAttemptAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "adminNotificationDevices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "bookings",
       "queryScope": "COLLECTION",
       "fields": [
@@ -719,20 +743,6 @@
       ]
     },
     {
-      "collectionGroup": "gallery",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "uploadedAt",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "visitor_checkins",
       "queryScope": "COLLECTION",
       "fields": [
@@ -1058,6 +1068,17 @@
     }
   ],
   "fieldOverrides": [
+    { "collectionGroup": "notificationDeliveryJobs", "fieldPath": "leaseId", "indexes": [] },
+    { "collectionGroup": "notificationDeliveryJobs", "fieldPath": "deviceCursor", "indexes": [] },
+    { "collectionGroup": "notificationDeliveryReceipts", "fieldPath": "expiresAt", "ttl": true, "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "DESCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "bookings", "fieldPath": "notificationRevision", "indexes": [] },
+    { "collectionGroup": "bookingDays", "fieldPath": "notificationFullRevision", "indexes": [] },
+    { "collectionGroup": "adminNotifications", "fieldPath": "expiresAt", "ttl": true, "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "DESCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "adminNotificationStates", "fieldPath": "expiresAt", "ttl": true, "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "DESCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "adminNotificationDevices", "fieldPath": "expiresAt", "ttl": true, "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "DESCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "notificationDeliveryJobs", "fieldPath": "expiresAt", "ttl": true, "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }, { "order": "DESCENDING", "queryScope": "COLLECTION" }] },
+    { "collectionGroup": "adminNotificationDevices", "fieldPath": "token", "indexes": [] },
+    { "collectionGroup": "adminNotifications", "fieldPath": "body", "indexes": [] },
     {
       "collectionGroup": "feedback",
       "fieldPath": "email",

@@ -20,7 +20,7 @@ describe('feedbackSubmissionSchema', () => {
     [{ ...valid, feedback: 'A'.repeat(19) }, 'short feedback'],
     [{ ...valid, feedback: 'A'.repeat(501) }, 'long feedback'],
     [{ ...valid, status: 'approved' }, 'unknown server-owned field'],
-  ])('rejects %s (%s)', (input) => {
-    expect(feedbackSubmissionSchema.safeParse(input).success).toBe(false);
+  ])('rejects %s (%s)', (input, reason) => {
+    expect(feedbackSubmissionSchema.safeParse(input).success, reason).toBe(false);
   });
 });

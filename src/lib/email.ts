@@ -9,6 +9,19 @@ import type { Booking } from './db/schema';
 import React from 'react';
 import { absoluteUrl } from './site';
 import { getPublicBookingCode } from './booking-number';
+import { z } from 'zod';
+
+const recipientSchema = z.string().max(254).email();
+
+function normalizeRecipient(value: string): string {
+  // Reject control characters before trimming, and accept one mailbox only.
+  if (typeof value !== 'string' || /[\x00-\x1f\x7f]/.test(value)) {
+    throw new Error('Invalid email recipient');
+  }
+  const result = recipientSchema.safeParse(value.trim());
+  if (!result.success) throw new Error('Invalid email recipient');
+  return result.data;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EMAIL SERVICE - Nodemailer (Gmail SMTP) Integration
@@ -23,6 +36,8 @@ function getTransporter() {
 
   return nodemailer.createTransport({
     service: 'gmail',
+    disableFileAccess: true,
+    disableUrlAccess: true,
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_PASS, // 16-character App Password
@@ -37,7 +52,8 @@ function getMailDefaults() {
   const cc = (process.env.EMAIL_CC || '')
     .split(',')
     .map((email) => email.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(normalizeRecipient);
 
   return {
     from: FROM_EMAIL,
@@ -58,10 +74,12 @@ export async function sendBookingConfirmation(booking: Booking): Promise<{
       return { success: false, error: 'No email address provided' };
     }
 
+    const recipient = normalizeRecipient(booking.email);
     const transporter = getTransporter();
     
     // Render React component to HTML
     const emailHtml = await render(
+        // eslint-disable-next-line react/no-children-prop -- This template uses children as a numeric guest count.
         React.createElement(BookingConfirmation, {
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
@@ -76,7 +94,7 @@ export async function sendBookingConfirmation(booking: Booking): Promise<{
 
     const info = await transporter.sendMail({
       ...getMailDefaults(),
-      to: booking.email,
+      to: { address: recipient, name: '' },
       subject: '🦜 Booking Confirmed — Birdman of Chennai',
       html: emailHtml,
     });
@@ -102,9 +120,11 @@ export async function sendBookingReminder(booking: Booking): Promise<{
       return { success: false, error: 'No email address provided' };
     }
 
+    const recipient = normalizeRecipient(booking.email);
     const transporter = getTransporter();
     
     const emailHtml = await render(
+        // eslint-disable-next-line react/no-children-prop -- This template uses children as a numeric guest count.
         React.createElement(BookingReminder, {
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
@@ -117,7 +137,7 @@ export async function sendBookingReminder(booking: Booking): Promise<{
 
     const info = await transporter.sendMail({
       ...getMailDefaults(),
-      to: booking.email,
+      to: { address: recipient, name: '' },
       subject: '⏰ Reminder: Your Visit is Today! — Birdman of Chennai',
       html: emailHtml,
     });
@@ -146,9 +166,11 @@ export async function sendRescheduleNotification(
       return { success: false, error: 'No email address provided' };
     }
 
+    const recipient = normalizeRecipient(booking.email);
     const transporter = getTransporter();
     
     const emailHtml = await render(
+        // eslint-disable-next-line react/no-children-prop -- This template uses children as a numeric guest count.
         React.createElement(BookingReschedule, {
             visitorName: booking.visitorName,
             oldDate: oldBooking.bookingDate,
@@ -165,7 +187,7 @@ export async function sendRescheduleNotification(
 
     const info = await transporter.sendMail({
       ...getMailDefaults(),
-      to: booking.email,
+      to: { address: recipient, name: '' },
       subject: '📅 Booking Rescheduled — Birdman of Chennai',
       html: emailHtml,
     });
@@ -200,6 +222,8 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
   error?: string;
 }> {
   try {
+    const recipient = normalizeRecipient(email);
+    if (!/^\d{6}$/.test(code)) throw new Error('Invalid verification code');
     const transporter = getTransporter();
     
     const htmlBody = `
@@ -217,7 +241,7 @@ export async function sendAdminVerificationCode(email: string, code: string): Pr
 
     await transporter.sendMail({
       ...getMailDefaults(),
-      to: email,
+      to: { address: recipient, name: '' },
       subject: '🔐 Verification Code: Admin Profile Update — Birdman of Chennai',
       html: htmlBody,
     });
@@ -242,10 +266,12 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
       return { success: false, error: 'No email address provided' };
     }
 
+    const recipient = normalizeRecipient(booking.email);
     const transporter = getTransporter();
     
     // Render React component to HTML
     const emailHtml = await render(
+        // eslint-disable-next-line react/no-children-prop -- This template uses children as a numeric guest count.
         React.createElement(BookingCancellation, {
             visitorName: booking.visitorName,
             bookingDate: booking.bookingDate,
@@ -260,7 +286,7 @@ export async function sendBookingCancellation(booking: Booking): Promise<{
 
     const info = await transporter.sendMail({
       ...getMailDefaults(),
-      to: booking.email,
+      to: { address: recipient, name: '' },
       subject: '🦜 Booking Cancellation Notice — Birdman of Chennai',
       html: emailHtml,
     });
@@ -344,9 +370,11 @@ export async function sendVipWelcomeEmail(
       return { success: false, error: 'No email address provided' };
     }
 
+    const recipient = normalizeRecipient(booking.email);
     const transporter = getTransporter();
 
     const emailHtml = await render(
+      // eslint-disable-next-line react/no-children-prop -- This template uses children as a numeric guest count.
       React.createElement(VipWelcome, {
         visitorName: booking.visitorName,
         bookingDate: booking.bookingDate,
@@ -361,7 +389,7 @@ export async function sendVipWelcomeEmail(
 
     const info = await transporter.sendMail({
       ...getMailDefaults(),
-      to: booking.email,
+      to: { address: recipient, name: '' },
       subject: '⭐ Welcome Back, VIP! — Birdman of Chennai',
       html: emailHtml,
     });

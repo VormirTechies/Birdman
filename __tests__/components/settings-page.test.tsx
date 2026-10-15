@@ -1,240 +1,208 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
+import type { DatePicker } from '@/app/admin/_components/DatePicker';
 import SettingsPage from '@/app/admin/settings/page';
-import { vi } from 'vitest';
 
-/**
- * Phase 2 Tests: Settings Page UI
- * Tests for UI interactions and component behavior
- */
-
-// Mock Supabase client
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: vi.fn(() => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { email: 'admin@test.com' } },
-      }),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { id: 'admin-123' },
-        error: null,
-      }),
-    })),
-  })),
+vi.mock('@/lib/firebase/authenticated-fetch', () => ({
+  authenticatedFetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+// Isolate date selection from the popover's geometry; keep the real mode selector,
+// settings form and preview component so payloads and visible state are exercised.
+vi.mock('@/app/admin/_components/DatePicker', () => ({
+  DatePicker: ({ value, onChange }: ComponentProps<typeof DatePicker>) => (
+    <input aria-label="Date picker" type="date" value={`${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`}
+      onChange={event => onChange(new Date(`${event.target.value}T12:00:00`))} />
+  ),
 }));
 
-// Mock toast
-vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+const scope = { startDate: '2026-10-16', endDate: '2027-04-14' };
+const preview = { success: true, scope, affectedDatesCount: 181, affectedDates: ['2026-10-16'],
+  existingBookingsCount: 0, bookingsByDate: [], sampleCurrentSettings: [], willBlock: false };
+const day = { success: true, settings: { maxCapacity: 120, startTime: '18:00:00', isOpen: false } };
+const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
+const fetchMock = vi.fn<typeof fetch>();
+const posted = (path: string) => fetchMock.mock.calls.filter(([url]) => url === path).map(([, init]) => JSON.parse(String(init?.body)));
+const previewPath = '/api/admin/settings/preview';
+const applyPath = '/api/admin/settings/bulk-update';
 
-// Mock fetch
-global.fetch = vi.fn();
-
-describe('Settings Page UI', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubGlobal('fetch', fetchMock);
+  fetchMock.mockImplementation(async url => {
+    if (String(url).startsWith('/api/calendar/day/')) return json(day);
+    if (url === previewPath) return json(preview);
+    return json({ success: true, affectedCount: 181, cancelledBookingsCount: 0, emailsSent: 0, emailsFailed: 0 });
   });
+});
 
-  it('renders settings page with all components', () => {
+describe('Settings V2 selected changes and reviewed scope', () => {
+  it('starts with no settings selected and explains the bounded window', () => {
     render(<SettingsPage />);
-
-    expect(screen.getByText('Calendar Settings')).toBeInTheDocument();
-    expect(screen.getByText('Configure capacity, timings, and availability')).toBeInTheDocument();
-    expect(screen.getByText('Select Date Range')).toBeInTheDocument();
-    expect(screen.getByText('Configuration')).toBeInTheDocument();
-    expect(screen.getByText('Preview Changes')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Calendar Settings' })).toBeInTheDocument();
+    expect(screen.getByText(/181 dates, inclusive/)).toBeInTheDocument();
+    for (const field of screen.getAllByRole('checkbox')) expect(field).not.toBeChecked();
+    expect(screen.queryByLabelText('Maximum Capacity')).not.toBeInTheDocument();
   });
-
-  it('shows all three apply mode options', () => {
-    render(<SettingsPage />);
-
-    expect(screen.getByText('All Days')).toBeInTheDocument();
-    expect(screen.getByText('One Day')).toBeInTheDocument();
-    expect(screen.getByText('Date Range')).toBeInTheDocument();
-  });
-
-  it('switches between apply modes', async () => {
-    render(<SettingsPage />);
-
-    const oneDayButton = screen.getByText('One Day').closest('button');
-    const dateRangeButton = screen.getByText('Date Range').closest('button');
-
-    // Switch to One Day mode
-    fireEvent.click(oneDayButton!);
-    await waitFor(() => {
-      expect(screen.getByLabelText('Select Date')).toBeInTheDocument();
-    });
-
-    // Switch to Date Range mode
-    fireEvent.click(dateRangeButton!);
-    await waitFor(() => {
-      expect(screen.getByLabelText('Start Date')).toBeInTheDocument();
-      expect(screen.getByLabelText('End Date')).toBeInTheDocument();
-    });
-  });
-
-  it('displays configuration options', () => {
-    render(<SettingsPage />);
-
-    expect(screen.getByLabelText('Maximum Capacity')).toBeInTheDocument();
-    expect(screen.getByLabelText('Session Start Time')).toBeInTheDocument();
-    expect(screen.getByText('Open for Bookings')).toBeInTheDocument();
-  });
-
-  it('updates max capacity input', async () => {
-    const user = userEvent.setup();
-    render(<SettingsPage />);
-
-    const capacityInput = screen.getByLabelText('Maximum Capacity') as HTMLInputElement;
-    await user.clear(capacityInput);
-    await user.type(capacityInput, '150');
-
-    expect(capacityInput.value).toBe('150');
-  });
-
-  it('updates start time input', async () => {
-    const user = userEvent.setup();
-    render(<SettingsPage />);
-
-    const timeInput = screen.getByLabelText('Session Start Time') as HTMLInputElement;
-    await user.clear(timeInput);
-    await user.type(timeInput, '15:00');
-
-    // Time input displays with seconds appended by the component
-    expect(timeInput.value).toBe('15:00:00');
-  });
-
-  it('shows warning when blocking dates', async () => {
-    render(<SettingsPage />);
-
-    const switchButton = screen.getByRole('switch');
-    fireEvent.click(switchButton);
-
-    await waitFor(() => {
-      // Check for the red warning banner by looking for text unique to it
-      const warningDiv = screen.getByText((content, element) => {
-        return element?.classList.contains('text-[#ba1a1a]') &&
-               content.includes('Existing bookings for blocked dates');
-      });
-      expect(warningDiv).toBeInTheDocument();
-    });
-  });
-
-  it('validates one_day mode requires date', async () => {
+  it('rejects an empty change set without calling an API', async () => {
     const { toast } = await import('sonner');
     render(<SettingsPage />);
-
-    // Switch to One Day mode
-    const oneDayButton = screen.getByText('One Day').closest('button');
-    fireEvent.click(oneDayButton!);
-
-    // Click Preview without selecting date
-    const previewButton = screen.getByText('Preview Changes');
-    fireEvent.click(previewButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Please select a date');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    expect(toast.error).toHaveBeenCalledWith('Select at least one setting to change');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
-
-  it('validates date_range mode requires both dates', async () => {
+  it('sends capacity only and applies the exact reviewed date scope', async () => {
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+    await user.click(screen.getByLabelText('Change capacity'));
+    fireEvent.change(screen.getByLabelText('Maximum Capacity'), { target: { value: '80' } });
+    await user.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath)).toEqual([{ applyMode: 'all_days', settings: { maxCapacity: 80 } }]);
+    expect(screen.getByText(/2026-10-16 through 2027-04-14/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Change capacity')).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Confirm & Apply' }));
+    await waitFor(() => expect(posted(applyPath)).toEqual([{ applyMode: 'all_days', settings: { maxCapacity: 80 }, scope }]));
+    await waitFor(() => expect(screen.getByLabelText('Change capacity')).not.toBeChecked());
+  });
+  it('omits a field when it is unchecked, including a previously selected close action', async () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change booking availability'));
+    fireEvent.click(screen.getByLabelText('Open for Bookings'));
+    expect(screen.getByRole('alert')).toHaveTextContent('cancel existing confirmed bookings');
+    fireEvent.click(screen.getByLabelText('Change booking availability'));
+    fireEvent.click(screen.getByLabelText('Change visiting time'));
+    fireEvent.change(screen.getByLabelText('Visiting Hour (India time)'), { target: { value: '15:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath)[0].settings).toEqual({ startTime: '15:00:00' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('preserves explicit zero capacity and false availability', async () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.change(screen.getByLabelText('Maximum Capacity'), { target: { value: '0' } });
+    fireEvent.click(screen.getByLabelText('Change booking availability'));
+    fireEvent.click(screen.getByLabelText('Open for Bookings'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath)[0].settings).toEqual({ maxCapacity: 0, isOpen: false });
+  });
+  it('reset clears selections rather than submitting fallback values', () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.click(screen.getByLabelText('Change visiting time'));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset changes' }));
+    expect(screen.queryByLabelText('Maximum Capacity')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Visiting Hour (India time)')).not.toBeInTheDocument();
+    for (const field of screen.getAllByRole('checkbox')) expect(field).not.toBeChecked();
+  });
+  it('loads current day values without selecting fields automatically', async () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /One Day/ }));
+    await waitFor(() => expect(screen.getByLabelText('Change capacity')).toBeEnabled());
+    expect(screen.getByLabelText('Change capacity')).not.toBeChecked();
+    // Clicking the active mode again must not leave the form stuck loading.
+    fireEvent.click(screen.getByRole('button', { name: /One Day/ }));
+    expect(screen.getByLabelText('Change capacity')).toBeEnabled();
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    expect(screen.getByLabelText('Maximum Capacity')).toHaveValue(120);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath)[0].settings).toEqual({ maxCapacity: 120 });
+  });
+  it('blocks preview after a day-settings load failure', async () => {
+    fetchMock.mockResolvedValue(json({ error: 'Unavailable' }, 500));
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /One Day/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load');
+    expect(screen.getByRole('button', { name: 'Preview Changes' })).toBeDisabled();
+    expect(posted(previewPath)).toHaveLength(0);
+  });
+  it('ignores a delayed response for a previously selected date', async () => {
+    let finishFirst!: (value: Response) => void;
+    let calls = 0;
+    fetchMock.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) return new Promise(resolve => { finishFirst = resolve; });
+      return json({ ...day, settings: { ...day.settings, maxCapacity: 70 } });
+    });
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /One Day/ }));
+    expect(screen.getByRole('button', { name: 'Preview Changes' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Date picker'), { target: { value: '2026-11-02' } });
+    await waitFor(() => expect(screen.getByLabelText('Change capacity')).toBeEnabled());
+    await act(async () => finishFirst(json(day)));
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    expect(screen.getByLabelText('Maximum Capacity')).toHaveValue(70);
+  });
+  it('sends only inclusive range dates and selected fields', async () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /Date Range/ }));
+    const pickers = screen.getAllByLabelText('Date picker');
+    fireEvent.change(pickers[0], { target: { value: '2026-11-02' } });
+    fireEvent.change(pickers[1], { target: { value: '2026-11-03' } });
+    fireEvent.click(screen.getByLabelText('Change visiting time'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath)[0]).toEqual({ applyMode: 'date_range', startDate: '2026-11-02', endDate: '2026-11-03', settings: { startTime: '16:30:00' } });
+  });
+  it('prevents duplicate preview requests while the first request is pending', async () => {
+    let finish!: (value: Response) => void;
+    fetchMock.mockImplementation(async () => new Promise(resolve => { finish = resolve; }));
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    const button = screen.getByRole('button', { name: 'Preview Changes' });
+    fireEvent.click(button); fireEvent.click(button);
+    expect(posted(previewPath)).toHaveLength(1);
+    await act(async () => finish(json(preview)));
+    expect(screen.getByRole('button', { name: 'Confirm & Apply' })).toBeInTheDocument();
+  });
+  it.each(['-1', '201', '2.5', ''])('rejects invalid selected capacity %s', async value => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.change(screen.getByLabelText('Maximum Capacity'), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('keeps changes when preview fails, without opening a review', async () => {
+    fetchMock.mockResolvedValue(json({ error: 'Preview unavailable' }, 500));
     const { toast } = await import('sonner');
     render(<SettingsPage />);
-
-    // Switch to Date Range mode
-    const dateRangeButton = screen.getByText('Date Range').closest('button');
-    fireEvent.click(dateRangeButton!);
-
-    // Click Preview without selecting dates
-    const previewButton = screen.getByText('Preview Changes');
-    fireEvent.click(previewButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Please select start and end dates');
-    });
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Preview unavailable'));
+    expect(screen.getByLabelText('Maximum Capacity')).toHaveValue(100);
+    expect(screen.queryByRole('button', { name: 'Confirm & Apply' })).not.toBeInTheDocument();
   });
-
-  it('validates start date before end date', async () => {
+  it('cancel review permits editing and requires a fresh preview', async () => {
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(screen.getByLabelText('Change capacity')).toBeEnabled();
+    fireEvent.change(screen.getByLabelText('Maximum Capacity'), { target: { value: '70' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByRole('button', { name: 'Confirm & Apply' });
+    expect(posted(previewPath).at(-1).settings).toEqual({ maxCapacity: 70 });
+    expect(posted(applyPath)).toHaveLength(0);
+  });
+  it('prevents duplicate apply requests and keeps review open on failure', async () => {
+    let finish!: (value: Response) => void;
+    fetchMock.mockImplementation(async url => url === applyPath ? new Promise(resolve => { finish = resolve; }) : json(preview));
     const { toast } = await import('sonner');
-    const user = userEvent.setup();
     render(<SettingsPage />);
-
-    // Switch to Date Range mode
-    const dateRangeButton = screen.getByText('Date Range').closest('button');
-    fireEvent.click(dateRangeButton!);
-
-    // Set end date before start date
-    const startDateInput = screen.getByLabelText('Start Date');
-    const endDateInput = screen.getByLabelText('End Date');
-    
-    await user.type(startDateInput, '2026-06-20');
-    await user.type(endDateInput, '2026-06-10');
-
-    // Click Preview
-    const previewButton = screen.getByText('Preview Changes');
-    fireEvent.click(previewButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Start date must be before end date');
-    });
-  });
-
-  it('loads preview data on preview click', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        affectedDatesCount: 5,
-        affectedDates: ['2026-05-20', '2026-05-21', '2026-05-22'],
-        existingBookingsCount: 0,
-        bookingsByDate: [],
-        sampleCurrentSettings: [],
-        willBlock: false,
-      }),
-    });
-
-    const user = userEvent.setup();
-    render(<SettingsPage />);
-
-    // Configure settings
-    const capacityInput = screen.getByLabelText('Maximum Capacity');
-    await user.clear(capacityInput);
-    await user.type(capacityInput, '80');
-
-    // Click Preview button (use getByRole to be specific)
-    const previewButton = screen.getByRole('button', { name: /Preview Changes/i });
-    fireEvent.click(previewButton);
-
-    // Wait for modal to open and show affected dates count
-    await waitFor(() => {
-      expect(screen.getByText('5 Dates')).toBeInTheDocument();
-      expect(screen.getByText('Apply Mode')).toBeInTheDocument();
-    });
-  });
-
-  it('clears all settings when clear button clicked', async () => {
-    const user = userEvent.setup();
-    render(<SettingsPage />);
-
-    // Set some values
-    const capacityInput = screen.getByLabelText('Maximum Capacity') as HTMLInputElement;
-    await user.clear(capacityInput);
-    await user.type(capacityInput, '150');
-
-    // Click Clear all settings
-    const clearButton = screen.getByText('Clear all settings');
-    fireEvent.click(clearButton);
-
-    // Check that input is cleared
-    expect(capacityInput.value).toBe('');
+    fireEvent.click(screen.getByLabelText('Change capacity'));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview Changes' }));
+    const button = await screen.findByRole('button', { name: 'Confirm & Apply' });
+    fireEvent.click(button); fireEvent.click(button);
+    expect(posted(applyPath)).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await act(async () => finish(json({ error: 'Apply unavailable' }, 500)));
+    expect(toast.error).toHaveBeenCalledWith('Apply unavailable');
+    expect(screen.getByRole('button', { name: 'Confirm & Apply' })).toBeEnabled();
+    expect(screen.getByLabelText('Maximum Capacity')).toHaveValue(100);
   });
 });

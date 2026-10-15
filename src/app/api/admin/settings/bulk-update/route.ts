@@ -2,117 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendCancellationEmails } from '@/lib/email';
 import { cancelFirestoreBookingsForDates } from '@/lib/firebase/calendar-admin';
 import { indiaCalendarDate } from '@/lib/firebase/booking-capacity';
-import {
-  getFirestoreCalendarSettings,
-  getFutureCalendarSettingReferences,
-  updateFirestoreCalendarSettings,
-  upsertFirestoreCalendarSetting,
-  upsertFirestoreCalendarSettings,
-} from '@/lib/firebase/calendar-settings';
+import { upsertFirestoreCalendarSettings } from '@/lib/firebase/calendar-settings';
 import { requireAdmin } from '@/lib/require-admin';
+import { calendarSettingsRequestSchema, resolveCalendarScope, calendarScopeDates } from '@/lib/calendar-settings-request';
 
 export const dynamic = 'force-dynamic';
-
-type ApplyMode = 'all_days' | 'one_day' | 'date_range';
-
-interface BulkUpdateRequest {
-  applyMode: ApplyMode;
-  date?: string;
-  startDate?: string;
-  endDate?: string;
-  settings: {
-    maxCapacity?: number;
-    startTime?: string;
-    isOpen?: boolean;
-  };
-  adminId: string;
-}
-
-function dateRange(startDate: string, endDate: string) {
-  const dates: string[] = [];
-  const start = new Date(`${startDate}T00:00:00Z`);
-  const end = new Date(`${endDate}T00:00:00Z`);
-
-  for (let date = start; date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
-    dates.push(date.toISOString().split('T')[0]);
-  }
-
-  return dates;
-}
 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin(request);
     if (!authResult.user) return authResult.response;
 
-    const body: BulkUpdateRequest = await request.json();
-    const { applyMode, date, startDate, endDate, settings, adminId } = body;
-
-    if (!applyMode || !settings || !adminId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const today = indiaCalendarDate(new Date());
+    const parsed = calendarSettingsRequestSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    const { settings } = parsed.data;
+    let scope;
+    try { scope = resolveCalendarScope(parsed.data, indiaCalendarDate(new Date()), true); }
+    catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
     const updatedBy = authResult.user.uid;
-    let affectedCount = 0;
-    let cancellationStart: string | null = null;
-    let cancellationEnd: string | null = null;
-
-    switch (applyMode) {
-      case 'all_days': {
-        const references = await getFutureCalendarSettingReferences(today);
-        affectedCount = await updateFirestoreCalendarSettings(
-          references,
-          settings,
-          updatedBy
-        );
-
-        if (settings.isOpen === false) {
-          const futureSettings = await getFirestoreCalendarSettings(today);
-          cancellationStart = today;
-          cancellationEnd = futureSettings.at(-1)?.date ?? today;
-        }
-        break;
-      }
-      case 'one_day':
-        if (!date) {
-          return NextResponse.json(
-            { error: 'Date required for one_day mode' },
-            { status: 400 }
-          );
-        }
-        await upsertFirestoreCalendarSetting(date, settings, updatedBy);
-        affectedCount = 1;
-        if (settings.isOpen === false) {
-          cancellationStart = date;
-          cancellationEnd = date;
-        }
-        break;
-      case 'date_range':
-        if (!startDate || !endDate) {
-          return NextResponse.json(
-            { error: 'startDate and endDate required for date_range mode' },
-            { status: 400 }
-          );
-        }
-        affectedCount = await upsertFirestoreCalendarSettings(
-          dateRange(startDate, endDate),
-          settings,
-          updatedBy
-        );
-        if (settings.isOpen === false) {
-          cancellationStart = startDate;
-          cancellationEnd = endDate;
-        }
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid applyMode' }, { status: 400 });
-    }
-
-    const cancelledBookings = cancellationStart && cancellationEnd
+    const affectedCount = await upsertFirestoreCalendarSettings(calendarScopeDates(scope), settings, updatedBy);
+    const cancelledBookings = settings.isOpen === false
       ? await cancelFirestoreBookingsForDates(
-          cancellationStart,
-          cancellationEnd,
+          scope.startDate,
+          scope.endDate,
           updatedBy
         )
       : [];
@@ -125,6 +37,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      scope,
       affectedCount,
       cancelledBookingsCount: cancelledBookings.length,
       emailsSent: emailStats.sent,

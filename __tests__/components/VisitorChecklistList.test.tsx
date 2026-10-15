@@ -18,6 +18,8 @@ const makeVisitor = (overrides: Partial<ChecklistVisitor> = {}): ChecklistVisito
   phone: '+919000000000',
   visited: false,
   numberOfGuests: 1,
+  adults: 1,
+  children: 0,
   ...overrides,
 });
 

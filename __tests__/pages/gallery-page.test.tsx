@@ -57,6 +57,12 @@ vi.mock('@/app/admin/gallery/_components/AddImageModal', () => ({
               : {
                   id: 'new-img-1',
                   url: 'https://example.com/new.jpg',
+                thumbnailUrl: 'https://example.com/new-thumbnail.webp',
+                aspect: 'landscape',
+                width: 1920,
+                height: 1080,
+                categories: [],
+                order: 0,
                   altText: 'New Image',
                   caption: null,
                   uploadedAt: new Date().toISOString(),

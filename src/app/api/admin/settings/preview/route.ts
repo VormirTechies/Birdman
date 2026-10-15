@@ -3,78 +3,22 @@ import { getConfirmedBookingCounts } from '@/lib/firebase/calendar-admin';
 import { indiaCalendarDate } from '@/lib/firebase/booking-capacity';
 import { getFirestoreCalendarSettings } from '@/lib/firebase/calendar-settings';
 import { requireAdmin } from '@/lib/require-admin';
+import { calendarSettingsRequestSchema, resolveCalendarScope, calendarScopeDates } from '@/lib/calendar-settings-request';
 
 export const dynamic = 'force-dynamic';
-
-type ApplyMode = 'all_days' | 'one_day' | 'date_range';
-
-interface PreviewRequest {
-  applyMode: ApplyMode;
-  date?: string;
-  startDate?: string;
-  endDate?: string;
-  settings: {
-    maxCapacity?: number;
-    startTime?: string;
-    isOpen?: boolean;
-  };
-}
-
-function dateRange(startDate: string, endDate: string) {
-  const dates: string[] = [];
-  const start = new Date(`${startDate}T00:00:00Z`);
-  const end = new Date(`${endDate}T00:00:00Z`);
-
-  for (let date = start; date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
-    dates.push(date.toISOString().split('T')[0]);
-  }
-
-  return dates;
-}
 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAdmin(request);
     if (!authResult.user) return authResult.response;
 
-    const body: PreviewRequest = await request.json();
-    const { applyMode, date, startDate, endDate, settings } = body;
-
-    if (!applyMode || !settings) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const today = indiaCalendarDate(new Date());
-    let affectedDates: string[];
-
-    switch (applyMode) {
-      case 'all_days': {
-        const end = new Date(`${today}T00:00:00Z`);
-        end.setUTCDate(end.getUTCDate() + 180);
-        affectedDates = dateRange(today, end.toISOString().split('T')[0]);
-        break;
-      }
-      case 'one_day':
-        if (!date) {
-          return NextResponse.json(
-            { error: 'Date required for one_day mode' },
-            { status: 400 }
-          );
-        }
-        affectedDates = [date];
-        break;
-      case 'date_range':
-        if (!startDate || !endDate) {
-          return NextResponse.json(
-            { error: 'startDate and endDate required for date_range mode' },
-            { status: 400 }
-          );
-        }
-        affectedDates = dateRange(startDate, endDate);
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid applyMode' }, { status: 400 });
-    }
+    const parsed = calendarSettingsRequestSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    const { settings } = parsed.data;
+    let scope;
+    try { scope = resolveCalendarScope(parsed.data, indiaCalendarDate(new Date())); }
+    catch (error) { return NextResponse.json({ error: (error as Error).message }, { status: 400 }); }
+    const affectedDates = calendarScopeDates(scope);
 
     const counts = await getConfirmedBookingCounts(new Set(affectedDates));
     const bookingsByDate = affectedDates
@@ -103,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      scope,
       affectedDatesCount: affectedDates.length,
       affectedDates: affectedDates.slice(0, 10),
       totalAffectedDates: affectedDates.length,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Bird, CheckCircle2, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -23,6 +23,17 @@ const PERMISSION_MESSAGE =
   "You don't have permission to enter this page. Please contact your admin.";
 const CREDENTIAL_MESSAGE =
   'Unable to sign in. Check your email and password and try again.';
+function subscribeLocation(callback: () => void) {
+  window.addEventListener('popstate', callback);
+  return () => window.removeEventListener('popstate', callback);
+}
+function locationMessage() {
+  const query = new URLSearchParams(window.location.search);
+  if (query.get('reason') === 'forbidden') return PERMISSION_MESSAGE;
+  if (query.get('reset') === 'success') return 'Password reset complete. Sign in with your new password.';
+  return '';
+}
+const emptyMessage = () => '';
 
 function getFirebaseErrorCode(error: unknown) {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null;
@@ -39,12 +50,7 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get('reason');
-    const reset = new URLSearchParams(window.location.search).get('reset');
-    if (reason === 'forbidden') setError(PERMISSION_MESSAGE);
-    if (reset === 'success') setError('Password reset complete. Sign in with your new password.');
-  }, []);
+  const queryMessage = useSyncExternalStore(subscribeLocation, locationMessage, emptyMessage);
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,10 +187,10 @@ export default function AdminLoginPage() {
                   </p>
                 </div>
 
-                {error && <div role="alert" className="mb-4 rounded-lg bg-[#ffdad6] p-3 text-sm text-[#ba1a1a]">{error}</div>}
+                {(error || queryMessage) && <div role="alert" className="mb-4 rounded-lg bg-[#ffdad6] p-3 text-sm text-[#ba1a1a]">{error || queryMessage}</div>}
 
                 {view === 'login' && (
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form method="post" onSubmit={handleLogin} className="space-y-4">
                     <Field id="email" label="Email Address" icon={<Mail className="h-4 w-4" />}>
                       <input id="email" name="email" type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
                     </Field>
@@ -197,7 +203,7 @@ export default function AdminLoginPage() {
                 )}
 
                 {view === 'forgot' && (
-                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <form method="post" onSubmit={handleForgotPassword} className="space-y-4">
                     <Field id="forgot-email" label="Email Address" icon={<Mail className="h-4 w-4" />}>
                       <input id="forgot-email" type="email" required autoComplete="email" value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} className="w-full rounded-xl bg-[#F5F5F5] py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#2E7D32]/30" />
                     </Field>
@@ -220,8 +226,13 @@ function Field({ id, label, icon, action, children }: { id: string; label: strin
   return <div><div className="mb-1.5 flex items-center justify-between"><label htmlFor={id} className="text-sm font-semibold text-[#212121]">{label}</label>{action}</div><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#616161]">{icon}</span>{children}</div></div>;
 }
 
+const subscribeHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 function Submit({ loading, label, loadingLabel }: { loading: boolean; label: string; loadingLabel: string }) {
-  return <button type="submit" disabled={loading} className="w-full rounded-lg bg-[#2E7D32] py-2.5 text-sm font-bold text-white hover:bg-[#1B5E20] disabled:cursor-not-allowed disabled:bg-[#BDBDBD]">{loading ? loadingLabel : label}</button>;
+  // Keep native submission disabled until the React handler is attached.
+  const hydrated = useSyncExternalStore(subscribeHydration, clientReady, serverReady);
+  return <button type="submit" disabled={loading || !hydrated} className="w-full rounded-lg bg-[#2E7D32] py-2.5 text-sm font-bold text-white hover:bg-[#1B5E20] disabled:cursor-not-allowed disabled:bg-[#BDBDBD]">{loading ? loadingLabel : label}</button>;
 }
 
 function BackButton({ onClick }: { onClick: () => void }) {

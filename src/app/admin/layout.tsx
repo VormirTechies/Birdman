@@ -9,12 +9,10 @@ import { AdminSidebar } from './_components/Sidebar';
 import { AdminHeader } from './_components/Header';
 import { AdminBottomNav } from './_components/BottomNav';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
-import { subscribeUser } from '@/lib/push/client';
-import { requestPushPermission } from '@/lib/push/send';
-import { auth, firebaseConfigError } from '@/firebase';
 import enMessages from '@/../messages/en.json';
 import { PWAInstallBanner } from '@/components/admin/PWAInstallBanner';
 import { AdminAuthGuard } from './AdminAuthGuard';
+import { NotificationDeviceControl } from '@/components/admin/NotificationDeviceControl';
 
 const workSans = Work_Sans({
   subsets: ['latin'],
@@ -35,54 +33,6 @@ export default function AdminLayout({
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (link) link.href = '/admin-manifest.json';
-  }, []);
-
-  // Setup push notifications on mount
-  useEffect(() => {
-    const setupPushNotifications = async () => {
-      // Only run on client side and when not on excluded routes
-      if (typeof window === 'undefined') return;
-      if (pathname?.includes('/login') || pathname?.includes('/reset-password')) return;
-      if (firebaseConfigError) return;
-
-      try {
-        if (!auth.currentUser) return;
-
-        console.log('[Admin Layout] Setting up push notifications...');
-
-        // Request notification permission if not already granted
-        if ('Notification' in window && Notification.permission === 'default') {
-          const permission = await requestPushPermission();
-          
-          if (permission === 'granted') {
-            console.log('✅ Push notification permission granted');
-            
-            // Subscribe to push notifications
-            try {
-              const subscription = await subscribeUser();
-              console.log('✅ Push subscription created:', subscription);
-            } catch (subError) {
-              console.error('Failed to create push subscription:', subError);
-            }
-          } else {
-            console.log('❌ Push notification permission denied');
-          }
-        } else if (Notification.permission === 'granted') {
-          // Permission already granted, ensure subscription exists
-          try {
-            await subscribeUser();
-            console.log('✅ Push subscription verified');
-          } catch (subError) {
-            console.error('Failed to verify push subscription:', subError);
-          }
-        }
-      } catch (error) {
-        console.error('[Admin Layout] Error setting up push notifications:', error);
-      }
-    };
-
-    setupPushNotifications();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Routes that should bypass the layout wrapper
@@ -118,6 +68,7 @@ export default function AdminLayout({
 
           {/* Page content — padded below header, and above bottom nav on mobile */}
           <main className="flex-1 mt-16 pb-16 lg:pb-0 p-4 lg:p-8">
+            <NotificationDeviceControl />
             {children}
           </main>
         </div>

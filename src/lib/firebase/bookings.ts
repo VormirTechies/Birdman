@@ -1,4 +1,5 @@
 import 'server-only';
+import { assertContactDateLimit, BookingContactMismatchError, matchesBookingContact } from '@/lib/booking-policy';
 
 import {
   Timestamp,
@@ -9,6 +10,8 @@ import {
 } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase/admin';
 import { formatBookingNumber } from '@/lib/booking-number';
+import { stageNotificationEvents } from './notifications';
+import { bookingChangeEvent, capacityFullEvent, nextNotificationRevision } from './booking-notifications';
 import {
   DEFAULT_CALENDAR_CAPACITY,
   DEFAULT_CALENDAR_START_TIME,
@@ -53,6 +56,9 @@ interface TransactionOptions {
   requireEditableVisit?: boolean;
   requireNonPastVisit?: boolean;
   requireNonPastTarget?: boolean;
+  enforceContactLimit?: boolean;
+  verifiedContact?: string;
+  verifiedBookingNumber?: number;
 }
 
 export interface CreateBookingOptions extends TransactionOptions {
@@ -312,6 +318,10 @@ export async function createFirestoreBooking(
     );
     const setting = await calendarSettingInTransaction(transaction, input.bookingDate);
     assertCalendarAllowsBooking(setting, options);
+    if (options.source === 'public') {
+      const peers = await transaction.get(database.collection(BOOKINGS_COLLECTION).where('bookingDate', '==', input.bookingDate));
+      assertContactDateLimit(peers.docs.map(doc => doc.data()), { ...input, status: 'confirmed', numberOfGuests: input.adults + input.children });
+    }
 
     const currentBookingNumber = assertValidCounter(
       counterSnapshot.data()?.value,
@@ -335,6 +345,13 @@ export async function createFirestoreBooking(
       booking.numberOfGuests,
       setting.maxCapacity
     );
+
+    booking.notificationRevision = 1;
+    const event = bookingChangeEvent(bookingReference.id, null, booking)!;
+    const fullRevision = nextNotificationRevision(daySnapshot.data()?.notificationFullRevision);
+    const full = capacityFullEvent(input.bookingDate, currentConfirmedGuests, confirmedGuests, setting.maxCapacity, fullRevision);
+    await stageNotificationEvents(transaction, database, full ? [event, full] : [event], now);
+    if (full) transaction.set(dayReference, { notificationFullRevision: fullRevision }, { merge: true });
 
     transaction.set(
       counterReference,
@@ -364,6 +381,9 @@ export async function updateFirestoreBooking(
 
     const now = transactionTimestamp(options);
     const existing = asBookingDocument(bookingSnapshot.data() ?? {}, now);
+    if (options.verifiedContact !== undefined && (
+      !matchesBookingContact(existing, options.verifiedContact) || existing.bookingNumber !== options.verifiedBookingNumber
+    )) throw new BookingContactMismatchError('Booking ID and email/phone do not match. Please check your details.');
     if (options.requireConfirmed && existing.status !== 'confirmed') {
       throw new BookingNotEditableError('Only confirmed bookings can be changed');
     }
@@ -426,44 +446,28 @@ export async function updateFirestoreBooking(
     if (mutation.bookingDate !== undefined && targetSetting) {
       next.bookingTime = targetSetting.startTime;
     }
-
-    if (sameDay) {
-      if (targetDelta !== 0) {
-        const confirmedGuests = applyCapacityDelta(
-          oldConfirmedGuests,
-          targetDelta,
-          targetSetting?.maxCapacity ?? Number.MAX_SAFE_INTEGER
-        );
-        setDayCapacity(transaction, oldDayReference, confirmedGuests, now);
-      }
-    } else {
-      if (oldContribution > 0) {
-        const reducedOldConfirmedGuests = applyCapacityDelta(
-          oldConfirmedGuests,
-          -oldContribution,
-          Number.MAX_SAFE_INTEGER
-        );
-        setDayCapacity(
-          transaction,
-          oldDayReference,
-          reducedOldConfirmedGuests,
-          now
-        );
-      }
-      if (nextContribution > 0) {
-        const increasedNextConfirmedGuests = applyCapacityDelta(
-          nextConfirmedGuests,
-          nextContribution,
-          targetSetting?.maxCapacity ?? DEFAULT_CALENDAR_CAPACITY
-        );
-        setDayCapacity(
-          transaction,
-          nextDayReference,
-          increasedNextConfirmedGuests,
-          now
-        );
-      }
+    if (options.enforceContactLimit) {
+      const peers = await transaction.get(database.collection(BOOKINGS_COLLECTION).where('bookingDate', '==', next.bookingDate));
+      assertContactDateLimit(peers.docs.filter(doc => doc.id !== bookingId).map(doc => doc.data()), next, sameDay ? existing : undefined);
     }
+
+    const targetGuests = sameDay
+      ? targetDelta === 0 ? oldConfirmedGuests : applyCapacityDelta(oldConfirmedGuests, targetDelta, targetSetting?.maxCapacity ?? Number.MAX_SAFE_INTEGER)
+      : nextContribution === 0 ? nextConfirmedGuests : applyCapacityDelta(nextConfirmedGuests, nextContribution, targetSetting?.maxCapacity ?? DEFAULT_CALENDAR_CAPACITY);
+    const oldGuests = sameDay ? targetGuests
+      : oldContribution === 0 ? oldConfirmedGuests : applyCapacityDelta(oldConfirmedGuests, -oldContribution, Number.MAX_SAFE_INTEGER);
+    next.notificationRevision = nextNotificationRevision(existing.notificationRevision);
+    const event = bookingChangeEvent(bookingId, existing, next);
+    if (!event) next.notificationRevision = existing.notificationRevision ?? 0;
+    const fullRevision = nextNotificationRevision(nextDaySnapshot.data()?.notificationFullRevision);
+    const full = targetSetting
+      ? capacityFullEvent(next.bookingDate, nextConfirmedGuests, targetGuests, targetSetting.maxCapacity, fullRevision) : null;
+    const events = [...(event ? [event] : []), ...(full ? [full] : [])];
+    await stageNotificationEvents(transaction, database, events, now);
+    if (full) transaction.set(nextDayReference, { notificationFullRevision: fullRevision }, { merge: true });
+    // Serialize all contact/status changes with creates, even without a seat delta.
+    setDayCapacity(transaction, oldDayReference, oldGuests, now);
+    if (!sameDay) setDayCapacity(transaction, nextDayReference, targetGuests, now);
 
     transaction.update(bookingReference, next);
     return next;
@@ -498,9 +502,7 @@ export async function deleteFirestoreBooking(
     const dayReference = database
       .collection(BOOKING_DAYS_COLLECTION)
       .doc(booking.bookingDate);
-    const daySnapshot = contribution > 0
-      ? await transaction.get(dayReference)
-      : null;
+    const daySnapshot = await transaction.get(dayReference);
 
     if (daySnapshot) {
       const currentConfirmedGuests = await confirmedGuestsInTransaction(
@@ -513,6 +515,12 @@ export async function deleteFirestoreBooking(
         -contribution,
         Number.MAX_SAFE_INTEGER
       );
+      // Deleting a live confirmed booking is an administrative cancellation.
+      if (booking.status === 'confirmed') {
+        const cancelled = { ...booking, status: 'cancelled' as const,
+          notificationRevision: nextNotificationRevision(booking.notificationRevision) };
+        await stageNotificationEvents(transaction, database, [bookingChangeEvent(bookingId, booking, cancelled)!], transactionTimestamp(options));
+      }
       setDayCapacity(
         transaction,
         dayReference,

@@ -19,6 +19,8 @@ const baseVisitor: ChecklistVisitor = {
   phone: '+919876543210',
   visited: false,
   numberOfGuests: 2,
+  adults: 2,
+  children: 0,
 };
 
 describe('VisitorChecklistItem', () => {
@@ -46,19 +48,19 @@ describe('VisitorChecklistItem', () => {
 
     it('renders guest count badge with plural label', () => {
       render(<VisitorChecklistItem visitor={baseVisitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('2 guests')).toBeInTheDocument();
+      expect(screen.getByText('2 adults')).toBeInTheDocument();
     });
 
-    it('renders singular "guest" when numberOfGuests is 1', () => {
-      const visitor = { ...baseVisitor, numberOfGuests: 1 };
+    it('renders singular "adult" when adults is 1', () => {
+      const visitor = { ...baseVisitor, numberOfGuests: 1, adults: 1 };
       render(<VisitorChecklistItem visitor={visitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('1 guest')).toBeInTheDocument();
+      expect(screen.getByText('1 adult')).toBeInTheDocument();
     });
 
-    it('renders 4 guests correctly', () => {
-      const visitor = { ...baseVisitor, numberOfGuests: 4 };
+    it('renders adults and children separately', () => {
+      const visitor = { ...baseVisitor, numberOfGuests: 4, children: 2 };
       render(<VisitorChecklistItem visitor={visitor} onToggle={vi.fn()} isUpdating={false} />);
-      expect(screen.getByText('4 guests')).toBeInTheDocument();
+      expect(screen.getByText('2A / 2C')).toBeInTheDocument();
     });
   });
 

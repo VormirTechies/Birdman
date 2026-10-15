@@ -24,7 +24,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  distDir: process.env.FIREBASE_USE_LIVE === 'true' ? '.next-live' : '.next',
+  distDir: process.env.NODE_ENV !== 'production' && process.env.NOTIFICATION_BROWSER_TEST_APP === 'true'
+    ? '.next-notification-tests'
+    : process.env.FIREBASE_USE_LIVE === 'true' ? '.next-live' : '.next',
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [

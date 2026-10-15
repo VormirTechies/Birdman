@@ -19,6 +19,9 @@ import {
 } from '@/lib/firebase/bookings';
 import { sendBookingCancellation, sendRescheduleNotification } from '@/lib/email';
 import { getPublicBookingCode, parsePublicBookingNumber } from '@/lib/booking-number';
+import { canonicalBookingPhone, matchesBookingContact, BookingContactLimitError, BookingContactMismatchError } from '@/lib/booking-policy';
+import { bookingContactLimitResponse } from '@/lib/booking-limit-response';
+import { limitBookingAttempts } from '@/lib/firebase/booking-attempt-limit';
 
 const lookupSchema = z.object({
   bookingCode: z.string().trim().min(1).max(12),
@@ -41,8 +44,7 @@ function normalizeBookingCode(code: string) {
 }
 
 function normalizePhone(value: string) {
-  const digits = value.replace(/\D/g, '');
-  return digits.length > 10 ? digits.slice(-10) : digits;
+  return canonicalBookingPhone(value);
 }
 
 function maskEmail(email: string | null) {
@@ -122,8 +124,6 @@ function sanitizeBooking(booking: Booking) {
 async function findVerifiedBooking(bookingCode: string, contact: string) {
   const code = normalizeBookingCode(bookingCode);
   const bookingNumber = parsePublicBookingNumber(code);
-  const email = contact.includes('@') ? contact.trim().toLowerCase() : null;
-  const phone = normalizePhone(contact);
 
   if (!bookingNumber) return null;
 
@@ -137,9 +137,7 @@ async function findVerifiedBooking(bookingCode: string, contact: string) {
   if (!document) return null;
 
   const booking = bookingFromFirestore(document.id, document.data());
-  const bookingEmail = booking.email?.trim().toLowerCase() ?? '';
-  const bookingPhone = normalizePhone(booking.phone);
-  const verified = email ? bookingEmail === email : bookingPhone === phone;
+  const verified = booking.bookingNumber === bookingNumber && matchesBookingContact(booking, contact);
 
   return verified ? booking : null;
 }
@@ -163,6 +161,8 @@ interface CapacityErrorContext {
 }
 
 function mutationError(error: unknown, context?: CapacityErrorContext) {
+  if (error instanceof BookingContactLimitError) return bookingContactLimitResponse(error);
+  if (error instanceof BookingContactMismatchError) return NextResponse.json({ success: false, error: error.message }, { status: 404 });
   if (error instanceof BookingCapacityExceededError) {
     const available = error.availableGuests + (
       context && context.targetDate === context.currentDate
@@ -195,7 +195,7 @@ function mutationError(error: unknown, context?: CapacityErrorContext) {
   }
   if (error instanceof BookingNotFoundError) {
     return NextResponse.json(
-      { success: false, code: error.code, error: 'No matching booking found.' },
+      { success: false, code: error.code, error: 'Booking ID and email/phone do not match. Please check your details.' },
       { status: 404 }
     );
   }
@@ -209,13 +209,15 @@ function mutationError(error: unknown, context?: CapacityErrorContext) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await limitBookingAttempts(request, 'self-service');
+  if (rateLimit) return rateLimit;
   try {
     const body = lookupSchema.parse(await request.json());
     const booking = await findVerifiedBooking(body.bookingCode, body.contact);
 
     if (!booking) {
       return NextResponse.json(
-        { success: false, error: 'No matching booking found.' },
+        { success: false, error: 'Booking ID and email/phone do not match. Please check your details.' },
         { status: 404 }
       );
     }
@@ -229,6 +231,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const rateLimit = await limitBookingAttempts(request, 'self-service');
+  if (rateLimit) return rateLimit;
   let capacityContext: CapacityErrorContext | undefined;
   try {
     const body = patchSchema.parse(await request.json());
@@ -236,7 +240,7 @@ export async function PATCH(request: NextRequest) {
 
     if (!booking) {
       return NextResponse.json(
-        { success: false, error: 'No matching booking found.' },
+        { success: false, error: 'Booking ID and email/phone do not match. Please check your details.' },
         { status: 404 }
       );
     }
@@ -273,6 +277,9 @@ export async function PATCH(request: NextRequest) {
         enforceCutoff: true,
         requireConfirmed: true,
         requireEditableVisit: true,
+        enforceContactLimit: true,
+        verifiedContact: body.contact,
+        verifiedBookingNumber: booking.bookingNumber,
       }
     );
 
@@ -307,13 +314,15 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const rateLimit = await limitBookingAttempts(request, 'self-service');
+  if (rateLimit) return rateLimit;
   try {
     const body = lookupSchema.parse(await request.json());
     const booking = await findVerifiedBooking(body.bookingCode, body.contact);
 
     if (!booking) {
       return NextResponse.json(
-        { success: false, error: 'No matching booking found.' },
+        { success: false, error: 'Booking ID and email/phone do not match. Please check your details.' },
         { status: 404 }
       );
     }
@@ -321,6 +330,8 @@ export async function DELETE(request: NextRequest) {
     await cancelFirestoreBooking(booking.id, {
       requireConfirmed: true,
       requireNonPastVisit: true,
+      verifiedContact: body.contact,
+      verifiedBookingNumber: booking.bookingNumber,
     });
 
     const cancelled: Booking = {

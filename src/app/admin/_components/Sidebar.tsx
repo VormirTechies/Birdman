@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -18,8 +18,9 @@ import {
   MessageSquareText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { signOut } from 'firebase/auth';
-import { auth, firebaseConfigError } from '@/firebase';
+import { signOutAdmin } from '@/lib/firebase/notification-client';
+import { firebaseConfigError } from '@/firebase';
+import { toast } from 'sonner';
 import Image from 'next/image';
 import { useSyncExternalStore } from 'react';
 
@@ -42,6 +43,7 @@ interface SidebarProps {
 
 function SidebarContent({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   // Defer active-state to client to avoid SSR/hydration mismatch.
   // Server always renders all links inactive; client updates after mount.
   const mounted = useSyncExternalStore(
@@ -51,10 +53,12 @@ function SidebarContent({ onClose }: { onClose: () => void }) {
   );
 
   const handleSignOut = async () => {
-    if (!firebaseConfigError) {
-      await signOut(auth);
+    try {
+      if (!firebaseConfigError) await signOutAdmin();
+      router.replace('/admin/login');
+    } catch {
+      toast.error('Unable to disable notifications safely. Check your connection and try signing out again.');
     }
-    window.location.href = '/admin/login';
   };
 
   return (

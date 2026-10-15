@@ -1,436 +1,151 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { POST as previewPost } from '@/app/api/admin/settings/preview/route';
-import { POST as bulkUpdatePost } from '@/app/api/admin/settings/bulk-update/route';
-import * as dbModule from '@/lib/db';
-import * as queriesModule from '@/lib/db/queries';
-import * as emailModule from '@/lib/email';
-import { NextRequest } from 'next/server';
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest, NextResponse } from 'next/server';
+import type { NormalizedCalendarSetting } from '@/lib/firebase/calendar-settings';
+import { makeAdminBooking } from '../fixtures/booking';
 
-/**
- * Phase 1 Tests: Admin Settings API
- * Tests for Preview and Bulk Update endpoints
- */
-
-// Mock modules
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: vi.fn(),
-    update: vi.fn(),
-    execute: vi.fn(),
-  },
+const mocks = vi.hoisted(() => ({
+  auth: vi.fn(),
+  counts: vi.fn<typeof import('@/lib/firebase/calendar-admin').getConfirmedBookingCounts>(),
+  cancel: vi.fn<typeof import('@/lib/firebase/calendar-admin').cancelFirestoreBookingsForDates>(),
+  settings: vi.fn<typeof import('@/lib/firebase/calendar-settings').getFirestoreCalendarSettings>(),
+  references: vi.fn<typeof import('@/lib/firebase/calendar-settings').getFutureCalendarSettingReferences>(),
+  update: vi.fn<typeof import('@/lib/firebase/calendar-settings').updateFirestoreCalendarSettings>(),
+  upsert: vi.fn<typeof import('@/lib/firebase/calendar-settings').upsertFirestoreCalendarSetting>(),
+  upsertMany: vi.fn<typeof import('@/lib/firebase/calendar-settings').upsertFirestoreCalendarSettings>(),
+  emails: vi.fn<typeof import('@/lib/email').sendCancellationEmails>(),
 }));
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/require-admin', () => ({ requireAdmin: mocks.auth }));
+vi.mock('@/lib/firebase/calendar-admin', () => ({ getConfirmedBookingCounts: mocks.counts, cancelFirestoreBookingsForDates: mocks.cancel }));
+vi.mock('@/lib/firebase/calendar-settings', () => ({ getFirestoreCalendarSettings: mocks.settings,
+  getFutureCalendarSettingReferences: mocks.references, updateFirestoreCalendarSettings: mocks.update,
+  upsertFirestoreCalendarSetting: mocks.upsert, upsertFirestoreCalendarSettings: mocks.upsertMany }));
+vi.mock('@/lib/email', () => ({ sendCancellationEmails: mocks.emails }));
+import { POST as preview } from '@/app/api/admin/settings/preview/route';
+import { POST as bulkUpdate } from '@/app/api/admin/settings/bulk-update/route';
 
-vi.mock('@/lib/db/queries', () => ({
-  cancelBookingsForDates: vi.fn(),
-}));
+const setting = (date: string): NormalizedCalendarSetting => ({ id: date, date, maxCapacity: 100,
+  isOpen: true, startTime: '16:30:00', updatedBy: null, createdAt: null, updatedAt: null });
+const cancellations: Awaited<ReturnType<typeof import('@/lib/firebase/calendar-admin').cancelFirestoreBookingsForDates>> =
+  [makeAdminBooking({ id: 'b1', bookingNumber: 23, bookingDate: '2099-05-20' }), makeAdminBooking({ id: 'b2', bookingNumber: 24, bookingDate: '2099-05-20' })]
+  .map(({ id, bookingNumber, email, visitorName, bookingDate, adults, children, numberOfGuests }) =>
+    ({ id, bookingNumber, email, visitorName, bookingDate, adults, children, numberOfGuests }));
+const request = (body: unknown) => new NextRequest('http://localhost/api/admin/settings', { method: 'POST', body: JSON.stringify(body) });
+beforeEach(() => {
+  vi.resetAllMocks(); vi.useFakeTimers(); vi.setSystemTime(new Date('2099-05-14T06:00:00Z'));
+  mocks.auth.mockResolvedValue({ user: { uid: 'verified-admin' } });
+  mocks.counts.mockResolvedValue(new Map()); mocks.cancel.mockResolvedValue([]); mocks.settings.mockResolvedValue([]);
+  mocks.references.mockResolvedValue([]); mocks.update.mockResolvedValue(2); mocks.upsert.mockResolvedValue(setting('2099-05-20'));
+  mocks.upsertMany.mockImplementation(async (dates) => dates.length); mocks.emails.mockResolvedValue({ sent: 0, failed: 0, errors: [] });
+});
+afterEach(() => vi.useRealTimers());
 
-vi.mock('@/lib/email', () => ({
-  sendCancellationEmails: vi.fn(),
-}));
-
-describe('POST /api/admin/settings/preview', () => {
-  let mockDb: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDb = dbModule.db as any;
+describe('POST /api/admin/settings/preview — Firestore', () => {
+  it('previews the current 181-day all-days horizon without modifying data', async () => {
+    const response = await preview(request({ applyMode: 'all_days', settings: { isOpen: false } }));
+    expect(response.status).toBe(200); const data = await response.json();
+    expect(data).toMatchObject({ success: true, affectedDatesCount: 181, totalAffectedDates: 181, willBlock: true });
+    expect(data.affectedDates).toHaveLength(10);
+    const dates = mocks.counts.mock.calls[0][0]; expect(dates.size).toBe(181); expect(dates.has('2099-05-14')).toBe(true);
+    expect(mocks.settings).toHaveBeenCalledWith('2099-05-14', [...dates].at(-1));
+    expect(mocks.cancel).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled();
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('previews one date and its existing bookings', async () => {
+    mocks.counts.mockResolvedValue(new Map([['2099-05-20', 4]])); mocks.settings.mockResolvedValue([setting('2099-05-20')]);
+    const response = await preview(request({ applyMode: 'one_day', date: '2099-05-20', settings: { maxCapacity: 80 } }));
+    expect(await response.json()).toMatchObject({ success: true, affectedDatesCount: 1, existingBookingsCount: 4,
+      bookingsByDate: [{ date: '2099-05-20', count: 4 }], sampleCurrentSettings: [{ date: '2099-05-20', maxCapacity: 100 }], willBlock: false });
   });
-
-  it('returns affected dates for all_days mode', async () => {
-    const mockDates = [
-      { date: '2026-05-14' },
-      { date: '2026-05-15' },
-      { date: '2026-05-16' },
-    ];
-
-    let selectCallCount = 0;
-    mockDb.select.mockImplementation(() => {
-      selectCallCount++;
-      // Call 1: Get affected dates (orderBy)
-      // Call 2: Get booking counts (groupBy)
-      // Call 3: Get sample settings (orderBy)
-      
-      if (selectCallCount === 1 || selectCallCount === 3) {
-        // Calendar settings queries use orderBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(mockDates),
-            }),
-          }),
-        };
-      } else {
-        // Bookings query uses groupBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              groupBy: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        };
-      }
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/preview', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'all_days',
-        settings: { isOpen: false },
-      }),
-    });
-
-    const response = await previewPost(request);
+  it('counts only the selected range and caps sample settings at five', async () => {
+    mocks.counts.mockResolvedValue(new Map([['2099-06-01', 5], ['2099-06-03', 3], ['2099-06-10', 99]]));
+    mocks.settings.mockResolvedValue(Array.from({ length: 7 }, (_, i) => setting(`2099-06-0${i + 1}`)));
+    const response = await preview(request({ applyMode: 'date_range', startDate: '2099-06-01', endDate: '2099-06-07', settings: { isOpen: false } }));
     const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedDatesCount).toBe(3);
-    expect(data.willBlock).toBe(true);
+    expect(data).toMatchObject({ affectedDatesCount: 7, existingBookingsCount: 8, willBlock: true });
+    expect(mocks.counts).toHaveBeenCalledWith(new Set(Array.from({ length: 7 }, (_, i) => `2099-06-0${i + 1}`)));
+    expect(data.sampleCurrentSettings).toHaveLength(5);
   });
-
-  it('returns affected dates for one_day mode', async () => {
-    // one_day mode doesn't query calendar settings, just uses the date directly
-    // But still queries bookings and sample settings
-    let selectCallCount = 0;
-    mockDb.select.mockImplementation(() => {
-      selectCallCount++;
-      // Call 1: Get booking counts (groupBy)
-      // Call 2: Get sample settings (orderBy)
-      
-      if (selectCallCount === 1) {
-        // Bookings query uses groupBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              groupBy: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        };
-      } else {
-        // Sample settings uses orderBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue([{ date: '2026-05-20', maxCapacity: 50, startTime: '16:30:00', isOpen: true }]),
-            }),
-          }),
-        };
-      }
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/preview', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'one_day',
-        date: '2026-05-20',
-        settings: { maxCapacity: 50 },
-      }),
-    });
-
-    const response = await previewPost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedDatesCount).toBe(1);
-    expect(data.willBlock).toBe(false);
+  it.each([{}, { applyMode: 'one_day', settings: {} }, { applyMode: 'date_range', settings: {}, startDate: '2099-06-01' },
+    { applyMode: 'invalid', settings: {} }])('rejects missing/invalid mode inputs %j', async body => {
+    expect((await preview(request(body))).status).toBe(400); expect(mocks.counts).not.toHaveBeenCalled();
   });
-
-  it('returns affected dates and booking counts for date_range mode', async () => {
-    const mockDates = [
-      { date: '2026-06-01' },
-      { date: '2026-06-02' },
-      { date: '2026-06-03' },
-    ];
-
-    const mockBookingCounts = [
-      { bookingDate: '2026-06-01', count: 5 },
-      { bookingDate: '2026-06-02', count: 3 },
-    ];
-
-    const mockSampleSettings = [
-      { date: '2026-06-01', maxCapacity: 100, startTime: '16:30:00', isOpen: true },
-      { date: '2026-06-02', maxCapacity: 100, startTime: '16:30:00', isOpen: true },
-    ];
-
-    let selectCallCount = 0;
-    mockDb.select.mockImplementation(() => {
-      selectCallCount++;
-      // Call 1: Get affected dates (orderBy)
-      // Call 2: Get booking counts (groupBy)
-      // Call 3: Get sample settings (orderBy)
-      
-      if (selectCallCount === 1) {
-        // Affected dates query
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(mockDates),
-            }),
-          }),
-        };
-      } else if (selectCallCount === 2) {
-        // Bookings query uses groupBy
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              groupBy: vi.fn().mockResolvedValue(mockBookingCounts),
-            }),
-          }),
-        };
-      } else {
-        // Sample settings query
-        return {
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(mockSampleSettings),
-            }),
-          }),
-        };
-      }
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/preview', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'date_range',
-        startDate: '2026-06-01',
-        endDate: '2026-06-03',
-        settings: { isOpen: false },
-      }),
-    });
-
-    const response = await previewPost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedDatesCount).toBe(3);
-    expect(data.existingBookingsCount).toBe(8); // 5 + 3
-    expect(data.willBlock).toBe(true);
-  });
-
-  it('returns 400 for missing required fields', async () => {
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/preview', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'one_day',
-        // Missing 'date' field
-        settings: { isOpen: false },
-      }),
-    });
-
-    const response = await previewPost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toBeDefined();
+  it('returns 500 if the booking count service fails', async () => {
+    mocks.counts.mockRejectedValue(new Error('Service unavailable'));
+    expect((await preview(request({ applyMode: 'one_day', date: '2099-05-20', settings: { isOpen: true } }))).status).toBe(500);
   });
 });
 
-describe('POST /api/admin/settings/bulk-update', () => {
-  let mockDb: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDb = dbModule.db as any;
+describe('POST /api/admin/settings/bulk-update — Firestore', () => {
+  it('applies exactly the previewed window using the verified administrator, even across IST midnight', async () => {
+    const previewResponse = await preview(request({ applyMode: 'all_days', settings: { maxCapacity: 80 } }));
+    const { scope } = await previewResponse.json();
+    const reviewedDates = [...mocks.counts.mock.calls[0][0]];
+    vi.setSystemTime(new Date('2099-05-14T19:00:00Z'));
+    const response = await bulkUpdate(request({ applyMode: 'all_days', scope, settings: { maxCapacity: 80 }, adminId: 'untrusted-id' }));
+    expect(await response.json()).toMatchObject({ success: true, affectedCount: 181, scope, cancelledBookingsCount: 0 });
+    expect(mocks.references).not.toHaveBeenCalled();
+    expect(mocks.upsertMany).toHaveBeenCalledWith(reviewedDates, { maxCapacity: 80 }, 'verified-admin');
+    expect(mocks.cancel).not.toHaveBeenCalled(); expect(mocks.emails).not.toHaveBeenCalled();
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('blocks a date, cancels its bookings and sends typed cancellation emails', async () => {
+    mocks.cancel.mockResolvedValue(cancellations); mocks.emails.mockResolvedValue({ sent: 2, failed: 0, errors: [] });
+    const response = await bulkUpdate(request({ applyMode: 'one_day', date: '2099-05-20', settings: { isOpen: false }, adminId: 'ignored' }));
+    expect(await response.json()).toMatchObject({ success: true, affectedCount: 1, cancelledBookingsCount: 2, emailsSent: 2, emailsFailed: 0 });
+    expect(mocks.upsertMany).toHaveBeenCalledWith(['2099-05-20'], { isOpen: false }, 'verified-admin');
+    expect(mocks.cancel).toHaveBeenCalledWith('2099-05-20', '2099-05-20', 'verified-admin');
+    expect(mocks.emails).toHaveBeenCalledWith(cancellations);
   });
-
-  it('updates all days and tracks admin', async () => {
-    const mockUpdatedRows = [
-      { id: '1', date: '2026-05-14', isOpen: true, updatedBy: 'admin-1' },
-      { id: '2', date: '2026-05-15', isOpen: true, updatedBy: 'admin-1' },
-    ];
-
-    mockDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue(mockUpdatedRows),
-        }),
-      }),
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'all_days',
-        settings: { maxCapacity: 80 },
-        adminId: 'admin-1',
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedCount).toBe(2);
-    expect(data.cancelledBookingsCount).toBe(0);
+  it('updates every date in an inclusive range', async () => {
+    const response = await bulkUpdate(request({ applyMode: 'date_range', startDate: '2099-06-01', endDate: '2099-06-03', settings: { startTime: '15:00:00' }, adminId: 'ignored' }));
+    expect(await response.json()).toMatchObject({ success: true, affectedCount: 3 });
+    expect(mocks.upsertMany).toHaveBeenCalledWith(['2099-06-01', '2099-06-02', '2099-06-03'], { startTime: '15:00:00' }, 'verified-admin');
   });
-
-  it('blocks date and cancels bookings', async () => {
-    const mockUpdatedRows = [{ id: '1', date: '2026-05-20', isOpen: false }];
-
-    mockDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue(mockUpdatedRows),
-        }),
-      }),
-    });
-
-    const mockCancelledBookings = [
-      { id: 'b1', email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', numberOfGuests: 2 },
-      { id: 'b2', email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', numberOfGuests: 3 },
-    ];
-
-    vi.mocked(queriesModule.cancelBookingsForDates).mockResolvedValue(mockCancelledBookings);
-
-    vi.mocked(emailModule.sendCancellationEmails).mockResolvedValue({
-      sent: 2,
-      failed: 0,
-      errors: [],
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'one_day',
-        date: '2026-05-20',
-        settings: { isOpen: false },
-        adminId: 'admin-1',
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedCount).toBe(1);
-    expect(data.cancelledBookingsCount).toBe(2);
-    expect(data.emailsSent).toBe(2);
-    expect(data.emailsFailed).toBe(0);
-
-    expect(queriesModule.cancelBookingsForDates).toHaveBeenCalledWith('2026-05-20', '2026-05-20');
-    expect(emailModule.sendCancellationEmails).toHaveBeenCalledWith(mockCancelledBookings);
+  it('limits cancellations to the exact previewed window, not the last future record', async () => {
+    const { scope } = await (await preview(request({ applyMode: 'all_days', settings: { isOpen: false } }))).json();
+    await bulkUpdate(request({ applyMode: 'all_days', scope, settings: { isOpen: false } }));
+    expect(mocks.cancel).toHaveBeenCalledWith(scope.startDate, scope.endDate, 'verified-admin');
   });
-
-  it('updates date range', async () => {
-    const mockUpdatedRows = [
-      { id: '1', date: '2026-06-01', startTime: '15:00:00' },
-      { id: '2', date: '2026-06-02', startTime: '15:00:00' },
-      { id: '3', date: '2026-06-03', startTime: '15:00:00' },
-    ];
-
-    mockDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue(mockUpdatedRows),
-        }),
-      }),
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'date_range',
-        startDate: '2026-06-01',
-        endDate: '2026-06-03',
-        settings: { startTime: '15:00:00' },
-        adminId: 'admin-1',
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.affectedCount).toBe(3);
+  it('rejects applying all days without a previewed scope', async () => {
+    expect((await bulkUpdate(request({ applyMode: 'all_days', settings: { maxCapacity: 80 } }))).status).toBe(400);
+    expect(mocks.upsertMany).not.toHaveBeenCalled();
   });
-
-  it('returns 400 for missing adminId', async () => {
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'all_days',
-        settings: { maxCapacity: 80 },
-        // Missing adminId
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('required');
+  it.each([
+    { applyMode: 'one_day', date: '2099-05-20', scope: { startDate: '2099-05-20', endDate: '2099-05-21' } },
+    { applyMode: 'all_days', scope: { startDate: '2099-05-14', endDate: '2099-12-31' } },
+  ])('rejects a mismatched scope before writes %j', async (body) => {
+    expect((await bulkUpdate(request({ ...body, settings: { isOpen: false } }))).status).toBe(400);
+    expect(mocks.upsertMany).not.toHaveBeenCalled();
+    expect(mocks.cancel).not.toHaveBeenCalled();
   });
-
-  it('returns 400 for invalid applyMode', async () => {
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'invalid_mode',
-        settings: { isOpen: true },
-        adminId: 'admin-1',
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toBeDefined();
+  it('cancels a blocked range and skips email for bookings without an address', async () => {
+    mocks.cancel.mockResolvedValue([cancellations[0], { ...cancellations[1], email: null }]);
+    await bulkUpdate(request({ applyMode: 'date_range', startDate: '2099-06-01', endDate: '2099-06-03', settings: { isOpen: false }, adminId: 'ignored' }));
+    expect(mocks.cancel).toHaveBeenCalledWith('2099-06-01', '2099-06-03', 'verified-admin');
+    expect(mocks.emails).toHaveBeenCalledWith([cancellations[0]]);
   });
+  it('retains successful updates when individual emails fail', async () => {
+    mocks.cancel.mockResolvedValue(cancellations); mocks.emails.mockResolvedValue({ sent: 1, failed: 1, errors: ['b2: SMTP failed'] });
+    const response = await bulkUpdate(request({ applyMode: 'one_day', date: '2099-05-20', settings: { isOpen: false }, adminId: 'ignored' }));
+    expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ success: true, emailsSent: 1, emailsFailed: 1, emailErrors: ['b2: SMTP failed'] });
+  });
+  it.each([{ applyMode: 'all_days', settings: {} }, { applyMode: 'invalid', settings: {}, adminId: 'admin' },
+    { applyMode: 'one_day', settings: {}, adminId: 'admin' },
+    { applyMode: 'date_range', settings: {}, adminId: 'admin', startDate: '2099-06-01' }])('rejects invalid bulk requests %j', async body => {
+    expect((await bulkUpdate(request(body))).status).toBe(400); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.cancel).not.toHaveBeenCalled();
+  });
+  it('returns 500 without sending emails when cancellation fails', async () => {
+    mocks.cancel.mockRejectedValue(new Error('Transaction failed'));
+    expect((await bulkUpdate(request({ applyMode: 'one_day', date: '2099-05-20', settings: { isOpen: false }, adminId: 'ignored' }))).status).toBe(500);
+    expect(mocks.emails).not.toHaveBeenCalled();
+  });
+});
 
-  it('handles partial email failures gracefully', async () => {
-    mockDb.update.mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: '1', date: '2026-05-20', isOpen: false }]),
-        }),
-      }),
-    });
-
-    const mockCancelledBookings = [
-      { id: 'b1', email: 'user1@test.com', visitorName: 'User 1', bookingDate: '2026-05-20', numberOfGuests: 2 },
-      { id: 'b2', email: 'user2@test.com', visitorName: 'User 2', bookingDate: '2026-05-20', numberOfGuests: 3 },
-    ];
-
-    vi.mocked(queriesModule.cancelBookingsForDates).mockResolvedValue(mockCancelledBookings);
-
-    vi.mocked(emailModule.sendCancellationEmails).mockResolvedValue({
-      sent: 1,
-      failed: 1,
-      errors: ['b2: SMTP connection failed'],
-    });
-
-    const request = new NextRequest('http://localhost:3001/api/admin/settings/bulk-update', {
-      method: 'POST',
-      body: JSON.stringify({
-        applyMode: 'one_day',
-        date: '2026-05-20',
-        settings: { isOpen: false },
-        adminId: 'admin-1',
-      }),
-    });
-
-    const response = await bulkUpdatePost(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.emailsSent).toBe(1);
-    expect(data.emailsFailed).toBe(1);
-    expect(data.emailErrors).toHaveLength(1);
+describe.each([['preview', preview], ['bulk update', bulkUpdate]] as const)('%s authorization', (_name, handler) => {
+  it.each([401, 403])('rejects unauthorized requests (%i) before service calls', async status => {
+    mocks.auth.mockResolvedValue({ user: null, response: NextResponse.json({ success: false }, { status }) });
+    expect((await handler(request({}))).status).toBe(status);
+    expect(mocks.counts).not.toHaveBeenCalled(); expect(mocks.references).not.toHaveBeenCalled(); expect(mocks.upsert).not.toHaveBeenCalled();
+    expect(mocks.cancel).not.toHaveBeenCalled(); expect(mocks.emails).not.toHaveBeenCalled();
   });
 });

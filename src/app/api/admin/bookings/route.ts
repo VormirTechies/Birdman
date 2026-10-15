@@ -17,7 +17,6 @@ import {
 import { createFirestoreBooking } from '@/lib/firebase/bookings';
 import { adminBookingCreationSchema } from '@/models/firestore/booking';
 import { sendBookingConfirmation } from '@/lib/email';
-import { sendPushToAllAdmins } from '@/lib/push';
 import { requireAdmin } from '@/lib/require-admin';
 import { ZodError } from 'zod';
 
@@ -287,25 +286,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     };
 
-    // Format guest count for display
-    const guestCount = booking.children > 0 
-      ? `${booking.adults} adult(s) + ${booking.children} child(ren)`
-      : `${booking.adults} guest(s)`;
-
-    // Notify All Admins
-    try {
-      await sendPushToAllAdmins({
-        title: 'Walk-in Visitor Registered',
-        body: `${booking.visitorName} (${guestCount}) checked in for ${booking.bookingDate}.`,
-        url: '/admin',
-        visitorName: booking.visitorName,
-        bookingDate: booking.bookingDate,
-      });
-    } catch (pushError) {
-      console.error('[Admin API] Push notification failed, but booking created:', pushError);
-    }
-
-    // Send confirmation email only if email is provided (non-blocking)
+    // Admin alerts are queued atomically by createFirestoreBooking.
     let emailSent = false;
     if (validatedData.email && validatedData.email.trim() !== '') {
       try {

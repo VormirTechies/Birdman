@@ -17,7 +17,7 @@ function unauthorized(message = 'Unauthorized') {
   );
 }
 
-export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
+export async function requireAdmin(request: Request, options: { checkRevoked?: boolean } = {}): Promise<AdminAuthResult> {
   const authorization = request.headers.get('authorization');
 
   if (!authorization?.startsWith('Bearer ')) {
@@ -30,7 +30,9 @@ export async function requireAdmin(request: Request): Promise<AdminAuthResult> {
   }
 
   try {
-    const user = await getAdminAuth().verifyIdToken(token);
+    const user = options.checkRevoked
+      ? await getAdminAuth().verifyIdToken(token, true)
+      : await getAdminAuth().verifyIdToken(token);
     const admin = await authorizeAdminToken(user);
     if (!admin) {
       return {

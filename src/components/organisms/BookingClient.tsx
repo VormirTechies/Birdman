@@ -143,6 +143,7 @@ export function BookingClient() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [groupContactPhone, setGroupContactPhone] = useState<string | null>(null);
   const [bookingResult, setBookingResult] = useState<{
     id: string;
     bookingNumber?: number;
@@ -325,6 +326,7 @@ export function BookingClient() {
     }
     setIsSubmitting(true);
     setSubmitError('');
+    setGroupContactPhone(null);
     try {
       const response = await fetch('/api/bookings', {
         method: 'POST',
@@ -341,6 +343,7 @@ export function BookingClient() {
         }),
       });
       const result = await readApiJson<{
+        contactPhone?: string;
         success?: boolean;
         code?: string;
         error?: string;
@@ -354,6 +357,7 @@ export function BookingClient() {
         id?: string;
       }>(response);
       if (!response.ok) {
+        if (result.code === 'BOOKING_CONTACT_LIMIT') setGroupContactPhone(result.contactPhone ?? null);
         if (
           result.code === 'BOOKING_CAPACITY_EXCEEDED' &&
           typeof result.available === 'number' &&
@@ -852,6 +856,7 @@ export function BookingClient() {
                           <label className="text-[11px] font-bold text-canopy-dark/50 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5" /> Number of Guests
                           </label>
+                          <p className="mb-3 text-xs text-canopy-dark/65">Up to 10 guests per booking, including children. Across bookings, you may book up to 25 guests per date. For larger groups, please contact Vithya mam.</p>
                           
                           {/* Adults */}
                           <div className="mb-4">
@@ -1108,9 +1113,11 @@ export function BookingClient() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm mb-4"
+                      role="alert"
                     >
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       {submitError}
+                      {groupContactPhone && <a className="ml-2 underline" href={`tel:${groupContactPhone.replace(/[^+\d]/g, '')}`}>Call Vithya mam</a>}
                     </motion.div>
                   )}
                 </AnimatePresence>
