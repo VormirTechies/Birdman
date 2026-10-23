@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingCapacityExceededError } from '@/lib/firebase/booking-capacity';
 import { BookingContactLimitError } from '@/lib/booking-policy';
 
@@ -76,10 +76,23 @@ function request(body: unknown) {
 
 describe('POST /api/bookings', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2099-08-01T10:00:00Z'));
     mocks.limitBookingAttempts.mockResolvedValue(null);
     vi.clearAllMocks();
     mocks.createFirestoreBooking.mockResolvedValue(createdBooking);
     mocks.sendPushToAllAdmins.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it('accepts day 45 and rejects day 46 without writing', async () => {
+    expect((await POST(request({ ...validRequest, bookingDate: '2099-09-15' }) as never)).status).toBe(201);
+    mocks.createFirestoreBooking.mockClear();
+    const response = await POST(request({ ...validRequest, bookingDate: '2099-09-16' }) as never);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'BOOKING_VALIDATION_ERROR' });
+    expect(mocks.createFirestoreBooking).not.toHaveBeenCalled();
   });
 
   it('creates through the atomic repository and returns a safe public DTO', async () => {

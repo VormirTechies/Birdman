@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { PUBLIC_BOOKING_WINDOW_DAYS, publicBookingWindow } from '@/lib/booking-window';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -92,7 +93,6 @@ const GUIDELINES = [
 ];
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const PUBLIC_BOOKING_WINDOW_DAYS = 30;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -216,8 +216,7 @@ export function BookingClient() {
   const lastOfMonth = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: firstOfMonth, end: lastOfMonth });
   const startDow = getDay(firstOfMonth);
-  const todayForBookingWindow = new Date();
-  todayForBookingWindow.setHours(0, 0, 0, 0);
+  const todayForBookingWindow = new Date(`${publicBookingWindow().today}T00:00:00`);
   const maxBookableDate = addDays(todayForBookingWindow, PUBLIC_BOOKING_WINDOW_DAYS);
   const nextMonthStart = startOfMonth(addMonths(calendarMonth, 1));
   const canGoNextMonth = nextMonthStart <= maxBookableDate;
@@ -637,7 +636,10 @@ export function BookingClient() {
                           <span className="w-2 h-2 rounded-full bg-amber-400" /> Filling up
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-canopy-dark/20" /> Full / Closed
+                          <span className="w-2 h-2 rounded-full bg-canopy-dark/20" /> Full
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span aria-hidden="true" className="w-2 h-2 rounded-full bg-red-400" /> Not opened
                         </span>
                       </div>
 

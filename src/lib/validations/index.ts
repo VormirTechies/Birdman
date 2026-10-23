@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PUBLIC_BOOKING_WINDOW_DAYS } from '@/lib/booking-window';
 
 // ─── Booking Validation ──────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ export const createBookingSchema = z.object({
       }
 
       const maxBookingDate = new Date(today);
-      maxBookingDate.setDate(maxBookingDate.getDate() + 30);
+      maxBookingDate.setDate(maxBookingDate.getDate() + PUBLIC_BOOKING_WINDOW_DAYS);
 
       if (bookingDate > maxBookingDate) {
         return false;
@@ -72,7 +73,7 @@ export const createBookingSchema = z.object({
       }
       
       return true;
-    }, 'Booking date must be within the next 30 days and at least 1 hour before today\'s session'),
+    }, `Booking date must be within the next ${PUBLIC_BOOKING_WINDOW_DAYS} days and at least 1 hour before today's session`),
   bookingTime: z
     .string()
     .min(5, 'Time must be provided'),

@@ -15,6 +15,7 @@ import { publicBookingSubmissionSchema } from '@/models/firestore/booking';
 import { BookingContactLimitError } from '@/lib/booking-policy';
 import { bookingContactLimitResponse } from '@/lib/booking-limit-response';
 import { limitBookingAttempts } from '@/lib/firebase/booking-attempt-limit';
+import { isWithinPublicBookingWindow, PUBLIC_BOOKING_WINDOW_DAYS } from '@/lib/booking-window';
 
 console.log('[api/bookings] module loaded');
 
@@ -123,10 +124,13 @@ export async function POST(request: NextRequest) {
     // from adults + children on the server.
     delete normalizedBody.numberOfGuests;
     delete normalizedBody.number_of_guests;
-    const validatedData = publicBookingSubmissionSchema.parse(normalizedBody);
+    const now = new Date();
+    const validatedData = publicBookingSubmissionSchema.refine(
+      data => isWithinPublicBookingWindow(data.bookingDate, now),
+      { path: ['bookingDate'], message: `Booking date must be between today and ${PUBLIC_BOOKING_WINDOW_DAYS} days ahead (India time).` }
+    ).parse(normalizedBody);
 
     console.log('[api/bookings] creating Firestore booking');
-    const now = new Date();
     const created = await createFirestoreBooking(validatedData, {
       source: 'public',
       enforceCutoff: true,
