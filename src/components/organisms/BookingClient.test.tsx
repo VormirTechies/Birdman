@@ -71,6 +71,23 @@ describe('BookingClient availability calendar', () => {
     expect(availability).toHaveTextContent('0 seats would remain after your booking');
   });
 
+  it('disables a date whose confirmed guests exceed capacity', async () => {
+    const targetDate = addDays(new Date(), 1);
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse([{
+      date: format(targetDate, 'yyyy-MM-dd'), bookingCount: 104,
+      maxCapacity: 100, isOpen: true, startTime: '16:30:00',
+      percentage: 104, remaining: 0,
+    }])));
+    const user = userEvent.setup();
+    render(<BookingClient />);
+    if (!isSameMonth(new Date(), targetDate)) {
+      await user.click(screen.getByRole('button', { name: 'Next month' }));
+    }
+    expect(await screen.findByRole('button', {
+      name: `${format(targetDate, 'EEEE, d MMMM')}, no seats available`,
+    })).toBeDisabled();
+  });
+
   it('shows a retry state instead of presenting unknown dates as available', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ error: 'Unavailable' }, 500));
     vi.stubGlobal('fetch', fetchMock);

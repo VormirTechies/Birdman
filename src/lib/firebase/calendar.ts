@@ -81,10 +81,31 @@ async function getBookingDayCounters(firstDay: string, lastDay: string) {
     .get();
   console.log('[FIRESTORE READ]', 'getBookingDayCounters', 'docs:', snapshot.size);
 
-  return new Map(snapshot.docs.map((document) => [
+  const counters = new Map(snapshot.docs.map((document) => [
     document.id,
     Math.max(0, numberValue(document.data().confirmedGuests) ?? 0),
   ]));
+
+  const daysInMonth = Number(lastDay.slice(-2));
+  if (counters.size < daysInMonth) {
+    // Legacy/imported bookings may predate bookingDays. Confirmation already
+    // falls back to their totals; availability must not advertise empty seats
+    // for those dates. Project only capacity fields, never visitor details.
+    const bookings = await getAdminDb().collection('bookings')
+      .where('bookingDate', '>=', firstDay)
+      .where('bookingDate', '<=', lastDay)
+      .select('bookingDate', 'status', 'numberOfGuests', 'adults', 'children')
+      .get();
+    const fallback = new Map<string, number>();
+    for (const document of bookings.docs) {
+      const data = document.data();
+      const date = String(data.bookingDate ?? '');
+      if (data.status !== 'confirmed' || counters.has(date)) continue;
+      fallback.set(date, (fallback.get(date) ?? 0) + guestCount(data));
+    }
+    for (const [date, total] of fallback) counters.set(date, total);
+  }
+  return counters;
 }
 
 async function getConfirmedBookingsForDay(date: string) {

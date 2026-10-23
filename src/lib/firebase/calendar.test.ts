@@ -29,9 +29,11 @@ function queryWithDocuments(
 ) {
   const query = {
     where: vi.fn(),
+    select: vi.fn(),
     get: vi.fn().mockResolvedValue({ docs: documents, size: documents.length }),
   };
   query.where.mockReturnValue(query);
+  query.select.mockReturnValue(query);
   return query;
 }
 
@@ -48,6 +50,7 @@ describe('Firestore calendar capacity reads', () => {
       },
     ]);
     const collection = vi.fn((name: string) => {
+      if (name === 'bookings') return queryWithDocuments([]);
       expect(name).toBe('bookingDays');
       return bookingDays;
     });
@@ -69,6 +72,40 @@ describe('Firestore calendar capacity reads', () => {
       maxCapacity: 100,
       percentage: 97,
     });
+    expect(collection).toHaveBeenCalledWith('bookings');
+  });
+
+  it('counts confirmed legacy bookings on missing-counter dates without overriding existing counters', async () => {
+    const bookingDays = queryWithDocuments([
+      { id: '2026-10-25', data: () => ({ confirmedGuests: 97 }) },
+    ]);
+    const bookings = queryWithDocuments([
+      { id: 'legacy-1', data: () => ({ bookingDate: '2026-10-24', status: 'confirmed', numberOfGuests: 100 }) },
+      { id: 'legacy-2', data: () => ({ bookingDate: '2026-10-24', status: 'confirmed', adults: 2, children: 2 }) },
+      { id: 'cancelled', data: () => ({ bookingDate: '2026-10-24', status: 'cancelled', numberOfGuests: 10 }) },
+      { id: 'counted', data: () => ({ bookingDate: '2026-10-25', status: 'confirmed', numberOfGuests: 5 }) },
+    ]);
+    mocks.getAdminDb.mockReturnValue({ collection: (name: string) => name === 'bookingDays' ? bookingDays : bookings });
+    mocks.getCalendarSettings.mockResolvedValue([]);
+
+    const days = await getFirestoreMonthlyBookingStats(2026, 10);
+    expect(days.find(day => day.date === '2026-10-24')).toMatchObject({ bookingCount: 104, maxCapacity: 100, percentage: 104 });
+    expect(days.find(day => day.date === '2026-10-25')).toMatchObject({ bookingCount: 97 });
+    expect(days.find(day => day.date === '2026-10-26')).toMatchObject({ bookingCount: 0 });
+    expect(bookings.select).toHaveBeenCalledWith('bookingDate', 'status', 'numberOfGuests', 'adults', 'children');
+    expect(bookings.where).toHaveBeenCalledWith('bookingDate', '>=', '2026-10-01');
+    expect(bookings.where).toHaveBeenCalledWith('bookingDate', '<=', '2026-10-31');
+  });
+
+  it('does not scan legacy bookings when all monthly counters exist', async () => {
+    const bookingDays = queryWithDocuments(Array.from({ length: 31 }, (_, index) => ({
+      id: `2026-10-${String(index + 1).padStart(2, '0')}`,
+      data: () => ({ confirmedGuests: 0 }),
+    })));
+    const collection = vi.fn(() => bookingDays);
+    mocks.getAdminDb.mockReturnValue({ collection });
+    mocks.getCalendarSettings.mockResolvedValue([]);
+    expect(await getFirestoreMonthlyBookingStats(2026, 10)).toHaveLength(31);
     expect(collection).not.toHaveBeenCalledWith('bookings');
   });
 
