@@ -40,6 +40,10 @@ describe('BookingClient availability calendar', () => {
     const user = userEvent.setup();
     render(<BookingClient />);
 
+    for (const label of ['Available', 'Filling up', 'Full', 'Not opened']) {
+      expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
+    }
+
     if (!isSameMonth(today, targetDate)) {
       await user.click(screen.getByRole('button', { name: 'Next month' }));
     }
