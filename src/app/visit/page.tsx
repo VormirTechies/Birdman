@@ -395,8 +395,8 @@ export default function VisitPage() {
           {/* Map */}
           <AnimatedSection>
             <div className="bg-white rounded-2xl overflow-hidden shadow-card border border-sanctuary-green/10">
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3887.1905!2d80.26246!3d13.07305!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a5267b9df1e24eb%3A0xef6a4ed4fb0bba9b!2sChintadripet%2C%20Chennai%2C%20Tamil%20Nadu!5e0!3m2!1sen!2sin!4v1716000000000!5m2!1sen!2sin"
+              <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3193.0621214136813!2d80.26794587403465!3d13.07851351252735!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a52673f2a820b89%3A0xdf66f55f098c58b0!2sParrot%20Sudarson!5e1!3m2!1sen!2sin!4v1793130308982!5m2!1sen!2sin" 
                 width="100%"
                 height="360"
                 style={{ border: 0 }}
