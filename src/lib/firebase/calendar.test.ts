@@ -93,8 +93,26 @@ describe('Firestore calendar capacity reads', () => {
     expect(days.find(day => day.date === '2026-10-25')).toMatchObject({ bookingCount: 97 });
     expect(days.find(day => day.date === '2026-10-26')).toMatchObject({ bookingCount: 0 });
     expect(bookings.select).toHaveBeenCalledWith('bookingDate', 'status', 'numberOfGuests', 'adults', 'children');
-    expect(bookings.where).toHaveBeenCalledWith('bookingDate', '>=', '2026-10-01');
-    expect(bookings.where).toHaveBeenCalledWith('bookingDate', '<=', '2026-10-31');
+    expect(bookings.where).toHaveBeenCalledExactlyOnceWith(
+      'bookingDate', 'in', Array.from({ length: 31 }, (_, index) =>
+        '2026-10-' + String(index + 1).padStart(2, '0')
+      ).filter(date => date !== '2026-10-25')
+    );
+  });
+
+  it('splits a 31-day month with no counters into two bounded queries', async () => {
+    const bookings = queryWithDocuments([]);
+    mocks.getAdminDb.mockReturnValue({
+      collection: (name: string) => name === 'bookingDays' ? queryWithDocuments([]) : bookings,
+    });
+    mocks.getCalendarSettings.mockResolvedValue([]);
+
+    const days = await getFirestoreMonthlyBookingStats(2026, 10);
+    expect(days).toHaveLength(31);
+    expect(days.every(day => day.bookingCount === 0)).toBe(true);
+    expect(bookings.where).toHaveBeenCalledTimes(2);
+    expect(bookings.where.mock.calls[0][2]).toHaveLength(30);
+    expect(bookings.where).toHaveBeenNthCalledWith(2, 'bookingDate', 'in', ['2026-10-31']);
   });
 
   it('does not scan legacy bookings when all monthly counters exist', async () => {

@@ -79,7 +79,6 @@ async function getBookingDayCounters(firstDay: string, lastDay: string) {
     .where(FieldPath.documentId(), '>=', firstDay)
     .where(FieldPath.documentId(), '<=', lastDay)
     .get();
-  console.log('[FIRESTORE READ]', 'getBookingDayCounters', 'docs:', snapshot.size);
 
   const counters = new Map(snapshot.docs.map((document) => [
     document.id,
@@ -87,15 +86,21 @@ async function getBookingDayCounters(firstDay: string, lastDay: string) {
   ]));
 
   const daysInMonth = Number(lastDay.slice(-2));
-  if (counters.size < daysInMonth) {
+  const missingDates = Array.from({ length: daysInMonth }, (_, index) =>
+    firstDay.slice(0, -2) + String(index + 1).padStart(2, '0')
+  ).filter(date => !counters.has(date));
+  let fallbackQueries = 0;
+  let fallbackDocuments = 0;
+  for (let offset = 0; offset < missingDates.length; offset += 30) {
     // Legacy/imported bookings may predate bookingDays. Confirmation already
     // falls back to their totals; availability must not advertise empty seats
     // for those dates. Project only capacity fields, never visitor details.
     const bookings = await getAdminDb().collection('bookings')
-      .where('bookingDate', '>=', firstDay)
-      .where('bookingDate', '<=', lastDay)
+      .where('bookingDate', 'in', missingDates.slice(offset, offset + 30))
       .select('bookingDate', 'status', 'numberOfGuests', 'adults', 'children')
       .get();
+    fallbackQueries++;
+    fallbackDocuments += bookings.size;
     const fallback = new Map<string, number>();
     for (const document of bookings.docs) {
       const data = document.data();
@@ -105,6 +110,13 @@ async function getBookingDayCounters(firstDay: string, lastDay: string) {
     }
     for (const [date, total] of fallback) counters.set(date, total);
   }
+  console.log('[calendar.monthly]', {
+    month: firstDay.slice(0, 7),
+    counterDocuments: snapshot.size,
+    missingCounterDates: missingDates.length,
+    fallbackQueries,
+    fallbackDocuments,
+  });
   return counters;
 }
 
