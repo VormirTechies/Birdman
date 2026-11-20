@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/require-admin';
 import { notificationStateInputSchema } from '@/models/firestore/notification';
-import { listNotificationInbox, notificationListSchema, updateNotificationStates,
+import { countUnreadNotifications, listNotificationInbox, notificationListSchema, updateNotificationStates,
   NotificationInboxAccessError, NotificationInboxMissingError } from '@/lib/firebase/notification-inbox';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +9,16 @@ const headers = { 'Cache-Control': 'no-store' };
 export async function GET(request: Request) {
   const auth = await requireAdmin(request, { checkRevoked: true });
   if (!auth.user) return auth.response;
+  const params = new URL(request.url).searchParams;
+  if (params.size === 1 && params.get('view') === 'badge') {
+    try {
+      return NextResponse.json({ success: true, unreadCount: await countUnreadNotifications(auth.user.uid) }, { headers });
+    } catch {
+      return NextResponse.json({ success: false, error: 'Notifications are temporarily unavailable.' }, { status: 503, headers });
+    }
+  }
   let input;
   try {
-    const params = new URL(request.url).searchParams;
     if ([...params.keys()].some(key => params.getAll(key).length > 1)) throw new Error('Duplicate parameter');
     input = notificationListSchema.parse(Object.fromEntries(params));
   } catch { return NextResponse.json({ success: false, error: 'Invalid notification page.' }, { status: 400, headers }); }

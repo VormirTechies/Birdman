@@ -1,12 +1,13 @@
 // @vitest-environment node
 import { beforeEach, expect, it, vi } from 'vitest';
 import { NextResponse } from 'next/server';
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), list: vi.fn(), update: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), list: vi.fn(), update: vi.fn(), count: vi.fn() }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/require-admin', () => ({ requireAdmin: mocks.auth }));
 vi.mock('@/lib/firebase/admin', () => ({ getAdminDb: vi.fn() }));
 vi.mock('@/lib/firebase/notification-inbox', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/firebase/notification-inbox')>(), listNotificationInbox: mocks.list, updateNotificationStates: mocks.update,
+  countUnreadNotifications: mocks.count,
 }));
 import { GET, PATCH } from './route';
 import { NotificationInboxAccessError, NotificationInboxMissingError } from '@/lib/firebase/notification-inbox';
@@ -19,6 +20,16 @@ it.each([401, 403])('rejects unauthorized calls (%i) before repository access', 
   expect((await GET(new Request('http://localhost'))).status).toBe(status); expect((await PATCH(request({ ids: [id], action: 'read' }))).status).toBe(status);
   expect(mocks.list).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled();
   expect(mocks.auth).toHaveBeenCalledWith(expect.any(Request), { checkRevoked: true });
+  expect((await GET(new Request('http://localhost/?view=badge'))).status).toBe(status);
+  expect(mocks.count).not.toHaveBeenCalled();
+});
+it('returns only the verified admin badge count without listing the inbox', async () => {
+  mocks.count.mockResolvedValue(7);
+  const response = await GET(new Request('http://localhost/?view=badge'));
+  expect(await response.json()).toEqual({ success: true, unreadCount: 7 });
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
+  expect(mocks.count).toHaveBeenCalledWith('verified-admin');
+  expect(mocks.list).not.toHaveBeenCalled();
 });
 it('uses a verified uid, default size 20 and no-store responses', async () => {
   const response = await GET(new Request('http://localhost')); expect(response.status).toBe(200);

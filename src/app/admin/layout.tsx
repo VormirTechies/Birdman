@@ -13,6 +13,7 @@ import enMessages from '@/../messages/en.json';
 import { PWAInstallBanner } from '@/components/admin/PWAInstallBanner';
 import { AdminAuthGuard } from './AdminAuthGuard';
 import { NotificationDeviceControl } from '@/components/admin/NotificationDeviceControl';
+import { adminNotificationsEnabled } from '@/lib/admin-notification-flag';
 
 const workSans = Work_Sans({
   subsets: ['latin'],
@@ -53,7 +54,7 @@ export default function AdminLayout({
   return (
     <NextIntlClientProvider locale="en" messages={enMessages}>
       <AdminAuthGuard>
-        <NotificationProvider>
+        <NotificationProvider enabled={adminNotificationsEnabled}>
         <div className={`${workSans.variable} min-h-screen bg-[#f8f8f8]`}>
         {/* Fixed sidebar (desktop) + drawer (mobile) */}
         <AdminSidebar
@@ -68,7 +69,7 @@ export default function AdminLayout({
 
           {/* Page content — padded below header, and above bottom nav on mobile */}
           <main className="flex-1 mt-16 pb-16 lg:pb-0 p-4 lg:p-8">
-            <NotificationDeviceControl />
+            {adminNotificationsEnabled && <NotificationDeviceControl />}
             {children}
           </main>
         </div>

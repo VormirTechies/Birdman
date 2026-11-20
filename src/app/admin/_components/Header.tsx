@@ -11,6 +11,7 @@ import { auth, firebaseConfigError } from '@/firebase';
 import { ActionsMenu } from './ActionsMenu';
 import { useNotifications } from '@/components/providers/NotificationProvider';
 import { NotificationInbox } from './NotificationInbox';
+import { adminNotificationsEnabled } from '@/lib/admin-notification-flag';
 
 // ─── Avatar helpers (matches profile page palette) ─────────────────────────
 
@@ -32,7 +33,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   const [userInitial, setUserInitial] = useState('A');
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  const { unreadCount, refresh } = useNotifications();
+  const { unreadCount } = useNotifications();
 
   useEffect(() => {
     if (firebaseConfigError) {
@@ -74,7 +75,6 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
   const handleBellClick = () => {
     const next = !isPopoverOpen;
     setIsPopoverOpen(next);
-    if (next) refresh();
   };
 
   const handleSignOut = async () => {
@@ -129,7 +129,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
       {/* Right actions */}
       <div className="flex items-center gap-1">
         {/* Bell — notifications popover */}
-        <div ref={bellWrapperRef} className="relative">
+        {adminNotificationsEnabled && <div ref={bellWrapperRef} className="relative">
           <button
             ref={bellRef}
             onClick={handleBellClick}
@@ -163,7 +163,7 @@ export function AdminHeader({ onMenuClick }: HeaderProps) {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </div>}
 
         {/* Avatar — triggers profile context menu */}
         <button

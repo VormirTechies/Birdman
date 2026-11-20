@@ -9,14 +9,28 @@ import type { NotificationInboxPage } from '@/models/firestore/notification';
 
 interface NotificationContextType extends NotificationInboxPage {
   loading: boolean; error: string; busy: boolean; canPrevious: boolean;
+  setInboxOpen: (open: boolean) => void;
   refresh: () => void; next: () => void; previous: () => void; latest: () => void;
   act: (ids: string[], action: 'read' | 'dismiss') => Promise<void>;
 }
 const empty: NotificationInboxPage = { notifications: [], unreadCount: 0, pagination: { limit: 20, hasMore: false, nextCursor: null } };
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-export function NotificationProvider({ children }: { children: ReactNode }) {
+const noop = () => {};
+const disabled: NotificationContextType = {
+  ...empty, loading: false, error: '', busy: false, canPrevious: false,
+  setInboxOpen: noop, refresh: noop, next: noop, previous: noop, latest: noop, act: async () => {},
+};
+
+export function NotificationProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
+  if (!enabled) return <NotificationContext.Provider value={disabled}>{children}</NotificationContext.Provider>;
+  return <ActiveNotificationProvider>{children}</ActiveNotificationProvider>;
+}
+
+function ActiveNotificationProvider({ children }: { children: ReactNode }) {
   const [uid, setUid] = useState<string | null>(null);
   const [page, setPage] = useState(empty);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +42,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (firebaseConfigError) return;
     return onAuthStateChanged(auth, user => {
-      sequence.current++; setUid(user?.uid ?? null); setPage(empty); setCursors([null]); setError(''); setLoading(false);
+      sequence.current++; setUid(user?.uid ?? null); setPage(empty); setUnreadCount(0); setCursors([null]); setError(''); setLoading(false);
     });
   }, []);
   useEffect(() => {
@@ -36,26 +50,32 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController(); const requestId = ++sequence.current;
     // Loading tracks an external authenticated request, not derived render state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+    setLoading(inboxOpen);
     void (async () => {
       try {
-        const response = await authenticatedFetch(`/api/admin/notifications?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+        const url = inboxOpen
+          ? `/api/admin/notifications?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+          : '/api/admin/notifications?view=badge';
+        const response = await authenticatedFetch(url,
           { signal: controller.signal, cache: 'no-store' });
         if (!response.ok) throw new Error(response.status === 403 ? 'Administrator access is required.' : 'Unable to load notifications. Please retry.');
         const data = await response.json() as NotificationInboxPage;
-        if (requestId === sequence.current && auth.currentUser?.uid === uid) { setPage(data); setError(''); }
+        if (!controller.signal.aborted && requestId === sequence.current && auth.currentUser?.uid === uid) {
+          setUnreadCount(data.unreadCount);
+          if (inboxOpen) { setPage(data); setError(''); }
+        }
       } catch (failure) {
-        if (!controller.signal.aborted && requestId === sequence.current) {
+        if (inboxOpen && !controller.signal.aborted && requestId === sequence.current) {
           setError(failure instanceof Error ? failure.message : 'Unable to load notifications.'); setPage(empty);
         }
       } finally { if (requestId === sequence.current) setLoading(false); }
     })();
     return () => controller.abort();
-  }, [uid, cursor, revision]);
+  }, [uid, cursor, revision, inboxOpen]);
   useEffect(() => {
     if (!uid) return;
     const visibleRefresh = () => { if (document.visibilityState === 'visible') refresh(); };
-    const timer = window.setInterval(visibleRefresh, 30000);
+    const timer = window.setInterval(visibleRefresh, 120000);
     document.addEventListener('visibilitychange', visibleRefresh); window.addEventListener('focus', visibleRefresh);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', visibleRefresh); window.removeEventListener('focus', visibleRefresh); };
   }, [uid, refresh]);
@@ -101,7 +121,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (auth.currentUser?.uid === uid) setError(failure instanceof Error ? failure.message : 'Unable to save this action.');
     } finally { mutation.current = false; setBusy(false); }
   }, [uid, refresh]);
-  return <NotificationContext.Provider value={{ ...page, loading, error, busy, canPrevious: cursors.length > 1,
+  return <NotificationContext.Provider value={{ ...page, unreadCount, setInboxOpen, loading, error, busy, canPrevious: cursors.length > 1,
     refresh, act, latest: () => { setCursors([null]); refresh(); },
     next: () => { if (!loading && page.pagination.nextCursor) setCursors(values => [...values, page.pagination.nextCursor]); },
     previous: () => { if (!loading) setCursors(values => values.length > 1 ? values.slice(0, -1) : values); } }}>

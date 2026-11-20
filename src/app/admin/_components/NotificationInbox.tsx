@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ArrowUpRight, Bell, CalendarCheck, CalendarClock, CalendarX, Check, CheckCheck,
   ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Users, X } from 'lucide-react';
@@ -17,6 +18,11 @@ const actionStyle = 'inline-flex min-h-8 items-center justify-center gap-1.5 rou
 
 export function NotificationInbox({ onNavigate }: { onNavigate?: () => void } = {}) {
   const inbox = useNotifications();
+  const { setInboxOpen } = inbox;
+  useEffect(() => {
+    setInboxOpen(true);
+    return () => setInboxOpen(false);
+  }, [setInboxOpen]);
   return (
     <section aria-label="Admin notification inbox" aria-busy={inbox.loading}
       className="flex max-h-[min(36rem,calc(100dvh-7rem))] flex-col text-[#212121]"

@@ -30,6 +30,18 @@ beforeEach(() => {
 afterEach(cleanup);
 function Badge() { const { unreadCount } = useNotifications(); return <span data-testid="badge">{unreadCount}</span>; }
 const mount = () => render(<NotificationProvider><Badge /><NotificationInbox /></NotificationProvider>);
+it('only refreshes the badge on push while the inbox is closed', async () => {
+  const view = render(<NotificationProvider><Badge /></NotificationProvider>);
+  await waitFor(() => expect(screen.getByTestId('badge')).toHaveTextContent('1'));
+  act(() => worker.dispatchEvent(new MessageEvent('message', { data: { type: 'BIRDMAN_NOTIFICATION', notificationId: id } })));
+  await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(2));
+  expect(mocks.fetch.mock.calls.map(([url]) => url)).toEqual([
+    '/api/admin/notifications?view=badge', '/api/admin/notifications?view=badge',
+  ]);
+  view.rerender(<NotificationProvider><Badge /><NotificationInbox /></NotificationProvider>);
+  await screen.findByText('Booking confirmed');
+  expect(mocks.fetch.mock.calls.at(-1)?.[0]).toBe('/api/admin/notifications?limit=20');
+});
 it('does not restore private rows when an old account request resolves after an account switch', async () => {
   let finishOld: (response: Response) => void = () => {};
   mocks.fetch.mockImplementationOnce(() => new Promise<Response>(resolve => { finishOld = resolve; }));

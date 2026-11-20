@@ -23,6 +23,14 @@ export const notificationListSchema = z.object({
   cursor: z.string().max(512).optional().transform(value => value ? decodeNotificationCursor(value) : undefined),
 }).strict();
 
+export async function countUnreadNotifications(uid: string, db: Firestore = getAdminDb(), now = Timestamp.now()) {
+  const [total, read] = await Promise.all([
+    db.collection(C.history).where('expiresAt', '>', now).count().get(),
+    db.collection(C.states).where('uid', '==', uid).where('read', '==', true).where('expiresAt', '>', now).count().get(),
+  ]);
+  return Math.max(0, total.data().count - read.data().count);
+}
+
 export async function listNotificationInbox(uid: string, input: z.infer<typeof notificationListSchema>,
   db: Firestore = getAdminDb(), now = Timestamp.now()): Promise<NotificationInboxPage> {
   // Bound scanning even when many events have been dismissed. Empty pages may have a continuation.
@@ -44,16 +52,13 @@ export async function listNotificationInbox(uid: string, input: z.infer<typeof n
   const bookings = selected.filter(item => item.data.bookingId);
   const bookingSnapshots = bookings.length ? await db.getAll(...bookings.map(item => db.collection('bookings').doc(item.data.bookingId!))) : [];
   const exists = new Set(bookingSnapshots.filter(doc => doc.exists).map(doc => doc.id));
-  const [total, read] = await Promise.all([
-    db.collection(C.history).where('expiresAt', '>', now).count().get(),
-    db.collection(C.states).where('uid', '==', uid).where('read', '==', true).where('expiresAt', '>', now).count().get(),
-  ]);
+  const unreadCount = await countUnreadNotifications(uid, db, now);
   const hasMore = Boolean(last && snapshot.docs.indexOf(last) < snapshot.docs.length - 1);
   const timestamp = last?.get('createdAt') as Timestamp | undefined;
   return { notifications: selected.map(({ id, data, read }) => ({ id, type: data.type, title: data.title,
     body: data.body, bookingDate: data.bookingDate, bookingExists: Boolean(data.bookingId && exists.has(data.bookingId)),
     createdAt: data.createdAt.toDate().toISOString(), read, url: '/admin' })),
-    unreadCount: Math.max(0, total.data().count - read.data().count),
+    unreadCount,
     pagination: { limit: input.limit, hasMore, nextCursor: hasMore && timestamp && last
       ? Buffer.from(JSON.stringify({ seconds: timestamp.seconds, nanoseconds: timestamp.nanoseconds, id: last.id })).toString('base64url') : null } };
 }
