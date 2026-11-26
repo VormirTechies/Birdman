@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter, Noto_Sans_Tamil } from "next/font/google";
 import { ScrollToTop } from "@/components/ui/scroll-to-top";
 import Script from "next/script";
+import { LocalAnalyticsQA } from "@/components/LocalAnalyticsQA";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import "./globals.css";
 
@@ -108,6 +109,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col antialiased overflow-x-hidden" suppressHydrationWarning>
         {children}
+        {process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_GA4_LOCAL_QA === 'true' && <LocalAnalyticsQA />}
         <ScrollToTop />
         <Script
           id="structured-data"

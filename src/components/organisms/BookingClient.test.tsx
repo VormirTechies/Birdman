@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { addDays, format, isSameMonth } from 'date-fns';
 import { BookingClient } from './BookingClient';
+import { disableKey, type QAWindow } from '@/lib/local-analytics-qa';
 
 vi.mock('@/components/organisms/Header', () => ({ Header: () => null }));
 vi.mock('@/components/organisms/Footer', () => ({ Footer: () => null }));
@@ -115,5 +116,67 @@ describe('BookingClient availability calendar', () => {
     expect(fetchMock).toHaveBeenCalledTimes(
       isSameMonth(new Date(), unknownDateValue) ? 2 : 3
     );
+  });
+});
+
+describe('BookingClient local QA funnel', () => {
+  afterEach(() => {
+    const browser: QAWindow = window;
+    delete browser.birdmanQaData;
+    delete browser[disableKey];
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    history.replaceState(null, '', '/');
+  });
+
+  it.each([
+    [201, { success: true, booking: { id: 'private-booking-id' } }, 'booking_confirmed', undefined],
+    [429, { success: false, error: 'Private server message' }, 'booking_confirm_failed', 'rate_limit'],
+    [409, { success: false, code: 'BOOKING_CAPACITY_EXCEEDED', available: 0, error: 'No seats are available for this date.' }, 'booking_confirm_failed', 'capacity'],
+  ])('tracks one safe outcome for HTTP %i', async (status, body, outcome, category) => {
+    const browser: QAWindow = window;
+    browser.birdmanQaData = [];
+    browser[disableKey] = false;
+    vi.stubEnv('NEXT_PUBLIC_GA4_LOCAL_QA', 'true');
+    history.replaceState(null, '', '/book?email=synthetic%40example.com');
+
+    const target = addDays(new Date(), 1);
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === 'POST'
+      ? jsonResponse(body, status)
+      : jsonResponse([{
+        date: format(target, 'yyyy-MM-dd'), bookingCount: 0, maxCapacity: 100, isOpen: true,
+        startTime: '16:30:00', percentage: 0, remaining: 100,
+      }]));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(<BookingClient />);
+    const step = document.querySelector<HTMLDivElement>('.container-wide.max-w-6xl');
+    if (step) step.scrollIntoView = vi.fn();
+    if (!isSameMonth(new Date(), target)) await user.click(screen.getByRole('button', { name: 'Next month' }));
+    await user.click(await screen.findByRole('button', { name: `${format(target, 'EEEE, d MMMM')}, 100 seats available` }));
+    await user.type(screen.getByPlaceholderText('e.g. Priya Sharma'), 'Synthetic Visitor');
+    await user.type(screen.getByPlaceholderText('98765 43210'), '9876543210');
+    await user.click(screen.getByRole('button', { name: 'Review Booking' }));
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Confirm Booking' }));
+
+    const events = () => browser.birdmanQaData?.map(event => Array.from(event));
+    await waitFor(() => expect(events()?.map(event => event[1])).toEqual([
+      'booking_review_view', 'booking_confirm_attempt', outcome,
+    ]));
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(events()?.[2]?.[2]).toEqual({
+      page_location: location.origin + '/book', page_title: 'Book a Visit',
+      send_to: 'G-6CGCY64H6C', debug_mode: true, ...(category && { failure_category: category }),
+    });
+    expect(JSON.stringify(events())).not.toMatch(/9876543210|Synthetic|synthetic|private-booking-id|Private server message/);
+    if (status === 409) {
+      expect(await screen.findByRole('heading', { name: 'Plan Your Visit' })).toBeVisible();
+      expect(screen.getByRole('alert')).toHaveTextContent('No seats are available for this date.');
+      expect(screen.getByPlaceholderText('e.g. Priya Sharma')).toHaveValue('Synthetic Visitor');
+      await user.clear(screen.getByPlaceholderText('e.g. Priya Sharma'));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(JSON.stringify(events())).not.toContain('No seats are available');
+    }
   });
 });
