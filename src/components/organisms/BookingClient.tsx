@@ -517,6 +517,16 @@ export function BookingClient() {
             </Link>
           </div>
 
+                {submitError && (
+                  <div
+                    className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                    role="alert"
+                  >
+                    <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0" />
+                    <p>{submitError}</p>
+                  </div>
+                )}
+
                 <div className="bg-white rounded-3xl shadow-card overflow-hidden">
                   <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-canopy-dark/5">
 

@@ -132,6 +132,7 @@ describe('BookingClient local QA funnel', () => {
   it.each([
     [201, { success: true, booking: { id: 'private-booking-id' } }, 'booking_confirmed', undefined],
     [429, { success: false, error: 'Private server message' }, 'booking_confirm_failed', 'rate_limit'],
+    [409, { success: false, code: 'BOOKING_CAPACITY_EXCEEDED', available: 0, error: 'No seats are available for this date.' }, 'booking_confirm_failed', 'capacity'],
   ])('tracks one safe outcome for HTTP %i', async (status, body, outcome, category) => {
     const browser: QAWindow = window;
     browser.birdmanQaData = [];
@@ -169,5 +170,13 @@ describe('BookingClient local QA funnel', () => {
       send_to: 'G-6CGCY64H6C', debug_mode: true, ...(category && { failure_category: category }),
     });
     expect(JSON.stringify(events())).not.toMatch(/9876543210|Synthetic|synthetic|private-booking-id|Private server message/);
+    if (status === 409) {
+      expect(await screen.findByRole('heading', { name: 'Plan Your Visit' })).toBeVisible();
+      expect(screen.getByRole('alert')).toHaveTextContent('No seats are available for this date.');
+      expect(screen.getByPlaceholderText('e.g. Priya Sharma')).toHaveValue('Synthetic Visitor');
+      await user.clear(screen.getByPlaceholderText('e.g. Priya Sharma'));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(JSON.stringify(events())).not.toContain('No seats are available');
+    }
   });
 });
