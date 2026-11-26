@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatBookingNumber } from '@/lib/booking-number';
+import { bookingFailureCategory, trackQABooking } from '@/lib/local-analytics-qa';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ async function readApiJson<T>(response: Response): Promise<T> {
 
 export function BookingClient() {
   const stepRef = useRef<HTMLDivElement>(null);
+  const submitInFlight = useRef(false);
   const [step, setStep] = useState<Step>(1);
   const [heroIndex, setHeroIndex] = useState(0);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
@@ -315,18 +317,23 @@ export function BookingClient() {
       return;
     }
     setStep(2);
+    trackQABooking('booking_review_view');
     stepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSubmit = async () => {
+    if (submitInFlight.current) return;
     if (!formData.rulesAccepted) {
       setSubmitError('Please accept the sanctuary guidelines to continue');
       return;
     }
+    submitInFlight.current = true;
     setIsSubmitting(true);
     setSubmitError('');
     setGroupContactPhone(null);
+    let failureCategory: ReturnType<typeof bookingFailureCategory> = 'unavailable';
     try {
+      trackQABooking('booking_confirm_attempt');
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,6 +348,7 @@ export function BookingClient() {
           bookingTime: sessionTime,
         }),
       });
+      failureCategory = bookingFailureCategory(response.status);
       const result = await readApiJson<{
         contactPhone?: string;
         success?: boolean;
@@ -355,7 +363,8 @@ export function BookingClient() {
         };
         id?: string;
       }>(response);
-      if (!response.ok) {
+      if (!response.ok || result.success !== true) {
+        failureCategory = bookingFailureCategory(response.status, result.code);
         if (result.code === 'BOOKING_CONTACT_LIMIT') setGroupContactPhone(result.contactPhone ?? null);
         if (
           result.code === 'BOOKING_CAPACITY_EXCEEDED' &&
@@ -401,11 +410,14 @@ export function BookingClient() {
         startTime: sessionTime,
       });
       setStep(3);
+      trackQABooking('booking_confirmed');
       stepRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err: unknown) {
+      trackQABooking('booking_confirm_failed', failureCategory);
       const msg = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
       setSubmitError(msg);
     } finally {
+      submitInFlight.current = false;
       setIsSubmitting(false);
     }
   };
