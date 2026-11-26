@@ -8,7 +8,7 @@ import Image from 'next/image';
 const volunteerCards = [
   {
     name: 'Gopal',
-    role: 'Visitor Coordinationt',
+    role: 'Visitor Coordinators',
     image: '/images/volunteer-placeholder.svg',
     // description: 'Guides the daily feeding routine and helps manage the parakeet platforms.',
   },
